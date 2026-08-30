@@ -1,4 +1,13 @@
 """Página 4 — Real-Time Testing: probar el filtro interactivamente."""
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve()
+while not (_ROOT / "src").exists() and _ROOT.parent != _ROOT:
+    _ROOT = _ROOT.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -29,10 +38,25 @@ with st.form("rt_form", clear_on_submit=False):
     use_ml = st.checkbox("Incluir capa ML (embeddings + Random Forest)", value=True)
     submitted = st.form_submit_button("🛡️ Probar filtro", type="primary")
 
-if submitted and prompt.strip():
-    with st.spinner("Analizando…"):
-        result = filter_text(prompt, use_ml=use_ml)
+if submitted:
+    if not prompt.strip():
+        st.warning("Escribe un prompt antes de probar.")
+    else:
+        with st.spinner("Analizando…"):
+            result = filter_text(prompt, use_ml=use_ml)
+        st.session_state["rt_prompt"] = prompt
+        st.session_state["rt_result"] = result
+        if "rt_history" not in st.session_state:
+            st.session_state.rt_history = []
+        st.session_state.rt_history.append({
+            "prompt": prompt, "decision": result["decision"], "confidence": round(result["confidence"], 3),
+            "latency_ms": round(result["latency_ms"], 2), "reason": result["reason"],
+        })
 
+result = st.session_state.get("rt_result")
+prompt = st.session_state.get("rt_prompt", "")
+
+if result is not None:
     blocked = result["blocked"]
     if blocked:
         st.error("### 🚫 BLOQUEADO")
@@ -115,16 +139,6 @@ if submitted and prompt.strip():
                         st.success("El prompt llegó al LLM sin filtrar (permitido) y no robó el secreto.")
                     st.text_area("Respuesta del LLM (con filtro)", (r1.text if r1 else "(bloqueado)")[:600],
                                  height=140, key=f"resp_filt_{len(r1.text) if r1 else 0}")
-
-    # session history
-    if "rt_history" not in st.session_state:
-        st.session_state.rt_history = []
-    st.session_state.rt_history.append({
-        "prompt": prompt, "decision": result["decision"], "confidence": round(result["confidence"], 3),
-        "latency_ms": round(result["latency_ms"], 2), "reason": result["reason"],
-    })
-elif submitted:
-    st.warning("Escribe un prompt antes de probar.")
 
 if st.session_state.get("rt_history"):
     section_header("Historial de pruebas de esta sesión")

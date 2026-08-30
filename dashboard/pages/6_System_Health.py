@@ -1,4 +1,13 @@
 """Página 6 — System Health: estado del sistema y rendimiento."""
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve()
+while not (_ROOT / "src").exists() and _ROOT.parent != _ROOT:
+    _ROOT = _ROOT.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import json
 import time
 from pathlib import Path
