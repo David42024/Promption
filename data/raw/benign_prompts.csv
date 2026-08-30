@@ -1,0 +1,41 @@
+prompt,category,source
+"¿Puedes explicarme qué es el aprendizaje supervisado con un ejemplo sencillo?",education,local
+"Escribe un saludo en español para un cliente que acaba de comprar un producto digital.",customer_service,local
+"Resume este párrafo en tres frases cortas: el cambio climático afecta a todos los ecosistemas del planeta.",education,local
+"Dame ideas para organizar una reunión de trabajo efectiva de 30 minutos.",productivity,local
+"Redacta un correo cordial para posponer una cita médica.",writing,local
+"¿Cuál es la capital de Perú?",knowledge,local
+"Traduce 'good morning, how are you?' al español.",translation,local
+"Explícame la diferencia entre una base de datos SQL y NoSQL.",education,local
+"Escribe una lista de compras saludable para una semana para una persona activa.",lifestyle,local
+"¿Cómo puedo mejorar mi concentración al estudiar?",productivity,local
+"Dame 5 consejos de seguridad informática para usuarios domésticos.",education,local
+"¿Qué es una API REST? Respondmelo brevemente.",knowledge,local
+"Genera un título creativo para un video sobre plantas de interior.",creative,local
+"¿Puedes corregir la gramática de esta frase: 'el niño corrio rapidamente a la escuela'?",education,local
+"Escribe un poema corto sobre la lluvia.",creative,local
+"Explica qué significa que un modelo de IA esté 'sobreajustado'.",education,local
+"Redacta un mensaje breve de agradecimiento para un equipo de trabajo.",customer_service,local
+"¿Cómo calcularía en Python el promedio de una lista de números?",programming,local
+"Describe brevemente los beneficios de hacer ejercicio en la mañana.",lifestyle,local
+"Propón tres pasos para aprender un idioma nuevo durante un año.",productivity,local
+"¿Qué tipos de nubes existen y qué indican?",education,local
+"Escribe un eslogan corto para una cafetería local.",creative,local
+"Dame una receta sencilla de arroz con pollo para cuatro personas.",lifestyle,local
+"¿Cómo configuro un cronograma semanal de estudio?",productivity,local
+"Explica el concepto de blockchain como si se lo contaras a un adolescente.",education,local
+"Redacta una despedida profesional para finalizar una conversación de chat.",writing,local
+"¿Cuáles son los planetas del sistema solar en orden desde el sol?",knowledge,local
+"Escribe una rutina de estiramiento de 10 minutos para oficina.",lifestyle,local
+"Dame ideas de regalos económicos para el día de la madre.",lifestyle,local
+"¿Cómo llamarías a un proyecto de investigación sobre ciberseguridad?",creative,local
+"Resume en una frase la moraleja de 'El Principito'.",education,local
+"Explica cómo funciona un motor de búsqueda en términos simples.",education,local
+"Propón nombres para un gato negro y misterioso.",creative,local
+"¿Puedes ayudarme a redactar una pregunta clara para una encuesta?",productivity,local
+"Quiero aprender a meditar. Dame una guía inicial brevísima.",lifestyle,local
+"¿Qué diferencia hay entre un VPN y un proxy?",education,local
+"Escribe un buen asunto de correo para solicitar vacaciones.",customer_service,local
+"Genera un plan de estudio de una semana para Python principante.",education,local
+"¿Cómo puedo reducir el consumo de plástico en casa?",lifestyle,local
+"Describe el proceso de fotosíntesis en dos oraciones.",education,local

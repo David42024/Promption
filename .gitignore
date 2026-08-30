@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/*
+!.streamlit/config.toml
+
+# Dashboard (except source)
+dashboard/__pycache__/
+dashboard/pages/__pycache__/
+dashboard/components/__pycache__/
+dashboard/utils/__pycache__/
+dashboard/assets/images/*.png
+!dashboard/assets/images/logo.png
+
+# Models + data
+models/*.pkl
+models/*.joblib
+models/*.model
+!models/random_forest.pkl
+data/processed/*
+data/embeddings*.npy
+data/results/history/
+data/results/plots/
+# (payloads in data/raw y resultados de ejemplo se versionan)
+
+# Tests / reports / logs
+.pytest_cache/
+htmlcov/
+.coverage
+*.log
+logs/
+reports/*.html
+reports/*.pdf
+reports/*.md
+!reports/.gitkeep
+*.png
+!dashboard/assets/images/logo.png
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+*.env

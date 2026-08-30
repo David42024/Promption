@@ -1,0 +1,101 @@
+﻿# ============================================================
+# Heuristic Filter — Configurable detection rules
+# Each rule is a regex. A prompt is flagged by a rule when the
+# regex matches (case-insensitive).
+# ============================================================
+
+rules:
+  - name: "ignore_previous_instructions"
+    pattern: "ignore (all )?(previous|prior|above|earlier) (instructions|prompts|commands|messages|context|directions)"
+    description: "Instruction to ignore previously given instructions"
+    severity: "high"
+    enabled: true
+
+  - name: "pretend_game_role"
+    pattern: "pretend (you are|to be|that you are) (in )?(a|an) (game|story|movie|play)"
+    description: "Role-play / game jailbreak attempt"
+    severity: "medium"
+    enabled: true
+
+  - name: "developer_mode"
+    pattern: "developer mode|dev mode|dAN mode|superior mode"
+    description: "Known jailbreak modes (DAN, developer mode)"
+    severity: "high"
+    enabled: true
+
+  - name: "reveal_system_prompt"
+    pattern: "system prompt|initial prompt|your instructions|your system message|reveal (the )?(original|system) prompt"
+    description: "Prompt leaking / extraction attempt"
+    severity: "high"
+    enabled: true
+
+  - name: "disregard_safety"
+    pattern: "disregard (all )?(safety|ethical|moral|legal) (rules|guidelines|policies|boundaries|restrictions)"
+    description: "Request to bypass safety alignment"
+    severity: "high"
+    enabled: true
+
+  - name: "act_without_restrictions"
+    pattern: "act (as you want|without (any )?restrictions|however you want|unfiltered)"
+    description: "Unrestricted assistant request"
+    severity: "high"
+    enabled: true
+
+  - name: "sql_injection"
+    pattern: "(union select|drop table|delete from|insert into|select .{0,40}from .{0,40}where|x['\"] or|or 1=1|;.*--|information_schema)"
+    description: "SQL injection payload"
+    severity: "high"
+    enabled: true
+
+  - name: "commands_dangerous"
+    pattern: "rm -rf|format c:|del /f /s /q|cmd\\.exe|powershell -exec|wget .{0,30}-O|curl .{0,30}-o .+\\s(exec|sh|chmod|bash)"
+    description: "Dangerous shell / system commands"
+    severity: "high"
+    enabled: true
+
+  - name: "extraction_xss"
+    pattern: "<script|javascript:|onerror=|onload=|alert\\(|document\\.cookie"
+    description: "XSS / browser exploitation payload"
+    severity: "medium"
+    enabled: true
+
+  - name: "dont_tell_user"
+    pattern: "don't (tell|mention|reveal|say|inform) (the|your|any) (user|human)|do not (tell|mention|reveal|say|inform)"
+    description: "Instruction to hide information from the user"
+    severity: "high"
+    enabled: true
+
+  - name: "translate_to_instructions"
+    pattern: "translate (the )?(following|customer|text) (as |into )?(an? )?instruction"
+    description: "Classic translation-based obfuscation attack"
+    severity: "medium"
+    enabled: true
+
+  - name: "new_instructions"
+    pattern: "from now (on|forward)|forget (the )?(previous|prior|above)"
+    description: "Attempt to overwrite prior context"
+    severity: "medium"
+    enabled: true
+
+  - name: "steganography_gibberish"
+    pattern: "(\\b[a-z]{2,5}\\b ?){20,}|\\b\\w{40,}\\b"
+    description: "Gibberish / obfuscation patterns"
+    severity: "low"
+    enabled: true
+
+  - name: "credentials_leak"
+    pattern: "api[_ -]?key|password is|token:|secret key|credentials|bastion|privileged"
+    description: "Credential / secret extraction"
+    severity: "medium"
+    enabled: true
+
+scores:
+  high: 1.0
+  medium: 0.7
+  low: 0.4
+
+scoring:
+  # Combined heuristic score for a prompt = max severity found.
+  # A prompt is heuristically blocked when score >= heuristic_threshold.
+  heuristic_threshold: 0.6
+  max_matches: 5

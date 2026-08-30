@@ -1,0 +1,49 @@
+services:
+  api:
+    build: .
+    container_name: pif-api
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - PIF_API_URL=http://api:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # para alcanzar Ollama del host
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    container_name: pif-dashboard
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./dashboard:/app/dashboard
+    environment:
+      - PIF_API_URL=http://api:8000
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Opcional: Ollama en contenedor (si no usas el host)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pif-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama-data:

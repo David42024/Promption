@@ -1,0 +1,60 @@
+# ============================================================
+# Prompt Injection Filter — Centralized Configuration
+# ============================================================
+
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  results: "data/results"
+  plots: "data/results/plots"
+  models: "models"
+  logs: "logs"
+  reports: "reports"
+
+model:
+  embedding_model: "all-MiniLM-L6-v2"
+  classifier_path: "models/random_forest.pkl"
+  n_trees: 200
+  max_depth: 20
+  min_samples_leaf: 2
+  random_state: 42
+  confidence_threshold: 0.5
+
+ensemble:
+  # If either layer flags the prompt as malicious -> BLOCKED (OR logic)
+  # heuristic + ML scores are combined with a configurable weight
+  heuristic_weight: 0.4
+  ml_weight: 0.6
+  final_threshold: 0.5
+  require_llm_veto: false
+
+llm:
+  provider: "ollama"
+  host: "http://localhost:11434"
+  model: "mistral:latest"
+  temperature: 0.2
+  max_tokens: 200
+  timeout: 60
+  health_timeout: 5
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+
+dashboard:
+  host: "0.0.0.0"
+  port: 8501
+
+benchmark:
+  sample_size: null            # null = use full dataset
+  min_llm_queries: 3          # queries per case when testing LLM
+  save_history: true
+  history_dir: "data/results/history"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+  file: "logs/system.log"
+  max_bytes: 5242880
+  backup_count: 5
