@@ -37,27 +37,34 @@ pip install -r requirements.txt
 pip install -r requirements-dashboard.txt
 ```
 
-### 3. Preparar datos y entrenar
+### 3. Flujo completo (entrenar → benchmark → reporte → dashboard)
+
+Cuatro comandos van desde cero hasta el dashboard:
 
 ```bash
-# Convierte data/raw/*.csv en data/processed/training_data.csv
-python -m src.training.dataset
+# 1) Descargar los datasets públicos (NEPI, Shomi28, deepset, jailbreak_llms, OWASP)
+python scripts/download_datasets.py
 
-# Entrena el Random Forest sobre los embeddings (descarga all-MiniLM-L6-v2 la 1ª vez)
-python src/training/train.py
-```
-
-### 4. Ejecutar el benchmark
-
-```bash
-# Rápido, sin LLM (ASR proxy determinista)
+# 2) Preprocesar datos, entrenar el modelo y ejecutar el benchmark (ASR proxy, sin LLM)
 python scripts/run_benchmark.py --no-llm
 
-# Completo, consultando Ollama (recomendado si tienes llama3 o mistral)
-python scripts/run_benchmark.py
+# 3) Generar el reporte con gráficas (Markdown + PDF estilizado)
+python scripts/generate_report.py --pdf
+
+# 4) Abrir el dashboard interactivo
+streamlit run dashboard/app.py --server.port 8501
 ```
 
-Salida en `data/results/benchmark_results.csv`, `benchmark_results_latest.json` y `plots/*.png`.
+> `run_benchmark.py` automatiza las 3 fases: prepara `data/processed/training_data.csv`, entrena el Random Forest sobre los embeddings y guarda `models/random_forest.pkl`, y mide ASR / precisión / recall / F1 sobre todo el corpus. Salida en `data/results/`.
+
+### 4. Benchmark con LLM real (Ollama)
+
+```bash
+python scripts/run_benchmark.py --no-train   # solo benchmark (modelo ya entrenado)
+python scripts/run_benchmark.py              # completo + consultas a Ollama (más lento)
+```
+
+El `--no-llm` del paso 3 usa un **proxy determinista** (el ataque "tiene éxito" si no es bloqueado); con Ollama se mide el ASR real consultando a Mistral/Llama con el secreto `TOK-AZ9-KX7`.
 
 ### 5. Arrancar servidores
 
@@ -65,7 +72,7 @@ Salida en `data/results/benchmark_results.csv`, `benchmark_results_latest.json` 
 # Terminal 1 — API
 uvicorn src.api.main:app --reload --port 8000
 
-# Terminal 2 — Dashboard
+# Terminal 2 — Dashboard (si no se usó el paso 3)
 streamlit run dashboard/app.py --server.port 8501
 ```
 
@@ -132,7 +139,7 @@ prompt-injection-filter/
 ├── data/           raw/, processed/, results/
 ├── models/         random_forest.pkl
 ├── config/         config.yaml, heuristics.yaml
-├── scripts/        run_benchmark, generate_report, download_payloads
+├── scripts/        download_datasets, run_benchmark, generate_report
 ├── tests/          test_heuristic, test_ml_filter, test_benchmark
 ├── Dockerfile · docker-compose.yml · .streamlit/config.toml
 ```
