@@ -1,0 +1,37 @@
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# VCS / agentes / docs no necesarios en la imagen
+.git/
+.idea/
+.vscode/
+
+# Datos y modelos que se llevan dentro de la imagen vía git (los que hay que
+# versionar); los pesados/generados que no se deben copiar:
+data/processed/
+data/embeddings*.npy
+data/pdf_payloads/
+data/audio_payloads/
+data/results/history/
+data/results/plots/
+
+# Logs / reportes
+logs/
+*.log
+reports/*.pdf
+reports/*.html
+reports/*.md
+*.png
+
+# Secretos
+.env
+*.env
+.streamlit/secrets.toml

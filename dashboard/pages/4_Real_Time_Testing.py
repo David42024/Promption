@@ -12,9 +12,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from dashboard.components import charts
 from dashboard.components.metrics import section_header, status_badge
+from dashboard.components.sidebar import setup_page
 from dashboard.utils.filter_runner import filter_text
-from dashboard.utils.theme import PALETTE
+from dashboard.utils.theme import get_palette
+
+setup_page("Real-Time Testing — Prompt Injection Filter", "🧪")
 
 st.title("🧪 Real-Time Testing — Pruebas en vivo")
 
@@ -22,13 +26,13 @@ st.caption("Escribe un prompt y comprueba al instante qué capa decide, con qué
 
 
 def _layer_bars(result: dict) -> go.Figure:
+    pal = get_palette()
     heur = result["heuristic"].get("latency_ms", 0)
     ml = result["ml"].get("latency_ms", 0) if result["ml"].get("available") else 0
     fig = go.Figure(go.Bar(x=["Heurística", "ML (embeddings)"], y=[heur, ml],
-                           marker_color=[PALETTE["orange"], PALETTE["blue"]],
+                           marker_color=[pal["orange"], pal["blue"]],
                            text=[f"{heur:.1f} ms", f"{ml:.1f} ms"], textposition="outside"))
-    fig.update_layout(template="plotly_white", height=260, yaxis_title="Tiempo (ms)",
-                      title=dict(text="Tiempo por capa", x=0.5, xanchor="center"))
+    charts.apply_theme(fig, title="Tiempo por capa", height=260, yaxis_title="Tiempo (ms)")
     return fig
 
 
@@ -97,7 +101,7 @@ if result is not None:
             st.markdown("**Ensemble**")
             st.markdown(f"- Score ponderado: `{result['ensemble']['score']:.2f}`")
             st.markdown(f"- Umbral: {result['ensemble']['threshold']}")
-        st.plotly_chart(_layer_bars(result), width="stretch")
+        charts.render_chart(_layer_bars(result))
 
     # ---- LLM comparison
     section_header("Comparación con el LLM")

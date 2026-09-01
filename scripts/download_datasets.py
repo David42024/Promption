@@ -4,6 +4,7 @@ Fuentes (públicas, sin autenticación):
   - Vaibhav-GOAT/nepi-prompts-dataset (HF, NEPI: filas Safe + Malicious)
   - Shomi28/prompt-injection-dataset  (HF, injection + benign)
   - deepset/prompt-injections         (HF, binario 0/1)
+  - yanismiraoui/prompt_injections    (HF, multilingüe; se filtran ataques en español)
   - verazuo/jailbreak_llms (GitHub):  jailbreak_prompts_2023_12_25.csv
   - payloads estilo OWASP Top 10 (built-in)
   - prompts benignos (built-in)
@@ -172,6 +173,39 @@ def collect_deepset():
     return mal, ben
 
 
+_ES_MARKERS = (
+    "las instrucciones", "los instrucciones", "instrucciones", "anula tus restricciones", "restricciones éticas",
+    "desconéctate", "directriz", "directrices", "indicación", "desordena", "ignora", "olvida", "revela",
+    "sus reglas", "mis órdenes", "mis directrices", "modo", "capaz de", "configuración", "ética",
+    "el prompt", "entrenamiento", "tus instrucciones", "tus reglas", "oculta", "secreto",
+)
+
+
+def collect_yanismiraoui():
+    """Multilingüe (7 idiomas) de solo ataques. Filtramos a español con marcadores léxicos."""
+    mal = []
+    try:
+        url = HF_RESOLVE.format(id="yanismiraoui/prompt_injections",
+                                path="data/train-00000-of-00001.parquet")
+        df = pd.read_parquet(io.BytesIO(fetch_bytes(url)))
+    except Exception:
+        df = None
+    if df is None:
+        rows = list(hf_rows("yanismiraoui/prompt_injections", "train"))
+        df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=["prompt_injections"])
+    col = "prompt_injections" if "prompt_injections" in df.columns else df.columns[0]
+    for text in df[col].dropna().astype(str):
+        prompt = text.strip()
+        if not prompt:
+            continue
+        low = prompt.lower()
+        if any(m in low for m in _ES_MARKERS):
+            mal.append({"prompt": prompt, "dataset": "Custom",
+                        "attack_type": "injection_es", "source": "yanismiraoui"})
+    logger.info("yanismiraoui: %d ejemplos de inyección en español", len(mal))
+    return mal, []
+
+
 def collect_jailbreak_github():
     base = "https://raw.githubusercontent.com/verazuo/jailbreak_llms/main/data/prompts/"
     mal, ben = [], []
@@ -243,12 +277,29 @@ def collect_benign_builtin():
     return [{"prompt": p, "category": "general", "source": "builtin"} for p in prompts]
 
 
+def collect_benignes_translated():
+    """Carga beningos traducidos a español si existe el CSV data/raw/benign_translated_es.csv."""
+    path = Path(load_config()["paths"]["raw_data"]) / "benign_translated_es.csv"
+    if not path.exists():
+        return []
+    df = pd.read_csv(path, encoding="utf-8", encoding_errors="replace")
+    col = "prompt" if "prompt" in df.columns else df.columns[0]
+    ben = []
+    for text in df[col].dropna().astype(str):
+        prompt = text.strip()
+        if prompt:
+            ben.append({"prompt": prompt, "category": "general", "source": "translated_es"})
+    return ben
+
+
 def build_dataframes(max_src: int, max_ben: int):
     mal_cols = ["prompt", "dataset", "attack_type", "source"]
     ben_cols = ["prompt", "category", "source"]
     mal, ben = [], []
     for name, fn in [("NEPI", collect_nepi), ("Shomi28", collect_shomi),
-                     ("deepset", collect_deepset), ("jailbreak_llms", collect_jailbreak_github)]:
+                     ("deepset", collect_deepset),
+                     ("yanismiraoui", collect_yanismiraoui),
+                     ("jailbreak_llms", collect_jailbreak_github)]:
         try:
             m, b = fn()
             mdf = _clean(pd.DataFrame(m, columns=mal_cols), ["prompt"])
@@ -262,6 +313,7 @@ def build_dataframes(max_src: int, max_ben: int):
 
     mal.append(_clean(pd.DataFrame(collect_owasp_builtin(), columns=mal_cols), ["prompt"]))
     ben.append(_clean(pd.DataFrame(collect_benign_builtin(), columns=ben_cols), ["prompt"]))
+    ben.append(_clean(pd.DataFrame(collect_benignes_translated(), columns=ben_cols), ["prompt"]))
 
     df_mal = _clean(pd.concat(mal, ignore_index=True), ["prompt"])
     df_ben = _clean(pd.concat(ben, ignore_index=True), ["prompt"])

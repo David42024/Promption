@@ -16,10 +16,13 @@ import psutil
 import streamlit as st
 
 from dashboard.components.metrics import kpi_card, section_header, status_badge
+from dashboard.components.sidebar import setup_page
 from dashboard.utils.data_loader import api_health, api_reachable
 from dashboard.utils.paths import CONFIG_DIR, MODELS_DIR, RESULTS_DIR
 from src.filter.ensemble_filter import EnsembleFilter
 from src.llm.ollama_client import OllamaClient
+
+setup_page("System Health — Prompt Injection Filter", "⚡")
 
 st.title("⚡ System Health — Estado del sistema")
 

@@ -22,4 +22,5 @@ COPY . .
 EXPOSE 8000 8501
 
 # default: FastAPI (docker-compose overrides for the dashboard service)
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# $PORT permite que Render/Heroku inyecten el puerto de escucha (usa 8000 localmente)
+CMD uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}

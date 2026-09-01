@@ -29,8 +29,13 @@ _CONF = load_config()
 
 def embed_dataset(df: pd.DataFrame, model_name: str, cache_path: Path | None = None) -> np.ndarray:
     if cache_path and cache_path.exists():
-        logger.info("Loading cached embeddings from %s", cache_path)
-        return np.load(cache_path)
+        cached = np.load(cache_path)
+        if cached.shape[0] == len(df):
+            logger.info("Loading cached embeddings from %s", cache_path)
+            return cached
+        logger.warning("Cached embeddings (%d filas) no coinciden con el dataset (%d). Recomputando.",
+                       cached.shape[0], len(df))
+        cache_path.unlink(missing_ok=True)
 
     logger.info("Computing embeddings with '%s' (%d texts)…", model_name, len(df))
     from sentence_transformers import SentenceTransformer

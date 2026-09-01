@@ -10,3 +10,5 @@ reportlab>=4.0.0
 psutil>=5.9.0
 scikit-learn>=1.3.0
 joblib>=1.3.2
+pypdf>=5.0.0  # página 7: adjuntar PDFs y extraer su texto en el dashboard
+faster-whisper>=1.1.0  # página 8: transcribir audio subido en el dashboard

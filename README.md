@@ -66,6 +66,22 @@ python scripts/run_benchmark.py              # completo + consultas a Ollama (m�
 
 El `--no-llm` del paso 3 usa un **proxy determinista** (el ataque "tiene éxito" si no es bloqueado); con Ollama se mide el ASR real consultando a Mistral/Llama con el secreto `TOK-AZ9-KX7`.
 
+### 4b. Benchmarks con PDFs y audio
+
+Genéricamente el mismo flujo aplica a audio: cada prompt se lee en voz alta con el TTS de Windows (SAPI).
+
+```bash
+# PDF — un prompt por documento
+python scripts/generate_pdf_payloads.py --samples-per-class 40   # -> data/pdf_payloads/
+python scripts/run_benchmark.py --pdf-dir data/pdf_payloads --no-train --no-llm
+
+# Audio — cada prompt leído en voz alta (requiere Windows/SAPI)
+python scripts/generate_audio_payloads.py --samples-per-class 40 # -> data/audio_payloads/
+python scripts/run_benchmark.py --audio-dir data/audio_payloads --no-train --no-llm
+```
+
+Los PDFs se convierten a texto por páginas con `pypdf` y los audios se transcriben localmente con `faster-whisper` (modelo `tiny`, configurable en `config/config.yaml`). En el dashboard, **7 · PDF Testing** y **8 · Audio Testing** permiten adjuntar archivos y ver el veredicto del filtro.
+
 ### 5. Arrancar servidores
 
 ```bash
@@ -109,6 +125,8 @@ docker compose up -d ollama && docker exec -it pif-ollama ollama pull llama3.2
 4. **Real-Time Testing** — prueba interactiva del filtro + comparación con respuesta del LLM.
 5. **Attack Analysis** — top payloads, patrones comunes, word clouds, distribuciones.
 6. **System Health** — estado de Ollama/API, recursos, logs, configuración.
+7. **PDF Testing** — adjunta PDFs, extrae su texto por páginas y analiza cada página con el filtro.
+8. **Audio Testing** — transcribe audios localmente (faster-whisper) y analiza la transcripción.
 
 ## 🧠 Cómo se calcula el ASR
 

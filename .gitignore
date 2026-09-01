@@ -30,6 +30,8 @@ models/*.model
 !models/random_forest.pkl
 data/processed/*
 data/embeddings*.npy
+data/pdf_payloads/
+data/audio_payloads/
 data/results/history/
 data/results/plots/
 # (payloads in data/raw y resultados de ejemplo se versionan)

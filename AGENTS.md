@@ -8,6 +8,8 @@ Guía para trabajar en este repositorio (Proyecto académico: detección de Prom
 - **`src/api/`** — FastAPI. Endpoints en `routes.py` (prefijo `/api/v1`). Pydantic en `models.py`.
 - **`src/benchmark/`** — `runner.py` ejecuta el benchmark (mide ASR con un secreto `TOK-AZ9-KX7` que el LLM no debe revelar), `metrics.py` cálculos puros, `payloads.py` carga del dataset.
 - **`src/training/`** — `dataset.py` (CSV raw → `data/processed/training_data.csv`), `train.py` (embeddings → RandomForest → `models/random_forest.pkl`).
+- **`src/utils/pdf_extractor.py`** — PDF→texto por páginas con `pypdf` (benchmark `--pdf-dir` y página 7 del dashboard).
+- **`src/utils/audio_transcriber.py`** — audio→texto con `faster-whisper` (local, CPU; benchmark `--audio-dir` y página 8 del dashboard).
 - **`dashboard/`** — Streamlit multipágina. `app.py` + `pages/` (convención de nombres `1_.., 2_..`). Componentes reutilizables en `dashboard/components/` (Plotly), carga de datos en `dashboard/utils/data_loader.py`, filtro en proceso en `dashboard/utils/filter_runner.py`.
 - **`config/`** — `config.yaml` (rutas, modelo, ensemble, llm) y `heuristics.yaml` (reglas regex). Cargar SIEMPRE vía `src/utils/config.py` (`load_config`, `load_heuristics`), que resuelve rutas absolutas respecto a la raíz.
 
@@ -28,6 +30,10 @@ python -m pytest tests/ -q                        # tests (heurística, ML, benc
 python src/training/train.py                      # entrenar modelo
 python scripts/download_datasets.py               # descargar datasets públicos (NEPI, Shomi28, deepset, jailbreak_llms…)
 python scripts/run_benchmark.py --no-llm          # benchmark rápido (sin Ollama)
+python scripts/generate_pdf_payloads.py           # corpus de prueba en PDF -> data/pdf_payloads/
+python scripts/run_benchmark.py --pdf-dir data/pdf_payloads --no-train --no-llm  # benchmark sobre PDFs
+python scripts/generate_audio_payloads.py           # corpus WAV (TTS SAPI Windows) -> data/audio_payloads/
+python scripts/run_benchmark.py --audio-dir data/audio_payloads --no-train --no-llm  # benchmark sobre audios
 uvicorn src.api.main:app --reload --port 8000     # API
 streamlit run dashboard/app.py --server.port 8501 # dashboard
 python scripts/generate_report.py --pdf           # reporte

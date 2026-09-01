@@ -13,10 +13,13 @@ import streamlit as st
 
 from dashboard.components import charts
 from dashboard.components.metrics import section_header
+from dashboard.components.sidebar import setup_page
 from dashboard.components.tables import render_table
 from dashboard.utils.data_loader import load_benchmark_results
 from dashboard.utils.filters import filter_df, sidebar_filters
 from src.benchmark.metrics import all_metrics, confusion_counts, roc
+
+setup_page("Benchmark Results — Prompt Injection Filter", "📈")
 
 st.title("📈 Benchmark Results — Resultados detallados")
 
@@ -37,16 +40,16 @@ tp, fp, fn, tn, _ = confusion_counts(filtered)
 section_header("Gráficas comparativas")
 c1, c2 = st.columns(2)
 with c1:
-    st.plotly_chart(charts.plot_asr_comparison(m), width="stretch")
+    charts.render_chart(charts.plot_asr_comparison(m))
 with c2:
-    st.plotly_chart(charts.plot_confusion_matrix(tp, fp, fn, tn), width="stretch")
+    charts.render_chart(charts.plot_confusion_matrix(tp, fp, fn, tn))
 
 c3, c4 = st.columns(2)
 with c3:
-    st.plotly_chart(charts.plot_performance_by_attack_type(filtered), width="stretch")
+    charts.render_chart(charts.plot_performance_by_attack_type(filtered))
 with c4:
     roc_data = roc(filtered)
-    st.plotly_chart(charts.plot_roc_curve(roc_data), width="stretch")
+    charts.render_chart(charts.plot_roc_curve(roc_data))
 
 # ---------------------------------------------------------------- table
 section_header("Tabla interactiva de resultados")

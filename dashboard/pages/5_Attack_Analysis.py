@@ -15,7 +15,11 @@ import streamlit as st
 
 from dashboard.components import charts
 from dashboard.components.metrics import section_header
+from dashboard.components.sidebar import setup_page
 from dashboard.utils.data_loader import load_benchmark_results
+from dashboard.utils.theme import get_palette
+
+setup_page("Attack Analysis — Prompt Injection Filter", "🎯")
 
 st.title("🎯 Attack Analysis — Análisis por tipo de ataque")
 
@@ -86,12 +90,12 @@ c1, c2 = st.columns(2)
 with c1:
     sub2 = sub.copy()
     sub2["len"] = sub2["prompt"].str.len()
+    pal = get_palette()
     fig = px.histogram(sub2, x="len", color="label", nbins=25,
-                       color_discrete_map={1: "#DC2626", 0: "#16A34A"},
+                       color_discrete_map={1: pal["red"], 0: pal["green"]},
                        labels={"len": "Longitud (caracteres)", "count": "Prompts"})
-    fig.update_layout(template="plotly_white", legend_title="Etiqueta",
-                      title=dict(text="Longitud de prompts por categoría", x=0.5, xanchor="center"))
-    st.plotly_chart(fig, width="stretch")
+    charts.apply_theme(fig, title="Longitud de prompts por categoría", legend_title="Etiqueta")
+    charts.render_chart(fig)
 
 with c2:
     if "heuristic_score" in sub.columns:
@@ -100,7 +104,8 @@ with c2:
         corr = sub[corr_cols].corr().round(2)
         fig = px.imshow(corr, text_auto=True, color_continuous_scale="RdBu_r", zmin=-1, zmax=1,
                         title="Correlación entre características y éxito del ataque")
-        st.plotly_chart(fig, width="stretch")
+        charts.apply_theme(fig)
+        charts.render_chart(fig)
 
 # ------------------------------------------------------------ word cloud
 section_header("Word cloud de payloads")

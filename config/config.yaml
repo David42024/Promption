@@ -10,6 +10,12 @@ paths:
   models: "models"
   logs: "logs"
   reports: "reports"
+  pdf_payloads: "data/pdf_payloads"
+  audio_payloads: "data/audio_payloads"
+
+stt:
+  model: "tiny"            # faster-whisper (tiny/base/small…): descarga el modelo la 1ª vez
+  language: null           # null = auto-detect; p. ej. "en" para el corpus TTS
 
 model:
   embedding_model: "all-MiniLM-L6-v2"

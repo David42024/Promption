@@ -17,9 +17,13 @@ from sklearn.metrics import classification_report
 
 from dashboard.components import charts
 from dashboard.components.metrics import section_header
+from dashboard.components.sidebar import setup_page
 from dashboard.utils.data_loader import load_benchmark_results, load_history, load_model_metrics
 from dashboard.utils.paths import MODELS_DIR
+from dashboard.utils.theme import get_palette
 from src.benchmark.metrics import all_metrics
+
+setup_page("Model Analysis — Prompt Injection Filter", "🔬")
 
 st.title("🔬 Model Analysis — Análisis del modelo ML")
 
@@ -47,7 +51,7 @@ model_metrics = load_model_metrics()
 section_header("Feature importance")
 try:
     items = get_classifier_importance()
-    st.plotly_chart(charts.plot_feature_importance(items, top=20), width="stretch")
+    charts.render_chart(charts.plot_feature_importance(items, top=20))
     if not model_metrics.empty:
         mrow = model_metrics.iloc[0]
         st.caption(f"Métricas del entrenamiento — Accuracy: {mrow.get('accuracy', 0):.3f} · "
@@ -64,8 +68,8 @@ if history:
     fig = px.line(hdf.rename(columns={"timestamp": "Ejecución"}),
                   x="Ejecución", y=["asr_without", "asr_with"],
                   markers=True, labels={"value": "ASR", "variable": "Serie"})
-    fig.update_layout(template="plotly_white", title=dict(text="ASR a lo largo de las ejecuciones", x=0.5, xanchor="center"))
-    st.plotly_chart(fig, width="stretch")
+    charts.apply_theme(fig, title="ASR a lo largo de las ejecuciones")
+    charts.render_chart(fig)
 else:
     st.info("No hay ejecuciones históricas guardadas todavía.")
 
@@ -73,19 +77,26 @@ else:
 section_header("Distribución de embeddings (PCA)")
 if not df.empty:
     try:
+        n_pca = min(len(df), 1500)
+        probe = df.sample(n=n_pca, random_state=42) if n_pca < len(df) else df
         encoder = get_encoder()
         with st.spinner("Calculando embeddings de los prompts del benchmark…"):
-            emb = np.asarray(encoder.encode(df["prompt"].tolist(), normalize_embeddings=True, batch_size=32), dtype=np.float32)
+            emb = np.asarray(encoder.encode(probe["prompt"].tolist(), normalize_embeddings=True, batch_size=32),
+                             dtype=np.float32)
         pca = PCA(n_components=2, random_state=42)
         coords = pca.fit_transform(emb)
         pca_df = pd.DataFrame({"PC1": coords[:, 0], "PC2": coords[:, 1],
-                               "label": df["label"].astype(int).map({1: "Malicioso", 0: "Benigno"})})
+                               "label": probe["label"].astype(int).map({1: "Malicioso", 0: "Benigno"})})
+        pal = get_palette()
         fig = px.scatter(pca_df, x="PC1", y="PC2", color="label",
-                         color_discrete_map={"Malicioso": "#DC2626", "Benigno": "#16A34A"},
+                         color_discrete_map={"Malicioso": pal["red"], "Benigno": pal["green"]},
                          opacity=0.75, labels={"PC1": f"PC1 ({pca.explained_variance_ratio_[0]:.1%})",
                                                "PC2": f"PC2 ({pca.explained_variance_ratio_[1]:.1%})"})
-        fig.update_layout(template="plotly_white", title=dict(text="Proyección PCA de los embeddings", x=0.5, xanchor="center"))
-        st.plotly_chart(fig, width="stretch")
+        charts.apply_theme(fig, title="Proyección PCA de los embeddings")
+        charts.render_chart(fig)
+        if n_pca < len(df):
+            st.caption(f"PCA calculado sobre una muestra de {n_pca} de {len(df)} prompts "
+                       "(submuestreo por rendimiento).")
     except Exception as exc:  # noqa: BLE001
         st.warning(f"No se pudo calcular el PCA: {exc}")
 
@@ -98,7 +109,8 @@ if not df.empty:
     corr = num[keep].corr().round(2)
     fig = px.imshow(corr, text_auto=True, color_continuous_scale="RdBu_r", zmin=-1, zmax=1,
                     title="Correlación entre características")
-    st.plotly_chart(fig, width="stretch")
+    charts.apply_theme(fig)
+    charts.render_chart(fig)
 
 # ------------------------------------------------------------- threshold sim
 section_header("Umbral de confianza ajustable")

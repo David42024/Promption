@@ -1,0 +1,25 @@
+# Render Blueprint — API de detección de Prompt Injection
+# Cómo usarlo: sube el repo a GitHub y en Render elige
+#   "New Blueprint" -> selecciona el repo. Render enlaza servicios
+#   definidos aquí y hace autodeploy con cada commit.
+#
+# Nota: el dashboard Streamlit NO se despliega aquí: usa Streamlit
+# Community Cloud (share/streamlit). La API funciona sin LLM (Ollama
+# se queda local; sin él el benchmark usa su proxy determinista).
+
+services:
+  - type: web
+    name: pif-api
+    runtime: docker        # build a partir del Dockerfile del repo
+    plan: free             # 0.1 CPU / 512 MB — suficiente para la demo académica
+    region: oregon
+    dockerContext: .       # raíz del repo como contexto de build
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHONPATH
+        value: /app
+      # Render inyecta PORT automáticamente; el CMD del Dockerfile lo usa.
+      # Si algún día quieres exponer endpoints que consultan a un LLM remoto:
+      #   - key: LLM_PROVIDER
+      #     sync: false      # p. ej. openai_compatible (no implementado aún)
