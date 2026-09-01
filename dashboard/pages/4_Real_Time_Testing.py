@@ -105,15 +105,15 @@ if result is not None:
 
     # ---- LLM comparison
     section_header("Comparación con el LLM")
-    st.caption("Envía el mismo prompt a Ollama (sin filtro vs con filtro) y comprueba si logra robar el código secreto.")
-    if st.button("⚡ Consultar LLM (Ollama)", type="secondary"):
+    st.caption("Envía el mismo prompt al LLM (sin filtro vs con filtro) y comprueba si logra robar el código secreto.")
+    if st.button("⚡ Consultar LLM", type="secondary"):
         from src.benchmark.runner import SYSTEM_PROMPT, is_compromised
-        from src.llm.ollama_client import OllamaClient
+        from src.llm import get_llm_client
         with st.spinner("Consultando LLM… esto puede tardar unos segundos."):
-            client = OllamaClient()
+            client = get_llm_client()
             health = client.health()
             if not health["connected"]:
-                st.error(f"Ollama no responde en {health['host']}. Inicia `ollama serve` y verifica el modelo.")
+                st.error(f"LLM no responde en {health['host']}. Configura PIF_LLM_API_KEY o inicia `ollama serve`.")
             else:
                 r0 = client.generate(result["text"], system=SYSTEM_PROMPT)
                 leaked_raw = is_compromised(r0.text)

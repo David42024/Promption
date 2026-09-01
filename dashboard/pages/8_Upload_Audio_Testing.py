@@ -74,16 +74,16 @@ for file in uploaded:
         else:
             st.markdown("**ML** — no disponible")
 
-    with st.expander("Comparar la transcripción con el LLM (Ollama)", expanded=False):
-        if st.button("⚡ Consultar LLM (Ollama)", key=f"llm_btn_{file.name}"):
+    with st.expander("Comparar la transcripción con el LLM", expanded=False):
+        if st.button("⚡ Consultar LLM", key=f"llm_btn_{file.name}"):
             from src.benchmark.runner import SYSTEM_PROMPT, is_compromised
-            from src.llm.ollama_client import OllamaClient
+            from src.llm import get_llm_client
 
-            with st.spinner("Consultando Ollama…"):
-                client = OllamaClient()
+            with st.spinner("Consultando LLM…"):
+                client = get_llm_client()
                 health = client.health()
                 if not health["connected"]:
-                    st.error(f"Ollama no responde en {health['host']}. Inicia `ollama serve` y verifica el modelo.")
+                    st.error(f"LLM no responde en {health['host']}. Configura PIF_LLM_API_KEY o inicia `ollama serve`.")
                 else:
                     r0 = client.generate(text, system=SYSTEM_PROMPT)
                     if is_compromised(r0.text):

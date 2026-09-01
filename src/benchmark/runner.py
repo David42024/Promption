@@ -12,6 +12,7 @@ import pandas as pd
 from src.benchmark.metrics import all_metrics, by_attack_type, by_dataset
 from src.benchmark.payloads import load_evaluation_set
 from src.filter.ensemble_filter import EnsembleFilter
+from src.llm import get_llm_client
 from src.llm.ollama_client import OllamaClient
 from src.utils.config import load_config
 from src.utils.logger import logger
@@ -101,7 +102,7 @@ class BenchmarkRunner:
     def __init__(self, filter: EnsembleFilter | None = None, ollama: OllamaClient | None = None,
                  opts: RunnerOptions | None = None):
         self.filters = filter or EnsembleFilter()
-        self.ollama = ollama or OllamaClient()
+        self.ollama = ollama or get_llm_client()
         self.opts = opts or RunnerOptions()
 
     # --------------------------------------------------------------- execution

@@ -35,13 +35,17 @@ ensemble:
   require_llm_veto: false
 
 llm:
-  provider: "ollama"
+  provider: "auto"          # ollama | openai | auto (openai si hay PIF_LLM_API_KEY configurada)
   host: "http://localhost:11434"
   model: "mistral:latest"
   temperature: 0.2
   max_tokens: 200
   timeout: 60
   health_timeout: 5
+  openai:
+    base_url: "https://api.groq.com/openai/v1"   # override con PIF_LLM_BASE_URL
+    model: "llama-3.3-70b-versatile"             # override con PIF_LLM_MODEL
+    # API key: variable de entorno PIF_LLM_API_KEY (o secret de Streamlit). NUNCA en este archivo.
 
 api:
   host: "0.0.0.0"

@@ -42,7 +42,7 @@ def test_page4_submit_then_llm_button():
     assert submits, "Probar filtro button missing"
     at.button[submits[0]].click().run()
     assert not at.exception, "after submit"
-    llm = [i for i, b in enumerate(at.button) if "Ollama" in b.label]
+    llm = [i for i, b in enumerate(at.button) if "Consultar LLM" in b.label]
     assert llm, "LLM button not visible after submit"
     at.button[llm[0]].click().run()
     assert not at.exception, "after LLM click"

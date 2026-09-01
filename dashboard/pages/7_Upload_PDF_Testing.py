@@ -80,19 +80,19 @@ for file in uploaded:
             st.code(page[:800], language="text")
             st.divider()
 
-    with st.expander("Comparar una página con el LLM (Ollama)", expanded=False):
-        sel = st.selectbox("Página a enviar a Ollama", options=range(1, len(results) + 1),
+    with st.expander("Comparar una página con el LLM", expanded=False):
+        sel = st.selectbox("Página a enviar al LLM", options=range(1, len(results) + 1),
                            format_func=lambda p: f"Página {p}", key=f"llm_page_{file.name}")
-        if st.button("⚡ Consultar LLM (Ollama)", key=f"llm_btn_{file.name}"):
+        if st.button("⚡ Consultar LLM", key=f"llm_btn_{file.name}"):
             from src.benchmark.runner import SYSTEM_PROMPT, is_compromised
-            from src.llm.ollama_client import OllamaClient
+            from src.llm import get_llm_client
 
             idx = sel - 1
-            with st.spinner("Consultando Ollama…"):
-                client = OllamaClient()
+            with st.spinner("Consultando LLM…"):
+                client = get_llm_client()
                 health = client.health()
                 if not health["connected"]:
-                    st.error(f"Ollama no responde en {health['host']}. Inicia `ollama serve` y verifica el modelo.")
+                    st.error(f"LLM no responde en {health['host']}. Configura PIF_LLM_API_KEY o inicia `ollama serve`.")
                 else:
                     r0 = client.generate(pages[idx], system=SYSTEM_PROMPT)
                     if is_compromised(r0.text):

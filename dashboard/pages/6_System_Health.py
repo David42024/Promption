@@ -20,7 +20,6 @@ from dashboard.components.sidebar import setup_page
 from dashboard.utils.data_loader import api_health, api_reachable
 from dashboard.utils.paths import CONFIG_DIR, MODELS_DIR, RESULTS_DIR
 from src.filter.ensemble_filter import EnsembleFilter
-from src.llm.ollama_client import OllamaClient
 
 setup_page("System Health — Prompt Injection Filter", "⚡")
 
@@ -43,7 +42,7 @@ with c1:
     status_badge("API FastAPI (localhost:8000)", api_reachable())
 with c2:
     ollama = health.get("ollama", {})
-    status_badge(f"Ollama ({ollama.get('host', '…')})", bool(ollama.get("connected")))
+    status_badge(f"LLM ({ollama.get('host', '…')})", bool(ollama.get("connected")))
 with c3:
     status_badge("Modelo ML (random_forest.pkl)", MODELS_DIR.joinpath("random_forest.pkl").exists())
 
@@ -62,12 +61,12 @@ with c4:
     layers = filter_obj.layers_status()
     kpi_card("Reglas heurísticas", str(layers.get("heuristic_rules", 0)), "cargadas desde heuristics.yaml")
 
-# ------------------------------------------------------------------ ollama
-section_header("Modelos disponibles en Ollama")
+# ------------------------------------------------------------------ llm
+section_header("Modelos disponibles en el LLM")
 if ollama.get("models"):
     st.write(" · ".join(ollama["models"]))
 else:
-    st.warning("Ollama no responde o no tiene modelos. Verifica: `ollama list`")
+    st.warning("El LLM no responde o no tiene modelos. Configura PIF_LLM_API_KEY o verifica `ollama list`.")
 
 # ------------------------------------------------------------------ logs
 section_header("Logs recientes")
@@ -97,7 +96,7 @@ with c2:
     if st.button("🧪 Probar conexión de todos los servicios", width="stretch"):
         results = {
             "API FastAPI": api_reachable(),
-            "Ollama": bool(ollama.get("connected")),
+            "LLM": bool(ollama.get("connected")),
             "Modelo ML": MODELS_DIR.joinpath("random_forest.pkl").exists(),
             "Datos de benchmark": RESULTS_DIR.joinpath("benchmark_results.csv").exists(),
         }

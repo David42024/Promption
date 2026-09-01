@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, status
 from src.api.models import BenchmarkRequest, FilterRequest, FilterResponse, SystemInfo
 from src.benchmark.runner import BenchmarkRunner, RunnerOptions, json_safe, sanitize_prompt
 from src.filter.ensemble_filter import EnsembleFilter
-from src.llm.ollama_client import OllamaClient
+from src.llm import get_llm_client
 from src.utils.config import load_config
 from src.utils.logger import logger
 
@@ -19,7 +19,7 @@ router = APIRouter()
 _CONF = load_config()
 
 _filter = EnsembleFilter()
-_ollama = OllamaClient()
+_ollama = get_llm_client()
 _start_time = time.time()
 
 
