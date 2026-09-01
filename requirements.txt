@@ -21,3 +21,7 @@ python-dotenv>=1.0.0
 ollama>=0.1.8
 psutil>=5.9.0
 pytest>=7.4.0
+
+# Streamlit Community Cloud solo lee requirements.txt; agrega aquí las
+# dependencias del dashboard (streamlit, plotly, wordcloud, …) vía include.
+-r requirements-dashboard.txt
