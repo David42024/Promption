@@ -76,7 +76,14 @@ if result is not None:
         st.metric("Capa decisora", "Ensemble + " + (result["reason"] or "permitido"))
 
     st.progress(min(max(result["confidence"], 0.0), 1.0),
-                text="Probabilidad estimada de inyección")
+                text="Score ensemble (promedio ponderado, no la decisión)")
+    ens_thr = result["ensemble"]["threshold"]
+    if blocked and result["confidence"] < ens_thr:
+        st.caption(f"⛔ Bloqueado por **veto de capa** ({result['reason']}): el promedio "
+                   f"{result['confidence']:.2f} no cruzó el umbral {ens_thr}, pero una capa "
+                   f"sí superó el suyo propio. Cualquiera puede vetar (lógica OR fail-safe).")
+    elif blocked:
+        st.caption(f"Bloqueado por score {result['confidence']:.2f} ≥ umbral {ens_thr} ({result['reason']}).")
 
     heur = result["heuristic"]
     ml = result["ml"]
@@ -84,23 +91,22 @@ if result is not None:
         cc = st.columns(3)
         with cc[0]:
             st.markdown("**Heurística**")
-            st.markdown(f"- Score: `{heur['score']:.2f}`")
-            st.markdown(f"- Bloqueada: `{heur['blocked']}`")
-            st.markdown(f"- Umbral: {heur['threshold']}")
+            st.markdown(f"- Score: `{heur['score']:.2f}` (umbral {heur['threshold']})")
+            st.markdown(f"- Veto: {'🚫 SÍ — bloquea' if heur['blocked'] else '✅ no'}")
             if heur["matched_rules"]:
                 st.markdown("- Reglas: " + ", ".join(r["name"] for r in heur["matched_rules"]))
         with cc[1]:
             st.markdown("**ML**")
             if ml["available"]:
-                st.markdown(f"- Probabilidad: `{ml['probability']:.3f}`")
-                st.markdown(f"- Bloqueado: `{ml['blocked']}`")
-                st.markdown(f"- Umbral: {ml['threshold']}")
+                st.markdown(f"- Probabilidad: `{ml['probability']:.3f}` (umbral {ml['threshold']})")
+                st.markdown(f"- Veto: {'🚫 SÍ — bloquea' if ml['blocked'] else '✅ no'}")
             else:
                 st.markdown("- Modelo no disponible (entrena con `python src/training/train.py`)")
         with cc[2]:
             st.markdown("**Ensemble**")
-            st.markdown(f"- Score ponderado: `{result['ensemble']['score']:.2f}`")
-            st.markdown(f"- Umbral: {result['ensemble']['threshold']}")
+            st.markdown(f"- Promedio: `{result['ensemble']['score']:.2f}` (umbral {result['ensemble']['threshold']})")
+            st.markdown("- Veto: " + ("🚫 SÍ — bloquea" if result['ensemble']['score'] >= result['ensemble']['threshold'] else "✅ no"))
+            st.caption("Bloquea si CUALQUIERA veta: heurística, ML o promedio.")
         charts.render_chart(_layer_bars(result))
 
     # ---- LLM comparison
@@ -131,26 +137,40 @@ if result is not None:
                         st.error(f"No se pudo consultar el LLM: {exc}")
                         st.stop()
                 leaked_filt = False if blocked else (is_compromised(r1.text) if r1 else False)
+                seq = int(st.session_state.get("rt_llm_seq", 0)) + 1
+                st.session_state["rt_llm_seq"] = seq
+                st.session_state["rt_llm_cmp"] = {
+                    "seq": seq, "prompt": result["text"], "blocked": blocked,
+                    "raw_text": r0.text, "raw_ms": r0.latency_ms, "leaked_raw": leaked_raw,
+                    "filt_text": r1.text if r1 else "", "leaked_filt": leaked_filt,
+                }
 
-                a, b = st.columns(2)
-                with a:
-                    st.markdown("**Sin filtro**")
-                    if leaked_raw:
-                        st.error(f"⚠ El LLM reveló el código secreto (ASR ✓). {r0.latency_ms:.0f} ms")
-                    else:
-                        st.success(f"El LLM se negó correctamente. {r0.latency_ms:.0f} ms")
-                    st.text_area("Respuesta del LLM (sin filtro)", r0.text[:600], height=140,
-                                 key=f"resp_raw_{len(r0.text)}")
-                with b:
-                    st.markdown("**Con filtro**")
-                    if blocked:
-                        st.info("El prompt fue bloqueado: nunca llegó al LLM.")
-                    elif leaked_filt:
-                        st.error("⚠ El prompt superó el filtro y robó el secreto.")
-                    else:
-                        st.success("El prompt llegó al LLM sin filtrar (permitido) y no robó el secreto.")
-                    st.text_area("Respuesta del LLM (con filtro)", (r1.text if r1 else "(bloqueado)")[:600],
-                                 height=140, key=f"resp_filt_{len(r1.text) if r1 else 0}")
+    cmp = st.session_state.get("rt_llm_cmp")
+    if cmp is not None and cmp.get("prompt") == prompt:
+        seq = cmp["seq"]
+        a, b = st.columns(2)
+        with a:
+            st.markdown("**Sin filtro**")
+            if cmp["leaked_raw"]:
+                st.error(f"⚠ El LLM reveló el código secreto (ASR ✓). {cmp['raw_ms']:.0f} ms")
+            else:
+                st.success(f"El LLM se negó correctamente. {cmp['raw_ms']:.0f} ms")
+            st.text_area("Respuesta del LLM (sin filtro)", cmp["raw_text"][:600], height=140,
+                         key=f"resp_raw_{seq}")
+        with b:
+            st.markdown("**Con filtro**")
+            if cmp["blocked"]:
+                st.info("El prompt fue bloqueado: nunca llegó al LLM.")
+            elif cmp["leaked_filt"]:
+                st.error("⚠ El prompt superó el filtro y robó el secreto.")
+            else:
+                st.success("El prompt llegó al LLM sin filtrar (permitido) y no robó el secreto.")
+            if cmp["blocked"]:
+                st.text_area("Respuesta del LLM (con filtro)", "(bloqueado: no se llamó al LLM)",
+                             height=140, key=f"resp_filt_{seq}", disabled=True)
+            else:
+                st.text_area("Respuesta del LLM (con filtro)", cmp["filt_text"][:600],
+                             height=140, key=f"resp_filt_{seq}")
 
 if st.session_state.get("rt_history"):
     section_header("Historial de pruebas de esta sesión")
