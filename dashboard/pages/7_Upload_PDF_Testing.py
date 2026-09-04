@@ -84,7 +84,7 @@ for file in uploaded:
         sel = st.selectbox("Página a enviar al LLM", options=range(1, len(results) + 1),
                            format_func=lambda p: f"Página {p}", key=f"llm_page_{file.name}")
         if st.button("⚡ Consultar LLM", key=f"llm_btn_{file.name}"):
-            from src.benchmark.runner import SYSTEM_PROMPT, is_compromised
+            from src.benchmark.runner import SYSTEM_PROMPT, contains_secret
             from src.llm import get_llm_client
 
             idx = sel - 1
@@ -99,11 +99,14 @@ for file in uploaded:
                     except Exception as exc:  # noqa: BLE001
                         st.error(f"No se pudo consultar el LLM: {exc}")
                         st.stop()
-                    if is_compromised(r0.text):
+                    if contains_secret(r0.text):
                         st.error("⚠ El LLM reveló el código secreto (¿debería haber sido bloqueado?).")
+                    elif not r0.text.strip():
+                        st.warning("El LLM devolvió una respuesta vacía (sin contenido evaluable).")
                     else:
                         st.success("El LLM se negó a revelar el secreto.")
-                    st.text_area("Respuesta del LLM", r0.text[:600], height=140, key=f"llm_resp_{file.name}")
+                    st.text_area("Respuesta del LLM", (r0.text or "(respuesta vacía)")[:600],
+                                 height=140, key=f"llm_resp_{file.name}")
 
 section_header("Nota")
 st.caption("Los PDFs se leen en memoria (pypdf). Los documentos escaneados (solo imágenes) requieren OCR, "

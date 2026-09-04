@@ -76,7 +76,7 @@ for file in uploaded:
 
     with st.expander("Comparar la transcripción con el LLM", expanded=False):
         if st.button("⚡ Consultar LLM", key=f"llm_btn_{file.name}"):
-            from src.benchmark.runner import SYSTEM_PROMPT, is_compromised
+            from src.benchmark.runner import SYSTEM_PROMPT, contains_secret
             from src.llm import get_llm_client
 
             with st.spinner("Consultando LLM…"):
@@ -90,11 +90,13 @@ for file in uploaded:
                     except Exception as exc:  # noqa: BLE001
                         st.error(f"No se pudo consultar el LLM: {exc}")
                         st.stop()
-                    if is_compromised(r0.text):
+                    if contains_secret(r0.text):
                         st.error("⚠ El LLM reveló el código secreto.")
+                    elif not r0.text.strip():
+                        st.warning("El LLM devolvió una respuesta vacía (sin contenido evaluable).")
                     else:
                         st.success("El LLM se negó a revelar el secreto.")
-                    st.text_area("Respuesta del LLM", r0.text[:600], height=140,
+                    st.text_area("Respuesta del LLM", (r0.text or "(respuesta vacía)")[:600], height=140,
                                  key=f"llm_resp_{file.name}")
 
 section_header("Nota")

@@ -113,7 +113,7 @@ if result is not None:
     section_header("Comparación con el LLM")
     st.caption("Envía el mismo prompt al LLM (sin filtro vs con filtro) y comprueba si logra robar el código secreto.")
     if st.button("⚡ Consultar LLM", type="secondary"):
-        from src.benchmark.runner import SYSTEM_PROMPT, is_compromised
+        from src.benchmark.runner import SYSTEM_PROMPT, contains_secret
         from src.llm import get_llm_client
         with st.spinner("Consultando LLM… esto puede tardar unos segundos."):
             client = get_llm_client()
@@ -126,7 +126,7 @@ if result is not None:
                 except Exception as exc:  # noqa: BLE001
                     st.error(f"No se pudo consultar el LLM: {exc}")
                     st.stop()
-                leaked_raw = is_compromised(r0.text)
+                leaked_raw = contains_secret(r0.text)
                 if blocked:
                     r1 = None
                 else:
@@ -136,7 +136,7 @@ if result is not None:
                     except Exception as exc:  # noqa: BLE001
                         st.error(f"No se pudo consultar el LLM: {exc}")
                         st.stop()
-                leaked_filt = False if blocked else (is_compromised(r1.text) if r1 else False)
+                leaked_filt = False if blocked else (contains_secret(r1.text) if r1 else False)
                 seq = int(st.session_state.get("rt_llm_seq", 0)) + 1
                 st.session_state["rt_llm_seq"] = seq
                 st.session_state["rt_llm_cmp"] = {
@@ -153,10 +153,12 @@ if result is not None:
             st.markdown("**Sin filtro**")
             if cmp["leaked_raw"]:
                 st.error(f"⚠ El LLM reveló el código secreto (ASR ✓). {cmp['raw_ms']:.0f} ms")
+            elif not cmp["raw_text"].strip():
+                st.warning(f"El LLM devolvió una respuesta vacía (sin contenido evaluable). {cmp['raw_ms']:.0f} ms")
             else:
                 st.success(f"El LLM se negó correctamente. {cmp['raw_ms']:.0f} ms")
-            st.text_area("Respuesta del LLM (sin filtro)", cmp["raw_text"][:600], height=140,
-                         key=f"resp_raw_{seq}")
+            st.text_area("Respuesta del LLM (sin filtro)", (cmp["raw_text"] or "(respuesta vacía)")[:600],
+                         height=140, key=f"resp_raw_{seq}")
         with b:
             st.markdown("**Con filtro**")
             if cmp["blocked"]:
