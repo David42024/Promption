@@ -50,10 +50,28 @@ def _format_http_error(r: requests.Response, model: str) -> str:
     return f"LLM {r.status_code} en {r.url}: {body}.{hint}"
 
 
+def _resolve_setting(env_name: str) -> str:
+    """Lee un ajuste desde el entorno o desde los secrets de Streamlit."""
+    val = os.environ.get(env_name, "").strip()
+    if val:
+        return val
+    try:
+        import streamlit as st  # type: ignore
+        try:
+            secret = st.secrets.get(env_name)
+        except Exception:  # noqa: BLE001
+            secret = None
+        if secret:
+            return str(secret).strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 class OpenAICompatibleClient:
     """Cliente HTTP para APIs compatibles con OpenAI (POST /chat/completions).
 
-    Configurable por variables de entorno:
+    Configurable por variables de entorno o secrets de Streamlit:
       PIF_LLM_BASE_URL, PIF_LLM_MODEL, PIF_LLM_API_KEY
     """
 
@@ -63,9 +81,9 @@ class OpenAICompatibleClient:
     def __init__(self, host: str | None = None, model: str | None = None,
                  timeout: int | None = None, api_key: str | None = None):
         openai = _CONF.get("openai", {})
-        self.host = (host or os.environ.get("PIF_LLM_BASE_URL", "") or openai.get("base_url")
+        self.host = (host or _resolve_setting("PIF_LLM_BASE_URL") or openai.get("base_url")
                      or self._DEFAULT_BASE).rstrip("/")
-        self.model = (model or os.environ.get("PIF_LLM_MODEL", "") or openai.get("model")
+        self.model = (model or _resolve_setting("PIF_LLM_MODEL") or openai.get("model")
                       or self._DEFAULT_MODEL)
         self.api_key = api_key or resolve_api_key()
         self.timeout = timeout or int(_CONF.get("timeout", 60))
