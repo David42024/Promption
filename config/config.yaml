@@ -44,7 +44,7 @@ llm:
   health_timeout: 5
   openai:
     base_url: "https://api.groq.com/openai/v1"   # override con PIF_LLM_BASE_URL
-    model: "llama-3.3-70b-versatile"             # override con PIF_LLM_MODEL
+    model: "openai/gpt-oss-120b"                 # override con PIF_LLM_MODEL
     # API key: variable de entorno PIF_LLM_API_KEY (o secret de Streamlit). NUNCA en este archivo.
 
 api:

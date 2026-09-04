@@ -17,7 +17,7 @@ import streamlit as st
 
 from dashboard.components.metrics import kpi_card, section_header, status_badge
 from dashboard.components.sidebar import setup_page
-from dashboard.utils.data_loader import api_health, api_reachable
+from dashboard.utils.data_loader import API_URL, api_health, api_reachable
 from dashboard.utils.paths import CONFIG_DIR, MODELS_DIR, RESULTS_DIR
 from src.filter.ensemble_filter import EnsembleFilter
 
@@ -32,14 +32,18 @@ def _fmt_uptime(boot_ts: float) -> str:
     m = (secs % 3600) // 60
     return f"{d}d {h}h {m}m" if d else f"{h}h {m}m"
 
-health = api_health()
+api_up = api_reachable()
+health = api_health() if api_up else {"status": "offline", "api_url": API_URL}
 filter_obj = EnsembleFilter()
 
 # ------------------------------------------------------------------ services
 section_header("Servicios")
+st.caption(f"API consultada: `{API_URL}/api/v1/health` (define `PIF_API_URL` para apuntar a tu API en Render).")
+if not api_up:
+    st.warning(f"La API no responde en `{API_URL}`. El dashboard sigue funcionando con los ficheros locales (`data/results/`), pero el badge debe mostrar NO DISPONIBLE.")
 c1, c2, c3 = st.columns(3)
 with c1:
-    status_badge("API FastAPI (localhost:8000)", api_reachable())
+    status_badge(f"API FastAPI ({API_URL})", api_up)
 with c2:
     ollama = health.get("ollama", {})
     status_badge(f"LLM ({ollama.get('host', '…')})", bool(ollama.get("connected")))
@@ -94,9 +98,11 @@ with c1:
         st.success("Filtro recargado. Capas: " + json.dumps(EnsembleFilter().layers_status()))
 with c2:
     if st.button("🧪 Probar conexión de todos los servicios", width="stretch"):
+        up_now = api_reachable()
+        health_now = api_health() if up_now else {}
         results = {
-            "API FastAPI": api_reachable(),
-            "LLM": bool(ollama.get("connected")),
+            "API FastAPI": up_now,
+            "LLM": bool(health_now.get("ollama", {}).get("connected")),
             "Modelo ML": MODELS_DIR.joinpath("random_forest.pkl").exists(),
             "Datos de benchmark": RESULTS_DIR.joinpath("benchmark_results.csv").exists(),
         }

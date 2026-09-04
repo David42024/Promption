@@ -83,9 +83,13 @@ for file in uploaded:
                 client = get_llm_client()
                 health = client.health()
                 if not health["connected"]:
-                    st.error(f"LLM no responde en {health['host']}. Configura PIF_LLM_API_KEY o inicia `ollama serve`.")
+                    st.error(f"LLM no responde en {health['host']}. Configura PIF_LLM_API_KEY o inicia `ollama serve`. Detalle: {health.get('error')}")
                 else:
-                    r0 = client.generate(text, system=SYSTEM_PROMPT)
+                    try:
+                        r0 = client.generate(text, system=SYSTEM_PROMPT)
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"No se pudo consultar el LLM: {exc}")
+                        st.stop()
                     if is_compromised(r0.text):
                         st.error("⚠ El LLM reveló el código secreto.")
                     else:

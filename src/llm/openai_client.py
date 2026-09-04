@@ -33,6 +33,23 @@ def resolve_api_key() -> str | None:
     return None
 
 
+def _format_http_error(r: requests.Response, model: str) -> str:
+    """Resume el error HTTP sin exponer la API key."""
+    try:
+        body = r.text[:500]
+    except Exception:  # noqa: BLE001
+        body = "<sin cuerpo>"
+    hint = ""
+    lowered = body.lower()
+    if r.status_code in (400, 404) and ("model" in lowered or "decommission" in lowered):
+        hint = f" Revisa PIF_LLM_MODEL (actual: '{model}'). Groq retiró 'llama-3.3-70b-versatile' en ago-2026; usa 'openai/gpt-oss-120b'."
+    elif r.status_code == 401:
+        hint = " Revisa PIF_LLM_API_KEY (inválida o expirada)."
+    elif r.status_code == 429:
+        hint = " Cuota/límite excedido; reintenta más tarde."
+    return f"LLM {r.status_code} en {r.url}: {body}.{hint}"
+
+
 class OpenAICompatibleClient:
     """Cliente HTTP para APIs compatibles con OpenAI (POST /chat/completions).
 
@@ -41,7 +58,7 @@ class OpenAICompatibleClient:
     """
 
     _DEFAULT_BASE = "https://api.groq.com/openai/v1"
-    _DEFAULT_MODEL = "llama-3.3-70b-versatile"
+    _DEFAULT_MODEL = "openai/gpt-oss-120b"
 
     def __init__(self, host: str | None = None, model: str | None = None,
                  timeout: int | None = None, api_key: str | None = None):
@@ -68,7 +85,10 @@ class OpenAICompatibleClient:
 
     def list_models(self) -> list[str]:
         r = requests.get(f"{self.host}/models", headers=self._headers(), timeout=self.health_timeout)
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except requests.HTTPError as exc:
+            raise RuntimeError(_format_http_error(r, self.model)) from exc
         return [m.get("id", "") for m in r.json().get("data", []) if m.get("id")]
 
     def generate(self, prompt: str, system: str | None = None, temperature: float | None = None,
@@ -88,7 +108,10 @@ class OpenAICompatibleClient:
         start = time.perf_counter()
         r = requests.post(f"{self.host}/chat/completions", json=payload,
                           headers=self._headers(), timeout=self.timeout)
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except requests.HTTPError as exc:
+            raise RuntimeError(_format_http_error(r, self.model)) from exc
         data = r.json()
         choices = data.get("choices") or []
         message = choices[0].get("message") if choices else {}

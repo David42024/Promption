@@ -113,15 +113,23 @@ if result is not None:
             client = get_llm_client()
             health = client.health()
             if not health["connected"]:
-                st.error(f"LLM no responde en {health['host']}. Configura PIF_LLM_API_KEY o inicia `ollama serve`.")
+                st.error(f"LLM no responde en {health['host']}. Configura PIF_LLM_API_KEY o inicia `ollama serve`. Detalle: {health.get('error')}")
             else:
-                r0 = client.generate(result["text"], system=SYSTEM_PROMPT)
+                try:
+                    r0 = client.generate(result["text"], system=SYSTEM_PROMPT)
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"No se pudo consultar el LLM: {exc}")
+                    st.stop()
                 leaked_raw = is_compromised(r0.text)
                 if blocked:
                     r1 = None
                 else:
                     safe = result.get("sanitized", result["text"])
-                    r1 = client.generate(safe, system=SYSTEM_PROMPT)
+                    try:
+                        r1 = client.generate(safe, system=SYSTEM_PROMPT)
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"No se pudo consultar el LLM: {exc}")
+                        st.stop()
                 leaked_filt = False if blocked else (is_compromised(r1.text) if r1 else False)
 
                 a, b = st.columns(2)

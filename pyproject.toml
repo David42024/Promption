@@ -1,0 +1,8 @@
+[project]
+name = "promption"
+version = "1.0.0"
+description = "Sistema de detección de Prompt Injection en dos capas (heurística + ML)"
+requires-python = ">=3.10"
+
+[tool.vercel]
+entrypoint = "src.api.main:app"

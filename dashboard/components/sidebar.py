@@ -9,7 +9,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from dashboard.utils.data_loader import api_health, api_reachable, latest_benchmark_timestamp
+from dashboard.utils.data_loader import API_URL, api_health, api_reachable, latest_benchmark_timestamp
 from dashboard.utils.theme import get_palette, inject_css
 
 _ASSETS = Path(__file__).resolve().parents[1] / "assets"
@@ -52,6 +52,7 @@ def render_sidebar() -> None:
         st.divider()
         st.markdown("### ⚙️ Estado del sistema")
         st.markdown(f"**API FastAPI:** {'✅ conectada' if api_up else '❌ sin conexión'}")
+        st.caption(f"{API_URL}/api/v1/health")
 
         health = api_health()
         ollama = health.get("ollama", {})

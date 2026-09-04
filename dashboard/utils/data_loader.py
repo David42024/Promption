@@ -77,11 +77,22 @@ def file_exists(path: Path) -> bool:
 
 
 # ---------------------------------------------------------------------- api
+def api_base_url() -> str:
+    return API_URL
+
+
 def api_reachable(timeout: float = 2.0) -> bool:
+    """True solo si el endpoint responde 200 con JSON `{"status": "ok"}`.
+
+    Un simple `status_code == 200` da falsos positivos (p. ej. el propio
+    servidor de Streamlit responde 200/HTML a rutas desconocidas).
+    """
     try:
         r = requests.get(f"{API_URL}/api/v1/health", timeout=timeout)
-        return r.status_code == 200
-    except requests.RequestException:
+        if r.status_code != 200:
+            return False
+        return r.json().get("status") == "ok"
+    except (requests.RequestException, ValueError):
         return False
 
 
@@ -89,9 +100,14 @@ def api_reachable(timeout: float = 2.0) -> bool:
 def api_health() -> dict:
     try:
         r = requests.get(f"{API_URL}/api/v1/health", timeout=3)
-        return r.json() if r.status_code == 200 else {"status": "offline"}
-    except requests.RequestException:
-        return {"status": "offline"}
+        if r.status_code != 200:
+            return {"status": "offline", "api_url": API_URL}
+        data = r.json()
+        if data.get("status") != "ok":
+            return {"status": "offline", "api_url": API_URL}
+        return data
+    except (requests.RequestException, ValueError):
+        return {"status": "offline", "api_url": API_URL}
 
 
 def api_filter(text: str, use_ml: bool = True, timeout: float = 60) -> dict | None:
