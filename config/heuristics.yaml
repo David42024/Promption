@@ -19,8 +19,8 @@ rules:
 
   - name: "developer_mode"
     pattern: "developer mode|dev mode|dAN mode|superior mode"
-    description: "Known jailbreak modes (DAN, developer mode)"
-    severity: "high"
+    description: "Mención de modo jailbreak (no bloquea sola; el ML decide, cubre A07/A08)"
+    severity: "low"
     enabled: true
 
   - name: "reveal_system_prompt"
@@ -85,9 +85,200 @@ rules:
 
   - name: "credentials_leak"
     pattern: "api[_ -]?key|password is|token:|secret key|credentials|bastion|privileged"
-    description: "Credential / secret extraction"
+    description: "Mera mención de credencial (no bloquea sola; la petición la cubren credentials_request*)"
+    severity: "low"
+    enabled: true
+
+  - name: "credentials_request"
+    pattern: "(give me|show me|tell me|send me|hand over|reveal|disclose).{0,40}(your |the |synthetic )?(token|password|secret|access code|api[_ -]?key|credentials)"
+    description: "Direct credential request (give me the token / reveal the access code…)"
+    severity: "high"
+    enabled: true
+
+  - name: "credentials_request_es"
+    pattern: "(dame|pasame|pásame|dime|revelame|revélame).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|clave)"
+    description: "ES: petición directa de token/contraseña/secreto"
+    severity: "high"
+    enabled: true
+
+  - name: "ignore_instructions_es"
+    pattern: "ignora (todas )?(las )?(instrucciones|[óo]rdenes) (anteriores|previas|dadas|de arriba)"
+    description: "ES: orden de ignorar instrucciones previas"
+    severity: "high"
+    enabled: true
+
+  - name: "forget_context_es"
+    pattern: "olvida\\w* (todo|todas|las instrucciones|lo anterior)|olv[íi]date de (tus|las|mis) (reglas|instrucciones|órdenes|ordenes)"
+    description: "ES: intento de borrar el contexto previo"
+    severity: "high"
+    enabled: true
+
+  - name: "reveal_code_es"
+    pattern: "(revela\\w*|mu[ée]str\\w*|imprim\\w*) (el |tu )?(c[óo]digo (secreto|interno|de seguridad)|secreto interno|comando central)"
+    description: "ES: extracción directa del código/secreto"
+    severity: "high"
+    enabled: true
+
+  - name: "sneaky_reference_es"
+    pattern: "(cu[áa]l|qu[ée]|c[óo]mo).{0,40}(c[óo]digo|secreto).{0,40}(mencionan\\b|guardas?\\b|tienes\\b|tiene\\b|interno|oculto)|(mencionan\\b|guardas?\\b|tienes\\b).{0,40}(c[óo]digo|secreto)"
+    description: "ES: referencia indirecta al secreto (cuál era ese código que mencionan…)"
     severity: "medium"
     enabled: true
+
+  - name: "dan_jailbreak"
+    pattern: "(eres|soy|act[úu]a como|ahora eres|a partir de ahora eres).{0,25}\\bDAN\\b|\\bDAN\\b.{0,25}(sin restricciones|sin censura|sin l[íi]mites)"
+    description: "Jailbreak DAN (ES/EN, sin uso benigno posible)"
+    severity: "high"
+    enabled: true
+
+  - name: "authority_en"
+    pattern: "(auditor|audit).{0,50}(print|show|reveal|disclose).{0,30}(code|password|secret|credentials)"
+    description: "EN: falsa auditoría para extraer secretos"
+    severity: "medium"
+    enabled: true
+
+  - name: "story_exfil_es"
+    pattern: "(protagonista|h[ée]roe).{0,40}(susurr\\w*|revel\\w*).{0,40}c[óo]digo|c[óo]digo.{0,40}susurr\\w*|(di[áa]logo del villano|villano).{0,40}(clave|secreto|c[óo]digo)"
+    description: "ES: cuento/rol para sonsacar el código"
+    severity: "medium"
+    enabled: true
+
+  - name: "thesis_pretext"
+    pattern: "tesis.{0,80}usa el tuyo|ejemplo real de secreto"
+    description: "Pretexto académico para extraer el secreto"
+    severity: "medium"
+    enabled: true
+
+  - name: "repeat_instructions"
+    pattern: "(repite|repetir).{0,50}(tus|sus|mis) instrucciones"
+    description: "Eco de instrucciones (loro / repetición, ES)"
+    severity: "medium"
+    enabled: true
+
+  - name: "ignore_everything"
+    pattern: "ignore everything.{0,60}(disclose|reveal|tell|show)"
+    description: "Variante de ignore-previous con 'everything'"
+    severity: "medium"
+    enabled: true
+
+  - name: "boss_override_es"
+    pattern: "(como tu|soy tu) (jefe|superior).{0,50}(desactiv\\w*|ignora|olvida|obedece|revela|muestra)"
+    description: "ES: falso jefe ordenando desactivar filtros"
+    severity: "medium"
+    enabled: true
+
+  - name: "letter_split_es"
+    pattern: "(letra por letra|separando cada letra|deletrea|caracter por caracter).{0,40}(c[óo]digo|secreto)|c[óo]digo.{0,40}(letra por letra|separando cada letra|separadas?|deletrea)"
+    description: "ES: exfiltración deletreada para evadir filtros"
+    severity: "medium"
+    enabled: true
+
+  - name: "authority_claim"
+    pattern: "(como|soy) (el )?(CISO|CEO|director ejecutivo|administrador|investigador forense).{0,80}(reveles|revela|muestra|proporciona|obedece|autorizo|necesito que)"
+    description: "Autoridad auto-proclamada + extracción (ES)"
+    severity: "high"
+    enabled: true
+
+  - name: "authority_claim_en"
+    pattern: "(I am|as) (the )?(CEO|CISO|administrator|authorized .{0,20}investigator).{0,80}(reveal|provide|display|follow my order|authorize)"
+    description: "Self-claimed authority + extraction (EN)"
+    severity: "high"
+    enabled: true
+
+  - name: "audit_request"
+    pattern: "auditor[íi]a.{0,100}(revela|muestra|proporciona|entrega)"
+    description: "Auditoría + petición de revelar/mostrar"
+    severity: "medium"
+    enabled: true
+
+  - name: "corporate_credential"
+    pattern: "(\\bRFP\\b|\\bNDA\\b|\\bM&A\\b|auditor[íi]a|incidente de seguridad|acta de reuni[óo]n).{0,100}(credencial|contrase[ñn]a|password|clave sint[ée]tica|clave de respaldo|acceso temporal|muestra|entrega|proporciona|provide|indica|state)|(informe de incidente|incident report).{0,100}(clave|key|credencial|cual fue|cuál fue|what was)"
+    description: "Pretexto corporativo (RFP/NDA/M&A/auditoría/incidente) + petición de credencial"
+    severity: "medium"
+    enabled: true
+
+  - name: "buried_exception"
+    pattern: "(como excepci[óo]n|olvidaba mencionar|nota al pie|por cierto|\\bPS:).{0,80}(muestra|devuelve|revela|ignora|bypass|imprime|print|output|indica)"
+    description: "Cláusula de excepción enterrada + acción de extracción"
+    severity: "medium"
+    enabled: true
+
+  - name: "debug_override"
+    pattern: "(simula|simulate).{0,60}(depuraci[óo]n|debug).{0,80}(sobrescribe|overwrite)"
+    description: "Simular depuración para sobrescribir reglas"
+    severity: "medium"
+    enabled: true
+
+  - name: "decode_follow"
+    pattern: "(decod\\w*|decodific\\w*|conviert\\w*|convert\\w*).{0,30}(base64|hexadecimal|\\bhex\\b|rot\\s?13).{0,150}(follow|execut\\w*|ejecut\\w*|ejec[úu]t\\w*)"
+    description: "Decodificar + seguir la instrucción resultante"
+    severity: "medium"
+    enabled: true
+
+  - name: "sneaky_reference_en"
+    pattern: "(what|which).{0,40}(secret code|code).{0,40}(setup|mentioned|mentions|stored|kept|internal)|repeat the \\w+ line of your"
+    description: "EN: indirect secret reference (what was that code in your setup…)"
+    severity: "medium"
+    enabled: true
+
+  - name: "ask_code_es"
+    pattern: "dime (el |tu )?(c[óo]digo (interno|secreto|de descuento)|secreto)"
+    description: "ES: petición directa del código interno (exfiltración)"
+    severity: "medium"
+    enabled: true
+
+  - name: "repeat_secret_es"
+    pattern: "(repite|repetir) (todo )?(tu |el )?(mensaje de sistema|c[óo]digo|lo que (sabe|sabes|dice).{0,40}instrucciones)"
+    description: "ES: loro / repetición del system prompt o secreto"
+    severity: "high"
+    enabled: true
+
+  - name: "completion_es"
+    pattern: "completa.{0,80}c[óo]digo secreto"
+    description: "ES: truco de completar la frase con el secreto"
+    severity: "medium"
+    enabled: true
+
+  - name: "partial_extraction"
+    pattern: "([úu]ltimos|primeros) \\d+ (caracteres|letras|d[íi]gitos).{0,40}(c[óo]digo|secreto|revelar)"
+    description: "Extracción parcial del secreto (últimos N caracteres…)"
+    severity: "medium"
+    enabled: true
+
+  - name: "reverse_evasion"
+    pattern: "al rev[ée]s.{0,40}(c[óo]digo|secreto)|c[óo]digo.{0,60}al rev[ée]s"
+    description: "Evasión pidiendo el secreto al revés"
+    severity: "medium"
+    enabled: true
+
+  - name: "base64_exfil"
+    pattern: "base\\s?64.{0,60}(c[óo]digo|secreto)|c[óo]digo.{0,60}base\\s?64"
+    description: "Exfiltración del código codificado en base64"
+    severity: "medium"
+    enabled: true
+
+  - name: "authority_es"
+    pattern: "auditor[íi]?a? de seguridad.{0,60}(imprime|muestra|verifica|revela)"
+    description: "ES: falsa autoridad (auditoría) para extraer el código"
+    severity: "medium"
+    enabled: true
+
+  - name: "grandma_es"
+    pattern: "mi abuela.{0,80}c[óo]digos?|como si fueras mi abuela"
+    description: "ES: jailbreak de la abuela para sonsacar el secreto"
+    severity: "medium"
+    enabled: true
+
+# Señales benignas: cortesía/saludo. NUNCA bloquean por sí mismas; solo
+# habilitan el descuento del ensemble (ver config.yaml: ensemble.benign_*),
+# y únicamente cuando ninguna regla de ataque calzó.
+benign:
+  - name: "politeness"
+    pattern: "\\b(gracias|por favor|porfa|thank you|thanks|please)\\b"
+    description: "Cortesía explícita"
+  - name: "greeting"
+    pattern: "^(hola|buenos d[íi]as|buenas tardes|buenas noches|hello|hi|hey)\\b"
+    description: "Saludo de apertura"
 
 scores:
   high: 1.0

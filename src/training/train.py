@@ -39,8 +39,10 @@ def embed_dataset(df: pd.DataFrame, model_name: str, cache_path: Path | None = N
 
     logger.info("Computing embeddings with '%s' (%d texts)…", model_name, len(df))
     from sentence_transformers import SentenceTransformer
+    from src.filter.ml_filter import prepare_texts
     encoder = SentenceTransformer(model_name)
-    emb = encoder.encode(df["prompt"].tolist(), normalize_embeddings=True, batch_size=32, show_progress_bar=True)
+    emb = encoder.encode(prepare_texts(df["prompt"].tolist()), normalize_embeddings=True,
+                         batch_size=32, show_progress_bar=True)
     emb = np.asarray(emb, dtype=np.float32)
 
     if cache_path:
@@ -48,6 +50,35 @@ def embed_dataset(df: pd.DataFrame, model_name: str, cache_path: Path | None = N
         np.save(cache_path, emb)
         logger.info("Embeddings cached to %s", cache_path)
     return emb
+
+
+# Filas de aumento sintético: pertenecen a familias creadas para enseñar y
+# NUNCA deben caer en test (una familia no se reparte entre train y test).
+# El benchmark externo (data/eval/redteam_100.csv) jamás entra a train.
+SYNTH_SOURCES = {"redteam_synth", "hard_negative", "translated_es", "translated_es2",
+                 "translated_gemini", "local", "synth_v2"}
+
+
+def stratified_split(df: pd.DataFrame, seed: int = 42, test_frac: float = 0.2) -> np.ndarray:
+    """Test indices with 80/20 per (label, lang) stratum (deterministic),
+    excluding synthetic-augmentation families (forced to train)."""
+    rng = np.random.RandomState(seed)
+    te_parts = []
+    pub = ~df["source"].astype(str).isin(SYNTH_SOURCES) if "source" in df.columns else pd.Series(True, index=df.index)
+    groups = df[pub].groupby(["label", "lang"]).indices
+    for _, idx in sorted(groups.items()):
+        idx = np.asarray(idx)
+        rng.shuffle(idx)
+        k = max(1, int(len(idx) * test_frac)) if len(idx) > 1 else 1
+        te_parts.append(idx[:k])
+    return np.concatenate(te_parts) if te_parts else np.array([], dtype=int)
+
+
+def slice_metrics(y_true: np.ndarray, y_pred: np.ndarray, y_prob: np.ndarray) -> dict:
+    from sklearn.metrics import precision_recall_fscore_support
+    p, r, f, _ = precision_recall_fscore_support(y_true, y_pred, average="binary", zero_division=0)
+    return {"accuracy": float(accuracy_score(y_true, y_pred)), "precision": float(p),
+            "recall": float(r), "f1": float(f)}
 
 
 def main(embed_model: str | None = None, out_path: str | None = None, cache: bool = True) -> dict:
@@ -61,11 +92,10 @@ def main(embed_model: str | None = None, out_path: str | None = None, cache: boo
         cache_path if cache else None,
     )
 
-    # deterministic stratified split
-    rng = np.random.RandomState(_CONF["model"].get("random_state", 42))
-    perm = rng.permutation(len(df))
-    split = int(len(df) * 0.8)
-    tr_idx, te_idx = perm[:split], perm[split:]
+    # deterministic split, stratified by (label, lang) so EN/ES are
+    # represented in train and test proportionally (honest per-language eval)
+    te_idx = stratified_split(df, seed=int(_CONF["model"].get("random_state", 42)))
+    tr_idx = np.array([i for i in range(len(df)) if i not in set(te_idx.tolist())])
 
     clf = RandomForestClassifier(
         n_estimators=int(_CONF["model"].get("n_trees", 200)),
@@ -93,6 +123,12 @@ def main(embed_model: str | None = None, out_path: str | None = None, cache: boo
         "features": [f"dim_{i}" for i in range(X.shape[1])],
         "importances": [float(v) for v in clf.feature_importances_],
     }
+    for lang in ("en", "es"):
+        mask = (df["lang"].to_numpy()[te_idx] == lang)
+        metrics[f"n_test_{lang}"] = int(mask.sum())
+        if mask.sum() >= 2 and len(set(y[te_idx][mask])) > 1:
+            for k, v in slice_metrics(y[te_idx][mask], y_pred[mask], y_prob[mask]).items():
+                metrics[f"{k}_{lang}"] = v
     logger.info("Test metrics: %s", {k: v for k, v in metrics.items() if not isinstance(v, list)})
 
     model_dir = Path(out_path or _CONF["paths"]["classifier"]).parent

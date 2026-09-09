@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.utils.config import load_config
+from src.utils.lang import detect_lang
 from src.utils.logger import logger
 
 _CONF = load_config()
@@ -61,11 +62,24 @@ def load_raw_data(data_dir: str | None = None) -> pd.DataFrame:
     df = pd.concat([mal, ben], ignore_index=True)
     df["prompt"] = df["prompt"].astype(str).str.strip()
     df = df[df["prompt"].str.len() > 0].drop_duplicates(subset=["prompt"], keep="first").reset_index(drop=True)
-    return df[["prompt", "label", "attack_type", "category", "dataset", "source"]]
+    df["lang"] = df["prompt"].map(detect_lang)
+    return df[["prompt", "label", "attack_type", "category", "dataset", "source", "lang"]]
+
+
+def apply_quarantine(df: pd.DataFrame, processed_dir: str | None = None) -> pd.DataFrame:
+    """Excluye filas en data/processed/quarantine.csv (ruido de etiqueta auditado)."""
+    qpath = Path(processed_dir or _CONF["paths"]["processed_data"]) / "quarantine.csv"
+    if not qpath.exists():
+        return df
+    banned = set(pd.read_csv(qpath, encoding="utf-8")["prompt"].astype(str))
+    before = len(df)
+    df = df[~df["prompt"].astype(str).isin(banned)].reset_index(drop=True)
+    logger.info("Quarantine: %d filas excluidas (%s)", before - len(df), qpath)
+    return df
 
 
 def prepare_training_data(data_dir: str | None = None, processed_dir: str | None = None) -> Path:
-    df = load_raw_data(data_dir)
+    df = apply_quarantine(load_raw_data(data_dir), processed_dir)
     out = Path(processed_dir or _CONF["paths"]["processed_data"]) / "training_data.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False, encoding="utf-8")
@@ -77,7 +91,10 @@ def load_training_data(processed_dir: str | None = None) -> pd.DataFrame:
     path = Path(processed_dir or _CONF["paths"]["processed_data"]) / "training_data.csv"
     if not path.exists():
         path = prepare_training_data()
-    return pd.read_csv(path, encoding="utf-8")
+    df = pd.read_csv(path, encoding="utf-8")
+    if "lang" not in df.columns:  # CSVs generados antes de la columna lang
+        df["lang"] = df["prompt"].map(detect_lang)
+    return apply_quarantine(df, processed_dir)
 
 
 if __name__ == "__main__":

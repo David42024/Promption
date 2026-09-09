@@ -14,7 +14,21 @@ import requests
 
 from dashboard.utils.paths import RESULTS_DIR, ROOT_DIR
 
-API_URL = os.getenv("PIF_API_URL", "http://localhost:8000").rstrip("/")
+def _resolve_api_url() -> str:
+    """PIF_API_URL desde entorno o Secrets de Streamlit (ahí vive en la nube)."""
+    url = os.getenv("PIF_API_URL", "").strip()
+    if url:
+        return url.rstrip("/")
+    try:
+        secret = st.secrets.get("PIF_API_URL")
+    except Exception:  # noqa: BLE001
+        secret = None
+    if secret:
+        return str(secret).strip().rstrip("/")
+    return "http://localhost:8000"
+
+
+API_URL = _resolve_api_url()
 
 
 # ------------------------------------------------------------------ file based
@@ -81,25 +95,40 @@ def api_base_url() -> str:
     return API_URL
 
 
-def api_reachable(timeout: float = 2.0) -> bool:
+_LAST_API_ERROR: str | None = None
+
+
+def api_last_error() -> str | None:
+    """Último error al contactar la API (para diagnóstico en System Health)."""
+    return _LAST_API_ERROR
+
+
+def api_reachable(timeout: float = 5.0) -> bool:
     """True solo si el endpoint responde 200 con JSON `{"status": "ok"}`.
 
     Un simple `status_code == 200` da falsos positivos (p. ej. el propio
     servidor de Streamlit responde 200/HTML a rutas desconocidas).
     """
+    global _LAST_API_ERROR
     try:
         r = requests.get(f"{API_URL}/api/v1/health", timeout=timeout)
         if r.status_code != 200:
+            _LAST_API_ERROR = f"HTTP {r.status_code} (no 200)"
             return False
-        return r.json().get("status") == "ok"
-    except (requests.RequestException, ValueError):
+        if r.json().get("status") != "ok":
+            _LAST_API_ERROR = "200 pero sin {\"status\": \"ok\"} en el JSON"
+            return False
+        _LAST_API_ERROR = None
+        return True
+    except (requests.RequestException, ValueError) as exc:
+        _LAST_API_ERROR = f"{type(exc).__name__}: {exc}"
         return False
 
 
 @st.cache_data(ttl=10, show_spinner=False)
 def api_health() -> dict:
     try:
-        r = requests.get(f"{API_URL}/api/v1/health", timeout=3)
+        r = requests.get(f"{API_URL}/api/v1/health", timeout=8)
         if r.status_code != 200:
             return {"status": "offline", "api_url": API_URL}
         data = r.json()

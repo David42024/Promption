@@ -44,10 +44,13 @@ def filter_text(text: str, use_ml: bool = True):
     ml_ms = 0.0
     if use_ml:
         try:
+            from src.filter.ml_filter import chunk_text, prepare_texts
             enc, clf = load_ml_filter()
             tm0 = time.perf_counter()
-            emb = np.asarray(enc.encode([text], normalize_embeddings=True), dtype=np.float32)
-            prob = float(clf.predict_proba(emb)[0, int(np.flatnonzero(clf.classes_ == 1)[0])])
+            chunks = chunk_text(text)
+            emb = np.asarray(enc.encode(prepare_texts(chunks), normalize_embeddings=True), dtype=np.float32)
+            proba = clf.predict_proba(emb)[:, int(np.flatnonzero(clf.classes_ == 1)[0])]
+            prob = float(proba.max())
             ml_ms = (time.perf_counter() - tm0) * 1000
             ml = type("ML", (), {"probability": prob, "blocked": prob >= 0.5, "threshold": 0.5,
                                  "available": True})()
@@ -72,11 +75,13 @@ def filter_text(text: str, use_ml: bool = True):
         "latency_ms": round(total_ms, 2),
         "sanitized": sanitize_prompt(text, hres) if blocked else text,
         "heuristic": {"blocked": hres.blocked, "score": hres.score, "threshold": hres.threshold,
-                      "matched_rules": hres.matched_rules, "latency_ms": round(heur_ms, 2)},
+                      "matched_rules": hres.matched_rules, "latency_ms": round(heur_ms, 2),
+                      "benign_matched": list(hres.benign_matched)},
         "ml": {"available": ml.available if hasattr(ml, "available") else ml.probability is not None,
                "blocked": ml.blocked, "probability": ml.probability, "threshold": ml.threshold,
                "latency_ms": round(ml_ms, 2)},
-        "ensemble": {"score": float(score), "threshold": 0.5},
+        "ensemble": {"score": float(score), "threshold": 0.5,
+                     "benign_matched": list(hres.benign_matched)},
         "reason": _reason(hres, ml),
     }
 

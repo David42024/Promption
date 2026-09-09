@@ -6,6 +6,10 @@ class FilterRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Prompt to analyze")
     use_ml: bool = True
     threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    user_id: str | None = Field(default=None, description="End-user id (audit + per-user policy)")
+    roles: list[str] = Field(default_factory=list, description="End-user roles/scopes")
+    context: dict = Field(default_factory=dict, description="Tenant-defined context (doc ACL, channel…)"
+                          )
 
 
 class RuleMatch(BaseModel):
@@ -36,12 +40,28 @@ class FilterResponse(BaseModel):
     reason: str = ""
     layers: dict
     sanitized: str
+    tenant_id: str = "default"
 
 
 class BenchmarkRequest(BaseModel):
     sample_size: int | None = Field(default=None, ge=1)
     use_llm: bool = True
     dataset: str | None = None
+
+
+class OutputGuardRequest(BaseModel):
+    text: str = Field(..., min_length=1, description="LLM response to inspect")
+    user_id: str | None = None
+    context: dict = Field(default_factory=dict)
+
+
+class OutputGuardResponse(BaseModel):
+    action: str
+    risk: float
+    categories: list[str] = []
+    matches: int = 0
+    redacted_response: str | None = None
+    tenant_id: str = "default"
 
 
 class SystemInfo(BaseModel):

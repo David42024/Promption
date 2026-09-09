@@ -29,6 +29,7 @@ models/*.joblib
 models/*.model
 !models/random_forest.pkl
 data/processed/*
+!data/processed/quarantine.csv
 data/embeddings*.npy
 data/pdf_payloads/
 data/audio_payloads/
@@ -58,3 +59,7 @@ Thumbs.db
 # Env
 .env
 *.env
+
+# Frontend (demo Next.js)
+node_modules/
+.next/

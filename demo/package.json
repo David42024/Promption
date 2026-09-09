@@ -1,0 +1,16 @@
+{
+  "name": "demo-shop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Tienda demo: landing + login + chatbot protegido por el Filter API multi-tenant",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

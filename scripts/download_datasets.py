@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.utils.config import load_config
+from src.utils.lang import is_spanish
 from src.utils.logger import logger
 
 HF_BASE = "https://datasets-server.huggingface.co/rows"
@@ -173,12 +174,7 @@ def collect_deepset():
     return mal, ben
 
 
-_ES_MARKERS = (
-    "las instrucciones", "los instrucciones", "instrucciones", "anula tus restricciones", "restricciones éticas",
-    "desconéctate", "directriz", "directrices", "indicación", "desordena", "ignora", "olvida", "revela",
-    "sus reglas", "mis órdenes", "mis directrices", "modo", "capaz de", "configuración", "ética",
-    "el prompt", "entrenamiento", "tus instrucciones", "tus reglas", "oculta", "secreto",
-)
+
 
 
 def collect_yanismiraoui():
@@ -198,8 +194,7 @@ def collect_yanismiraoui():
         prompt = text.strip()
         if not prompt:
             continue
-        low = prompt.lower()
-        if any(m in low for m in _ES_MARKERS):
+        if is_spanish(prompt):
             mal.append({"prompt": prompt, "dataset": "Custom",
                         "attack_type": "injection_es", "source": "yanismiraoui"})
     logger.info("yanismiraoui: %d ejemplos de inyección en español", len(mal))
