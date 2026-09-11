@@ -11,6 +11,12 @@ rules:
     severity: "high"
     enabled: true
 
+  - name: "disable_filter"
+    pattern: "desactiva (el )?(filtro|firewall|seguridad|proteccion|guardia)|disable (the )?(filter|firewall|security|protection)"
+    description: "Request to disable security filters"
+    severity: "high"
+    enabled: true
+
   - name: "pretend_game_role"
     pattern: "pretend (you are|to be|that you are) (in )?(a|an) (game|story|movie|play)"
     description: "Role-play / game jailbreak attempt"
@@ -96,7 +102,7 @@ rules:
     enabled: true
 
   - name: "credentials_request_es"
-    pattern: "(dame|pasame|pásame|dime|revelame|revélame|pasa|da|entrega|dame|dime|revela|revéla).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|clave|credencial|acceso)"
+    pattern: "(dame|pasame|pásame|dime|revelame|revélame|pasa|da|entrega|dame|dime|revela|revéla|proporcioname|entregame).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|clave|credencial|acceso|api[_ -]?key)"
     description: "ES: petición directa de token/contraseña/secreto"
     severity: "high"
     enabled: true
