@@ -14,7 +14,6 @@ from src.api.models import (BenchmarkRequest, FilterRequest, FilterResponse,
 from src.benchmark.runner import BenchmarkRunner, RunnerOptions, json_safe, sanitize_prompt
 from src.filter.ensemble_filter import EnsembleFilter
 from src.filter.heuristic_filter import HeuristicFilter
-from src.filter.ml_filter import MLFilter
 from src.llm import get_llm_client
 from src.utils.config import load_config
 from src.utils.logger import logger
