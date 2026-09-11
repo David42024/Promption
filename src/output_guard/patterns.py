@@ -66,4 +66,17 @@ PATTERNS: list[tuple] = [
      0.9, True),
     ("login_pair", "password", "CRITICAL",
      r"(?i)\buser\s*:\s*[^\s,;]+\s+password\s*:\s*[^\s,;]{4,}", 0.9, True),
+    # Patrones de negación genérica (evitar respuestas vacías del LLM)
+    ("generic_refusal_es", "refusal", "MEDIUM",
+     r"(?i)(lo siento|no puedo|no estoy|no seré|no me es posible|no estoy programado|no tengo permiso|no puedo ayudar|no puedo proporcionar|no puedo revelar|no puedo compartir|no puedo dar|no puedo mostrar).{0,80}(con eso|con esto|con esa información|con ese dato|con esos datos|con esa solicitud|con esa petición|con ese tema|con ese asunto|$)",
+     0.75, True),
+    ("generic_refusal_en", "refusal", "MEDIUM",
+     r"(?i)(i'm sorry|i cannot|i am not|i will not|i am not able|i do not have permission|i cannot help|i cannot provide|i cannot reveal|i cannot share|i cannot give|i cannot show).{0,80}(with that|with this|with that information|with that data|with those details|with that request|with that topic|$)",
+     0.75, True),
+    ("polite_refusal_es", "refusal", "LOW",
+     r"(?i)(disculpa|perdona|lamentablemente|por desgracia|desafortunadamente).{0,30}(no puedo|no puedo ayudar|no está disponible|no tengo acceso|no me es posible)",
+     0.65, True),
+    ("polite_refusal_en", "refusal", "LOW",
+     r"(?i)(i apologize|sorry|unfortunately|regrettably).{0,30}(i cannot|i cannot help|it is not available|i do not have access|i am not able)",
+     0.65, True),
 ]

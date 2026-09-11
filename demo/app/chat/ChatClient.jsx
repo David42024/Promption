@@ -204,7 +204,8 @@ export default function ChatClient({ user }) {
               `\n🔧 ${a.tool} → ${a.allowed ? "ejecutada" : `denegada (${a.reason || "sin permiso"})`}${a.tier ? ` [${a.tier}]` : ""}`
           )
           .join("");
-        const modelTag = data.model
+        // Solo mostrar el modelo si no fue bloqueado por output guard
+        const modelTag = (data.model && data.guard !== "BLOCK" && data.guard !== "REDACT")
           ? `\n\n<span style="display:inline-block;opacity:.62;font-size:.72rem;font-style:italic;margin-top:6px;">✨ Respuesta generada con ${data.model}</span>`
           : "";
         setMsgs(m => [
@@ -214,6 +215,7 @@ export default function ChatClient({ user }) {
             text:
               data.reply +
               (data.leaked ? "\n\n⚠️ (el modelo filtró el secreto pero la comprobación local lo detectó)" : "") +
+              (data.guard === "BLOCK" || data.guard === "REDACT" ? "\n\n🛡️ (Respuesta filtrada por seguridad)" : "") +
               (trail ? `\n${trail}` : "") +
               modelTag,
           },

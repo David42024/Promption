@@ -16,6 +16,9 @@ def _action_for(findings: list[Finding]) -> str:
     if any(f.severity == Severity.HIGH for f in findings):
         return Action.REDACT if len(findings) == 1 else Action.BLOCK
     if any(f.severity == Severity.MEDIUM for f in findings):
+        # Si es un patrón de refusal, hacer BLOCK en lugar de REDACT
+        if any(f.category == "refusal" for f in findings):
+            return Action.BLOCK
         return Action.REDACT
     return Action.PASS
 

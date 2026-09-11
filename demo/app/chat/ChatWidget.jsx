@@ -101,7 +101,8 @@ export default function ChatWidget() {
               }`
           )
           .join("");
-        const modelTag = data.model
+        // Solo mostrar el modelo si no fue bloqueado por output guard
+        const modelTag = (data.model && data.guard !== "BLOCK" && data.guard !== "REDACT")
           ? `\n\n<span style="opacity:.6; font-size:.72rem; font-style:italic;">✨ Respuesta generada con ${data.model}</span>`
           : "";
         setMsgs((m) => [
@@ -111,6 +112,7 @@ export default function ChatWidget() {
             text:
               data.reply +
               (data.leaked ? "\n\n⚠️ (el modelo filtró el secreto)" : "") +
+              (data.guard === "BLOCK" || data.guard === "REDACT" ? "\n\n🛡️ (Respuesta filtrada por seguridad)" : "") +
               trail +
               modelTag,
           },
