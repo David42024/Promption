@@ -68,10 +68,10 @@ PATTERNS: list[tuple] = [
      r"(?i)\buser\s*:\s*[^\s,;]+\s+password\s*:\s*[^\s,;]{4,}", 0.9, True),
     # Patrones de negación genérica (evitar respuestas vacías del LLM)
     ("generic_refusal_es", "refusal", "MEDIUM",
-     r"(?i)(lo siento|no puedo|no estoy|no seré|no me es posible|no estoy programado|no tengo permiso|no puedo ayudar|no puedo proporcionar|no puedo revelar|no puedo compartir|no puedo dar|no puedo mostrar).{0,80}(con eso|con esto|con esa información|con ese dato|con esos datos|con esa solicitud|con esa petición|con ese tema|con ese asunto|$)",
+     r"(?i)(lo siento|no puedo|no estoy|no seré|no me es posible|no estoy programado|no tengo permiso|no puedo ayudar|no puedo proporcionar|no puedo revelar|no puedo compartir|no puedo dar|no puedo mostrar|no dispongo|no cuento|no tengo acceso|no tengo información|no soy capaz).{0,100}(con eso|con esto|con esa información|con ese dato|con esos datos|con esa solicitud|con esa petición|con ese tema|con ese asunto|ese tipo de información|esa lista|esos datos|esa información|$)",
      0.75, True),
     ("generic_refusal_en", "refusal", "MEDIUM",
-     r"(?i)(i'm sorry|i cannot|i am not|i will not|i am not able|i do not have permission|i cannot help|i cannot provide|i cannot reveal|i cannot share|i cannot give|i cannot show).{0,80}(with that|with this|with that information|with that data|with those details|with that request|with that topic|$)",
+     r"(?i)(i'm sorry|i cannot|i am not|i will not|i am not able|i do not have permission|i cannot help|i cannot provide|i cannot reveal|i cannot share|i cannot give|i cannot show|i don't have access|i don't have information|i'm not capable).{0,100}(with that|with this|with that information|with that data|with those details|with that request|with that topic|that type of information|that list|those data|that information|$)",
      0.75, True),
     ("polite_refusal_es", "refusal", "LOW",
      r"(?i)(disculpa|perdona|lamentablemente|por desgracia|desafortunadamente).{0,30}(no puedo|no puedo ayudar|no está disponible|no tengo acceso|no me es posible)",
@@ -79,4 +79,11 @@ PATTERNS: list[tuple] = [
     ("polite_refusal_en", "refusal", "LOW",
      r"(?i)(i apologize|sorry|unfortunately|regrettably).{0,30}(i cannot|i cannot help|it is not available|i do not have access|i am not able)",
      0.65, True),
+    # Patrón específico para "no tengo permiso para compartir..."
+    ("permission_refusal_es", "refusal", "MEDIUM",
+     r"(?i)(no tengo permiso|no cuento con permiso|no dispongo de permiso|no estoy autorizado|no me está permitido).{0,60}(para compartir|para mostrar|para revelar|para proporcionar|para dar|para facilitar|para acceder a|para ver|para consultar)",
+     0.8, True),
+    ("permission_refusal_en", "refusal", "MEDIUM",
+     r"(?i)(i don't have permission|i don't have the permission|i am not authorized|i am not permitted|i don't have access).{0,60}(to share|to show|to reveal|to provide|to give|to facilitate|to access|to see|to view|to consult)",
+     0.8, True),
 ]
