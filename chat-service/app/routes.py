@@ -118,7 +118,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 text=request.text,
                 user_id=request.user.id,
                 roles=user_roles,
-                use_ml=False  # Desactivado por falta de recursos en Render free (usar solo heurística)
+                use_ml=True  # Usar ML ligero (TF-IDF + LogisticRegression) que funciona en Render free
             )
             
             if filter_result.blocked:
