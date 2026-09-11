@@ -38,6 +38,9 @@ class FilterResponse(BaseModel):
     reason: Optional[str] = None
     layers: Optional[Dict[str, Any]] = None
     sanitized: Optional[str] = None
+    text: Optional[str] = None  # Campo adicional del Filter API
+    tenant_id: Optional[str] = None  # Campo adicional del Filter API
+    latency_ms: Optional[float] = None  # Campo adicional del Filter API
 
 
 class LLMResponse(BaseModel):

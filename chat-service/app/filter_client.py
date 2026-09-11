@@ -59,11 +59,13 @@ class FilterClient:
                     raise Exception(f"Filter API error {response.status_code}: {error_text}")
                 
                 data = response.json()
+                print(f"Filter API response: {data}")  # Debug logging
                 return FilterResponse(**data)
                 
         except httpx.TimeoutException:
             raise Exception("Filter API timeout")
         except Exception as e:
+            print(f"Filter client error: {e}")
             raise Exception(f"Filter API error: {str(e)}")
     
     async def output_guard(
