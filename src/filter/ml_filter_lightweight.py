@@ -6,7 +6,7 @@ This is a much lighter alternative to SentenceTransformers + RandomForest:
 - Very fast inference (~10ms vs ~200ms)
 """
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -24,7 +24,7 @@ class MLResult:
     probability: float
     threshold: float
     layer: str = "ml_lightweight"
-    feature_importances: dict[str, float] = dataclass(default_factory=dict)
+    feature_importances: dict[str, float] = field(default_factory=dict)
 
 
 class LightMLFilter:
