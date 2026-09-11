@@ -128,11 +128,22 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     filter_enabled=filter_enabled,
                     filter_skipped=False,
                     role="admin" if is_admin else "ventas",
-                    filter_layers=filter_result.layers
+                    filter_layers=filter_result.layers,
+                    reason=filter_result.reason,
+                    confidence=filter_result.confidence
                 )
         except Exception as e:
             print(f"Filter error: {e}")
-            filter_skipped = True
+            # SI el filtro falla, bloqueamos por seguridad en lugar de continuar
+            return ChatResponse(
+                blocked=True,
+                reply=f"Error en el sistema de filtrado: {str(e)}. Por seguridad, la petición ha sido bloqueada.",
+                filter_enabled=filter_enabled,
+                filter_skipped=True,
+                role="admin" if is_admin else "ventas",
+                reason="Filter API timeout",
+                confidence=1.0
+            )
     
     # 2. Build system prompt with user context
     system_prompt = build_system_prompt({

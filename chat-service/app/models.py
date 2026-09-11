@@ -78,6 +78,8 @@ class ChatResponse(BaseModel):
     role: str = "customer"
     model: str = ""
     filter_layers: Optional[Dict[str, Any]] = None
+    reason: Optional[str] = None  # Campo para el frontend cuando está bloqueado
+    confidence: Optional[float] = None  # Campo para el frontend cuando está bloqueado
 
 
 class HealthResponse(BaseModel):

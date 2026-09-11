@@ -12,7 +12,7 @@ class FilterClient:
         self.base_url = settings.filter_api_url.rstrip("/")
         self.api_key = settings.filter_api_key
         self.tenant_id = settings.tenant_id
-        self.timeout = 10.0
+        self.timeout = 30.0  # Aumentado a 30s para evitar timeouts en Render
     
     async def check_health(self) -> bool:
         """Check if Filter API is healthy"""
