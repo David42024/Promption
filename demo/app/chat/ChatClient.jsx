@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useChat } from "./ChatContext";
 import PermissionsConfig from "./PermissionsConfig";
 

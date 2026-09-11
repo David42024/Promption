@@ -1,6 +1,7 @@
 "use client";
 import { useChat } from "./ChatContext";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import PermissionsConfig from "./PermissionsConfig";
 
 const SendIcon = () => (
