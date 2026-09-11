@@ -1,6 +1,5 @@
 """Filter API client integration"""
 import httpx
-import time
 from typing import Optional, Dict, Any
 from .config import settings
 from .models import FilterResponse
@@ -13,31 +12,7 @@ class FilterClient:
         self.base_url = settings.filter_api_url.rstrip("/")
         self.api_key = settings.filter_api_key
         self.tenant_id = settings.tenant_id
-        self.timeout = 60.0  # Aumentado a 60s para manejar cold starts de Render
-        self._failure_count = 0
-        self._last_failure_time = 0
-        self._circuit_breaker_threshold = 3  # 3 fallos seguidos desactivan el Filter API temporalmente
-        self._circuit_breaker_cooldown = 300  # 5 minutos cooldown
-    
-    def _is_circuit_open(self) -> bool:
-        """Check if circuit breaker is open (Filter API temporarily disabled)"""
-        if self._failure_count >= self._circuit_breaker_threshold:
-            # Verificar si ha pasado el cooldown
-            if time.time() - self._last_failure_time < self._circuit_breaker_cooldown:
-                return True
-            else:
-                # Reset después del cooldown
-                self._failure_count = 0
-        return False
-    
-    def _record_failure(self):
-        """Record a failure and update circuit breaker state"""
-        self._failure_count += 1
-        self._last_failure_time = time.time()
-    
-    def _record_success(self):
-        """Record a success and reset circuit breaker"""
-        self._failure_count = 0
+        self.timeout = 60.0  # Timeout alto para manejar cold starts de Render
     
     async def check_health(self) -> bool:
         """Check if Filter API is healthy"""
@@ -56,10 +31,6 @@ class FilterClient:
         use_ml: bool = True
     ) -> FilterResponse:
         """Filter a prompt through the Filter API"""
-        # Check circuit breaker
-        if self._is_circuit_open():
-            raise Exception("Filter API circuit breaker open (too many failures)")
-        
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
@@ -88,14 +59,11 @@ class FilterClient:
                     raise Exception(f"Filter API error {response.status_code}: {error_text}")
                 
                 data = response.json()
-                self._record_success()  # Reset circuit breaker on success
                 return FilterResponse(**data)
                 
         except httpx.TimeoutException:
-            self._record_failure()
             raise Exception("Filter API timeout")
         except Exception as e:
-            self._record_failure()
             raise Exception(f"Filter API error: {str(e)}")
     
     async def output_guard(
