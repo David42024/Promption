@@ -118,7 +118,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 text=request.text,
                 user_id=request.user.id,
                 roles=user_roles,
-                use_ml=True  # Activar ML layer (tarda más en la primera petición por carga lazy)
+                use_ml=False  # Desactivado por falta de recursos en Render free (usar solo heurística)
             )
             
             if filter_result.blocked:
