@@ -49,6 +49,36 @@ def _contains_secret(text: str) -> bool:
     return False
 
 
+def _basic_local_filter(text: str) -> tuple[bool, str]:
+    """Basic local filter as fallback when Filter API is unavailable
+    
+    Returns: (blocked, reason)
+    """
+    # Palabras clave sospechosas para prompt injection
+    suspicious_keywords = [
+        "token", "clave", "password", "secret", "credencial", "api key",
+        "admin secret", "jwt", "sesión", "autenticación", "olvida tus instrucciones",
+        "ignore the policies", "override", "jailbreak", "desactivar el filtro"
+    ]
+    
+    text_lower = text.lower()
+    
+    # Detectar petición directa de credenciales
+    if any(keyword in text_lower for keyword in suspicious_keywords):
+        return True, "petición de credenciales o información sensible"
+    
+    # Detectar intento de jailbreak
+    jailbreak_patterns = [
+        "olvida", "ignora", "desactiva", "override", "modo desarrollador",
+        "actuar sin restricciones", "simular que eres", "ahora eres"
+    ]
+    
+    if any(pattern in text_lower for pattern in jailbreak_patterns):
+        return True, "intento de jailbreak o override de políticas"
+    
+    return False, ""
+
+
 @router.get("/health", tags=["system"])
 async def health() -> HealthResponse:
     """Health check endpoint"""
@@ -133,17 +163,20 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     confidence=filter_result.confidence
                 )
         except Exception as e:
-            print(f"Filter error: {e}")
-            # SI el filtro falla, bloqueamos por seguridad en lugar de continuar
-            return ChatResponse(
-                blocked=True,
-                reply=f"Error en el sistema de filtrado: {str(e)}. Por seguridad, la petición ha sido bloqueada.",
-                filter_enabled=filter_enabled,
-                filter_skipped=True,
-                role="admin" if is_admin else "ventas",
-                reason="Filter API timeout",
-                confidence=1.0
-            )
+            print(f"Filter API error: {e}, using local fallback filter")
+            filter_skipped = True
+            # Usar filtro local básico como fallback
+            local_blocked, local_reason = _basic_local_filter(request.text)
+            if local_blocked:
+                return ChatResponse(
+                    blocked=True,
+                    reply=f"Bloqueado por el filtro local ({local_reason})",
+                    filter_enabled=filter_enabled,
+                    filter_skipped=True,
+                    role="admin" if is_admin else "ventas",
+                    reason=local_reason,
+                    confidence=0.8
+                )
     
     # 2. Build system prompt with user context
     system_prompt = build_system_prompt({

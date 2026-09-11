@@ -153,9 +153,11 @@ export default function ChatWidget() {
         const formattedReply = formatBotMessage(data.reply);
         
         // Indicador de estado del filtro
-        const filterIndicator = data.filter_enabled 
-          ? "\n\n🛡️ Filtro de seguridad ACTIVO" 
-          : "\n\n⚠️ Filtro de seguridad DESACTIVADO";
+        const filterIndicator = data.filter_skipped 
+          ? "\n\n⚠️ Filtro de seguridad DESACTIVADO (timeout del Filter API)" 
+          : data.filter_enabled 
+            ? "\n\n🛡️ Filtro de seguridad ACTIVO" 
+            : "\n\n⚠️ Filtro de seguridad DESACTIVADO";
         
         setMsgs((m) => [
           ...m,
