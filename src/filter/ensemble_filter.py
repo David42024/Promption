@@ -12,7 +12,13 @@ from src.filter.heuristic_filter import HeuristicFilter, HeuristicResult
 from src.filter.ml_filter import MLFilter, MLResult
 from src.utils.config import load_config
 
-_CONF = load_config().get("ensemble", {})
+_CONF = load_config()
+_MODEL_CONF = _CONF.get("model", {})
+_USE_LIGHTWEIGHT = _MODEL_CONF.get("use_lightweight_ml", False)
+
+# Import lightweight ML filter if enabled
+if _USE_LIGHTWEIGHT:
+    from src.filter.ml_filter_lightweight import LightMLFilter
 
 
 @dataclass
@@ -41,12 +47,17 @@ class EnsembleResult:
 
 class EnsembleFilter:
     def __init__(self, heuristic: HeuristicFilter | None = None, ml: MLFilter | None = None):
-        conf = _CONF
+        conf = _CONF.get("ensemble", {})
         self.heuristic_weight = float(conf.get("heuristic_weight", 0.4))
         self.ml_weight = float(conf.get("ml_weight", 0.6))
         self.final_threshold = float(conf.get("final_threshold", 0.5))
         self.heuristic = heuristic or HeuristicFilter()
-        self.ml = ml or MLFilter()
+        
+        # Use lightweight ML if configured, otherwise use regular ML
+        if _USE_LIGHTWEIGHT:
+            self.ml = ml or LightMLFilter()
+        else:
+            self.ml = ml or MLFilter()
 
     def analyze(self, text: str, use_ml: bool = True) -> EnsembleResult:
         import time

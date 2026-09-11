@@ -21,6 +21,7 @@ model:
   embedding_model: "intfloat/multilingual-e5-small"
   embedding_prefix: "query: "
   classifier_path: "models/random_forest.pkl"
+  lightweight_classifier_path: "models/lightweight_classifier.pkl"  # TF-IDF + LogisticRegression (Render free)
   n_trees: 400
   max_depth: 20
   min_samples_leaf: 1
@@ -28,6 +29,7 @@ model:
   confidence_threshold: 0.5
   chunk_chars: 250        # ventana de chunk-max (~60 tokens): coincide con la longitud mediana del entrenamiento; no diluye ataques de 1-2 frases
   chunk_overlap: 100      # solape para el fallback sin frases (texto sin puntuación)
+  use_lightweight_ml: true  # Use TF-IDF + LogisticRegression instead of SentenceTransformers (Render free)
 
 ensemble:
   # If either layer flags the prompt as malicious -> BLOCKED (OR logic)
