@@ -11,14 +11,21 @@ from dataclasses import dataclass
 from src.filter.heuristic_filter import HeuristicFilter, HeuristicResult
 from src.filter.ml_filter import MLFilter, MLResult
 from src.utils.config import load_config
+from src.utils.logger import logger
 
 _CONF = load_config()
 _MODEL_CONF = _CONF.get("model", {})
 _USE_LIGHTWEIGHT = _MODEL_CONF.get("use_lightweight_ml", False)
 
+logger.info(f"DEBUG: use_lightweight_ml = {_USE_LIGHTWEIGHT}")
+logger.info(f"DEBUG: _MODEL_CONF keys = {list(_MODEL_CONF.keys()) if _MODEL_CONF else 'None'}")
+
 # Import lightweight ML filter if enabled
 if _USE_LIGHTWEIGHT:
     from src.filter.ml_filter_lightweight import LightMLFilter
+    logger.info("DEBUG: Using LightMLFilter (TF-IDF + LogisticRegression)")
+else:
+    logger.info("DEBUG: Using regular MLFilter (SentenceTransformers + RandomForest)")
 
 
 @dataclass
