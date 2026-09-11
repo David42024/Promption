@@ -57,7 +57,6 @@ def _filter_for(tenant: TenantContext, final_override: float | None = None) -> E
     if key not in _tenant_filters:
         flt = EnsembleFilter(
             heuristic=HeuristicFilter(threshold=float(h_thr)) if h_thr is not None else None,
-            ml=MLFilter(threshold=float(m_thr)) if m_thr is not None else None,
         )
         if f_thr is not None:
             flt.final_threshold = float(f_thr)
