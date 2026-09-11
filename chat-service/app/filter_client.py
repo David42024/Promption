@@ -54,7 +54,7 @@ class FilterClient:
                 if response.status_code == 401:
                     raise ValueError("Invalid Filter API key")
                 
-                if not response.ok:
+                if response.status_code != 200:
                     error_text = response.text
                     raise Exception(f"Filter API error {response.status_code}: {error_text}")
                 
