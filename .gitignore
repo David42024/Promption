@@ -28,6 +28,7 @@ models/*.pkl
 models/*.joblib
 models/*.model
 !models/random_forest.pkl
+!models/lightweight_classifier.pkl
 data/processed/*
 !data/processed/quarantine.csv
 data/embeddings*.npy
