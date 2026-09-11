@@ -176,7 +176,11 @@ export default function LoginForm() {
         <div className="demo-accounts">
           <h5>Cuentas de demostración</h5>
           <div className="demo-account">
-            <span className="role">💼 Ventas</span>
+            <span className="role">�️ Cliente</span>
+            <span className="creds">cliente@demo.shop / demo123</span>
+          </div>
+          <div className="demo-account">
+            <span className="role">�💼 Ventas</span>
             <span className="creds">ana@demo.shop / demo123</span>
           </div>
           <div className="demo-account">

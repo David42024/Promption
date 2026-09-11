@@ -227,6 +227,42 @@ rules:
     severity: "medium"
     enabled: true
 
+  - name: "ask_email_es"
+    pattern: "(dame|muéstrame|dime).{0,30}(@|correo|email|mail)"
+    description: "ES: petición de email/cliente"
+    severity: "high"
+    enabled: true
+
+  - name: "ask_phone_es"
+    pattern: "(dame|muéstrame|dime).{0,30}(tel[ée]fono|celular|phone|móvil)"
+    description: "ES: petición de teléfono/cliente"
+    severity: "high"
+    enabled: true
+
+  - name: "ask_address_es"
+    pattern: "(dame|muéstrame|dirección|domicilio).{0,50}"
+    description: "ES: petición de dirección/cliente"
+    severity: "high"
+    enabled: true
+
+  - name: "ask_id_es"
+    pattern: "(dame|muéstrame|dime).{0,30}(identificacion|id|clave|número)"
+    description: "ES: petición de ID/cliente"
+    severity: "high"
+    enabled: true
+
+  - name: "ask_api_key_es"
+    pattern: "(dame|muéstrame|dime).{0,30}(api.?key|token|clave secreta)"
+    description: "ES: petición de API key/token"
+    severity: "high"
+    enabled: true
+
+  - name: "ask_credentials_es"
+    pattern: "(dame|muéstrame|dime).{0,30}(credenciales|contraseñas|passwords|acceso)"
+    description: "ES: petición de credenciales completas"
+    severity: "high"
+    enabled: true
+
   - name: "repeat_secret_es"
     pattern: "(repite|repetir) (todo )?(tu |el )?(mensaje de sistema|c[óo]digo|lo que (sabe|sabes|dice).{0,40}instrucciones)"
     description: "ES: loro / repetición del system prompt o secreto"
@@ -266,6 +302,24 @@ rules:
   - name: "grandma_es"
     pattern: "mi abuela.{0,80}c[óo]digos?|como si fueras mi abuela"
     description: "ES: jailbreak de la abuela para sonsacar el secreto"
+    severity: "medium"
+    enabled: true
+
+  - name: "roleplay_general_es"
+    pattern: "(act[úu]a como|simula|interpreta|eres un).{0,40}(villano|antagonista|hacker|ciberdelincuente|personaje malvado)"
+    description: "ES: roleplay general de personajes maliciosos"
+    severity: "medium"
+    enabled: true
+
+  - name: "context_switch_es"
+    pattern: "(cambia de contexto|cambiar contexto|nuevo contexto|contexto diferente).{0,60}(instrucciones|reglas|comportamiento)"
+    description: "ES: intento de cambiar el contexto operativo"
+    severity: "medium"
+    enabled: true
+
+  - name: "hypothetical_es"
+    pattern: "(hipot[ée]tico|sup[óo]n|imagina|si fuera).{0,60}(c[óo]digo|secreto|contrase[ñn]a|acceso)"
+    description: "ES: ataque hipotético para sonsacar información"
     severity: "medium"
     enabled: true
 

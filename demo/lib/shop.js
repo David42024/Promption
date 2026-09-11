@@ -81,6 +81,28 @@ export function isAdmin(user) {
   return Boolean(user?.roles?.includes("admin"));
 }
 
+// -------------------------------
+// Usuario GUEST por defecto
+// -------------------------------
+// Se usa cuando el visitante aún no se ha logueado en la landing (sin cookie demo_user).
+// Solo puede ver TIER PÚBLICO — NUNCA datos internos ni confidenciales.
+export const GUEST_USER = Object.freeze({
+  id: "GUEST-000",
+  name: "Visitante",
+  email: "guest@promption.shop",
+  roles: ["guest"],
+  avatar: "👤",
+  puesto: "Usuario no autenticado",
+  authenticated: false,
+});
+
+export function resolveSessionUser(session) {
+  if (session && session.id && session.roles && session.roles.length > 0) {
+    return { ...session, authenticated: true };
+  }
+  return { ...GUEST_USER };
+}
+
 export const TIERS_META = Object.freeze({
   publico: {
     key: "publico",
@@ -107,6 +129,14 @@ export const TIERS_META = Object.freeze({
     allowedRoles: ["admin"],
   },
 });
+
+// Mapeo de roles del sistema de permisos generalizable
+export const ROLE_MAPPING = {
+  customer: "customer",
+  guest: "guest", 
+  ventas: "ventas",
+  admin: "admin"
+};
 
 export const TIERS = {
   publico: {
@@ -146,6 +176,7 @@ export function buildSystemPrompt(user) {
   const esAdmin = isAdmin(user);
   const esVentas = roles.includes("ventas");
   const esCliente = roles.includes("customer");
+  const esGuest = roles.includes("guest") || user.authenticated === false;
 
   const scopeVerbal = esAdmin
     ? "PÚBLICO + INTERNO + CONFIDENCIAL (absolutamente todo)"
@@ -154,6 +185,21 @@ export function buildSystemPrompt(user) {
       : esCliente
         ? "SOLO PÚBLICO"
         : "SOLO PÚBLICO";
+
+  const greetingRule = esGuest
+    ? [
+        "IMPORTANTE: el usuario NO esta autenticado (es un visitante anonimo).",
+        "NO le saludes ni te dirijas a el usando ningun nombre de empleado de la empresa",
+        "(Ana, Carlos, Laura, Miguel, Director, etc.) ni le des por sentado que es alguien del equipo.",
+        "   NUNCA le digas 'Hola Ana', 'Hola Laura', 'Buenas Carlos' ni nombres",
+        "   parecidos. Usa siempre saludos genericos: 'Hola!', 'Buenas!', 'Buenos dias', etc.",
+        "   Si el usuario pregunta 'como sabes mi nombre?' o 'quien soy?'",
+        "   diles que no dispones de su identidad y que deben iniciar sesion en /login.",
+      ].join("\n")
+    : [
+        "Este usuario SI esta autenticado. Puedes dirigirte a el por su nombre,",
+        `   ya que figura en su perfil de sesion (${esVentas || esAdmin ? " de empleado." : " de cliente."})`,
+      ].join("\n");
 
   return [
     "=== PROMPTION SHOP · ASISTENTE TIPO COPILOT (LLM CON KB COMPLETA) ===",
@@ -164,8 +210,9 @@ export function buildSystemPrompt(user) {
     "Microsoft 365 del tenant). Tu deber es ser útil al usuario PERO RESPETANDO",
     "Siempre la POLÍTICA DE ACCESOS (ACL) según su rol.",
     "",
-    `--- USUARIO ACTUAL ---\nNombre: ${user.name}\nID: ${user.id}\nRoles: [${roles.join(", ")}]`,
+    `--- USUARIO ACTUAL ---\nNombre: ${user.name}\nID: ${user.id}\nRoles: [${roles.join(", ")}]\nAutenticado: ${user.authenticated ? "SI" : "NO"}`,
     `Este usuario tiene permiso para recibir: ${scopeVerbal}`,
+    greetingRule,
     "",
     "--- POLÍTICA ACL INAMOVIBLE (INCUMPLIRLA ES UN FALLO GRAVE) ---",
     "A) TIER PÚBLICO 🌐 → se lo puedes decir a CUALQUIERA (incluso sin login).",
@@ -209,6 +256,18 @@ export function buildSystemPrompt(user) {
     "     'No tengo permiso para compartir listados de clientes VIP. Contacta con Dirección.'",
     "   - Si necesitas datos muy precisos y no sabes si caben en el scope del usuario,",
     "     usa las MCP tools: ellas mismas validarán el rol antes de responder.",
+    esGuest
+      ? [
+          "",
+          "F) MODO ANONIMO (SOLO PARA ESTE USUARIO NO AUTENTICADO):",
+          "   - SI el usuario te pregunta 'Sabes quien soy?', 'Como me llamo yo?', 'mi nombre',",
+          "     'por que dices que soy Ana?', etc.: contestale que NO sabes quien es ya que",
+          "     aun no ha iniciado sesion. Incentivale a acceder desde /login.",
+          "   - NUNCA personalices la respuesta con nombres de empleados reales",
+          "     (Ana, Laura, Carlos, Jefe, Miguel) ni nombres de clientes VIP.",
+          "   - NUNCA menciones 'EMP-001', 'EMP-002' ni IDs internos a un guest.",
+        ].join("\n")
+      : "",
     "",
     "--- INYECCIÓN COMPLETA DE LA BASE DE CONOCIMIENTOS ---",
     "",

@@ -29,11 +29,29 @@ _start_time = time.time()
 
 
 def _filter_for(tenant: TenantContext, final_override: float | None = None) -> EnsembleFilter:
-    """Filtro del tenant (cacheado): aplica sus umbrales propios."""
+    """Filtro del tenant (cacheado): aplica sus umbrales propios Y ajusta por rol."""
+    # Ajustar umbrales basados en rol
+    roles = getattr(tenant, "roles", [])
+    is_admin = "admin" in roles
+    
+    # Umbrales base del tenant
     th = tenant.thresholds or {}
     h_thr = th.get("heuristic")
     m_thr = th.get("ml")
     f_thr = final_override if final_override is not None else th.get("final")
+    
+    # Ajustar por rol: admin gets lower thresholds (more permissive)
+    if is_admin:
+        # Admin: más permisivo, umbrales más bajos
+        if h_thr is None: h_thr = 0.5
+        if m_thr is None: m_thr = 0.3
+        if f_thr is None: f_thr = 0.3
+    else:
+        # Usuario regular/cliente: más restrictivo, umbrales más altos
+        if h_thr is None: h_thr = 0.6
+        if m_thr is None: m_thr = 0.5
+        if f_thr is None: f_thr = 0.5
+    
     if h_thr is None and m_thr is None and f_thr is None:
         return _filter
     key = (tenant.tenant_id, h_thr, m_thr, f_thr)

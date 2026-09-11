@@ -15,15 +15,17 @@ tenants:
   - tenant_id: "demo-shop"
     name: "Demo Shop (tienda de ejemplo)"
     api_key: "pif_demo_shop_123456"
+    roles: ["cliente"]
     thresholds:
       heuristic: 0.6
       ml: 0.5
-      final: 0.5
+      final: 0.4
 
   - tenant_id: "acme-bank"
     name: "Acme Bank (perfil estricto de ejemplo)"
     api_key: "pif_demo_bank_123456"
+    roles: ["admin"]
     thresholds:
       heuristic: 0.6
       ml: 0.4
-      final: 0.4
+      final: 0.6

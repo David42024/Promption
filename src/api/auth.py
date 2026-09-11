@@ -28,6 +28,7 @@ class TenantContext:
     tenant_id: str
     name: str = ""
     thresholds: dict = field(default_factory=dict)
+    roles: list = field(default_factory=list)
 
 
 def _read_tenants_file() -> dict:
@@ -48,6 +49,7 @@ def load_tenants() -> dict[str, TenantContext]:
                 tenant_id=tid,
                 name=str(entry.get("name", "")),
                 thresholds=dict(entry.get("thresholds", {}) or {}),
+                roles=list(entry.get("roles", ["cliente"] or [])),
             )
     for pair in os.environ.get("PIF_API_KEYS", "").split(","):
         if ":" not in pair:

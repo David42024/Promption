@@ -1,6 +1,7 @@
 "use client";
 import { useChat } from "./ChatContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import PermissionsConfig from "./PermissionsConfig";
 
 const SendIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -25,10 +26,37 @@ const CloseIcon = () => (
   </svg>
 );
 
+const SettingsIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
 export default function ChatWidget() {
   const { msgs, setMsgs, isOpen, setIsOpen } = useChat();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showConfig, setShowConfig] = useState(false);
+
+  useEffect(() => {
+    // Verificar si hay usuario autenticado
+    const checkAuth = async () => {
+      try {
+        const r = await fetch("/api/login/status");
+        if (r.ok) {
+          const data = await r.json();
+          setCurrentUser(data.user);
+          window.__userLoggedIn = !!data.user;
+        }
+      } catch {
+        setCurrentUser(null);
+        window.__userLoggedIn = false;
+      }
+    };
+    checkAuth();
+  }, []);
 
   async function send(e) {
     e.preventDefault();
@@ -47,7 +75,12 @@ export default function ChatWidget() {
       if (!r.ok) {
         setMsgs((m) => [
           ...m,
-          { from: "blocked", text: `⚠️ ${data.error || "Error"}` },
+          {
+            from: "blocked",
+            text: data.friendly
+              ? "⏳ Nuestro asistente está algo saturado en estos momentos. Vuelve a intentarlo en 10-15 segundos."
+              : data.error || "Parece que ha habido un problema temporal. Vuelve a intentarlo.",
+          },
         ]);
       } else if (data.blocked) {
         setMsgs((m) => [
@@ -68,6 +101,9 @@ export default function ChatWidget() {
               }`
           )
           .join("");
+        const modelTag = data.model
+          ? `\n\n<span style="opacity:.6; font-size:.72rem; font-style:italic;">✨ Respuesta generada con ${data.model}</span>`
+          : "";
         setMsgs((m) => [
           ...m,
           {
@@ -75,12 +111,13 @@ export default function ChatWidget() {
             text:
               data.reply +
               (data.leaked ? "\n\n⚠️ (el modelo filtró el secreto)" : "") +
-              (trail ? `\n${trail}` : ""),
+              trail +
+              modelTag,
           },
         ]);
       }
     } catch {
-      setMsgs((m) => [...m, { from: "blocked", text: "⚠️ Error de red" }]);
+      setMsgs((m) => [...m, { from: "blocked", text: "⚠️ Error de red. Comprueba tu conexión e inténtalo de nuevo." }]);
     } finally {
       setBusy(false);
     }
@@ -157,20 +194,26 @@ export default function ChatWidget() {
             <p>
               <span className="status-dot"></span>
               En línea · Protegido
+              {currentUser && (
+                <span style={{ marginLeft: 8, fontSize: "0.75rem", opacity: 0.8 }}>
+                  · {currentUser.name}
+                </span>
+              )}
             </p>
           </div>
         </div>
         <div className="chat-actions">
+          <button
+            className="icon-btn"
+            onClick={() => setShowConfig(true)}
+            title="Configuración de permisos"
+          >
+            <SettingsIcon />
+          </button>
           <a
             href="/chat"
             className="icon-btn"
             title="Abrir en pantalla completa"
-            onClick={(e) => {
-              if (!window.__userLoggedIn) {
-                e.preventDefault();
-                window.location.href = "/login";
-              }
-            }}
           >
             <ExpandIcon />
           </a>
@@ -206,9 +249,34 @@ export default function ChatWidget() {
           >
             <div className="avatar sm">🤖</div>
             <div className="msg bot">
-              Hola 👋 Soy el asistente de Promption Shop. Tengo datos 🟢 públicos, 🟡
-              internos y 🔴 confidenciales. Pregunta lo que necesites… o si quieres
-              probar la seguridad, intenta sonsacarme algo que no debas ver 😏
+              {currentUser ? (
+                currentUser.roles.includes("customer") ? (
+                  <>
+                    Hola {currentUser.name} 👋 Soy el asistente de Promption Shop. 
+                    Puedo ayudarte con información pública de nuestros productos, 
+                    horarios, envíos y garantías. ¿En qué puedo ayudarte hoy?
+                  </>
+                ) : currentUser.roles.includes("admin") ? (
+                  <>
+                    Hola {currentUser.name} 👑 Soy el asistente de Promption Shop. 
+                    Tengo acceso a toda la información de la empresa. ¿Qué necesitas?
+                  </>
+                ) : (
+                  <>
+                    Hola {currentUser.name} 👋 Soy el asistente de Promption Shop. 
+                    Tengo datos 🟢 públicos y 🟡 internos de la empresa. Pregunta lo que necesites…
+                  </>
+                )
+              ) : (
+                <>
+                  Hola 👋 Soy el asistente de Promption Shop. 
+                  Como visitante, puedo ayudarte con información pública: horarios, 
+                  catálogo, garantías y contacto. Si necesitas acceso a información 
+                  interna, inicia sesión en <Link href="/login" style={{ color: "var(--brand-400)", textDecoration: "underline" }}>
+                    /login
+                  </Link>. ¿En qué puedo ayudarte?
+                </>
+              )}
             </div>
           </div>
         )}
@@ -287,6 +355,12 @@ export default function ChatWidget() {
           <SendIcon />
         </button>
       </form>
+      
+      <PermissionsConfig 
+        isOpen={showConfig} 
+        onClose={() => setShowConfig(false)} 
+        currentRole={currentUser?.roles?.[0] || "guest"}
+      />
     </div>
   );
 }
