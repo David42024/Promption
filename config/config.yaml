@@ -29,7 +29,7 @@ model:
   confidence_threshold: 0.5
   chunk_chars: 250        # ventana de chunk-max (~60 tokens): coincide con la longitud mediana del entrenamiento; no diluye ataques de 1-2 frases
   chunk_overlap: 100      # solape para el fallback sin frases (texto sin puntuación)
-  use_lightweight_ml: true  # Use TF-IDF + LogisticRegression instead of SentenceTransformers (Render free)
+  use_lightweight_ml: true  # Use TF-IDF + LogisticRegression instead of SentenceTransformers (Render free) - Updated
 
 ensemble:
   # If either layer flags the prompt as malicious -> BLOCKED (OR logic)
