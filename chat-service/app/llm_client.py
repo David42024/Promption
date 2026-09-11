@@ -75,7 +75,7 @@ class LLMClient:
         import time
         
         if not self.models:
-            raise Exception("No LLM providers configured")
+            raise Exception("No LLM providers configured. Please set GROQ_API_KEY or OPENROUTER_API_KEY environment variables.")
         
         last_error = None
         
@@ -110,7 +110,7 @@ class LLMClient:
                     
                     latency = (time.perf_counter() - start_time) * 1000
                     
-                    if response.ok:
+                    if response.status_code == 200:
                         data = response.json()
                         content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                         return LLMResponse(
@@ -126,7 +126,7 @@ class LLMClient:
                         await asyncio.sleep(1.2 ** attempt)  # Exponential backoff
                         continue
                     
-                    last_error = f"{model_config['provider'].upper()} {response.status_code}"
+                    last_error = f"{model_config['provider'].upper()} {response.status_code}: {response.text[:100]}"
                     break  # Try next model
                     
                 except httpx.TimeoutException:
@@ -137,7 +137,7 @@ class LLMClient:
                         continue
                     break
                 except Exception as e:
-                    last_error = str(e)
+                    last_error = f"{model_config['provider'].upper()} {str(e)}"
                     break
         
         raise Exception(f"All LLM providers failed: {last_error}")
