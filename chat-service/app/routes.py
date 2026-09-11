@@ -2,7 +2,6 @@
 import time
 from typing import List
 from fastapi import APIRouter, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .models import (
@@ -29,15 +28,6 @@ except ImportError:
         return f"Eres asistente de Promption Shop. Usuario: {user.get('name')}, Scope: {scope}"
 
 router = APIRouter()
-
-# CORS middleware
-router.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 _start_time = time.time()
 
