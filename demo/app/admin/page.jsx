@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-const PIF_API_URL = (process.env.PIF_API_URL || "http://localhost:8000").replace(/\/$/, "");
-const ADMIN_SECRET = process.env.PIF_ADMIN_SECRET || "admin_secret_change_me";
+const PIF_API_URL = (process.env.NEXT_PUBLIC_PIF_API_URL || "https://promption.onrender.com").replace(/\/$/, "");
+
+// NOTA: ADMIN_SECRET debe configurarse en .env.local como NEXT_PUBLIC_PIF_ADMIN_SECRET
+// para estar disponible en el cliente. En producción, usar un sistema de autenticación real.
+const ADMIN_SECRET = process.env.NEXT_PUBLIC_PIF_ADMIN_SECRET || "admin_secret_change_me";
 
 // ================ Iconos SVG inline =================
 const BackIcon = () => (
@@ -117,6 +121,9 @@ function getCategoryBadge(cat) {
 }
 
 export default function AdminPanel() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -130,6 +137,44 @@ export default function AdminPanel() {
   const [filterState, setFilterState] = useState(null);
   const [toggling, setToggling] = useState(false);
 
+  // Verificar autenticación
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const r = await fetch("/api/login/status");
+        if (r.ok) {
+          const data = await r.json();
+          if (data.user && data.user.roles && data.user.roles.includes("admin")) {
+            setCurrentUser(data.user);
+          } else {
+            router.push("/login");
+          }
+        } else {
+          router.push("/login");
+        }
+      } catch {
+        router.push("/login");
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+  if (authLoading) {
+    return (
+      <div style={{ 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center", 
+        height: "100vh",
+        fontSize: "1.2rem"
+      }}>
+        Verificando autenticación...
+      </div>
+    );
+  }
+
   const fetchLogs = async () => {
     try {
       setLoading(true);
@@ -142,14 +187,17 @@ export default function AdminPanel() {
         admin_key: ADMIN_SECRET,
       });
       const r = await fetch(`${PIF_API_URL}/api/v1/logs/structured?${params}`);
-      if (!r.ok) throw new Error("Failed to fetch logs");
+      if (!r.ok) {
+        const errorText = await r.text().catch(() => "Error desconocido");
+        throw new Error(`API Error ${r.status}: ${errorText}`);
+      }
       const d = await r.json();
       setLogs(d.logs || []);
       setCategories(d.categories || []);
       setTenants(d.tenants || []);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      setError(`Error cargando logs: ${err.message}. Verifica que PIF_API_URL y PIF_ADMIN_SECRET estén configurados correctamente.`);
     } finally {
       setLoading(false);
       setReloading(false);
@@ -159,9 +207,15 @@ export default function AdminPanel() {
   const fetchStats = async () => {
     try {
       const r = await fetch(`${PIF_API_URL}/api/v1/logs/stats?admin_key=${ADMIN_SECRET}`);
-      if (!r.ok) throw new Error("Failed to fetch stats");
+      if (!r.ok) {
+        const errorText = await r.text().catch(() => "Error desconocido");
+        console.error("Error fetching stats:", errorText);
+        return;
+      }
       setStats(await r.json());
-    } catch { /* silencioso */ }
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+    }
   };
 
   const fetchFilterState = async () => {

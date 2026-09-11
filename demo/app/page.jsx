@@ -115,7 +115,7 @@ export default function Landing() {
   };
 
   return (
-    <ChatProvider>
+    <ChatProvider userId={currentUser?.id || null}>
       <div className="wrap">
         <nav className="nav">
           <div className="logo">

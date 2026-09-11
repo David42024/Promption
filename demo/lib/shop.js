@@ -306,6 +306,9 @@ export const SECRET_MARKERS = [
   "vip2@correo.com",
   "compras@gamma-innova.example",
   "maria.j@example-particular.es",
+  // Patrones generales de emails (cualquier email con @correo.com o @example)
+  "@correo.com",
+  "@example",
   // KPIs exactos
   "3.184.200€",
   "3184200",
@@ -314,11 +317,23 @@ export const SECRET_MARKERS = [
   "412.700€",
   "308.700€",
   "16,9 meses",
+  // Patrones de IDs de clientes VIP
+  "CLI-VIP-",
+  // Facturación exacta de clientes
+  "420.000€",
+  "185.000€",
+  "310.000€",
+  "24.000€",
   // Secretos internos
   "pk_live_psp_1a2b3c4d5e6f7g8h9i0j",
   "prod-db-01.promption.internal",
   "J3f3-2026*-!AdminRoot",
   "eyJhbGciOiJFUzI1NiJ9.internal-do-not-share",
-  // Marcador antiguo por compatibilidad
-  "@correo.com",
+  // Patrones de API keys
+  "pk_live_",
+  "sk_live_",
+  "api_key",
+  "API_KEY",
+  // Números de teléfono completos (patrón)
+  /\+?\d{2,3}[-.\s]?\d{2,3}[-.\s]?\d{3,4}[-.\s]?\d{3,4}/,
 ];

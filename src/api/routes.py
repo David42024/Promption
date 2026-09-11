@@ -267,12 +267,17 @@ def output_guard(req: OutputGuardRequest, tenant: TenantContext = Depends(requir
     """Inspecciona una respuesta del LLM antes de entregarla (PASS/REDACT/BLOCK)."""
     from src.output_guard import guard_response, scan
     from src.utils.structured_logger import log_output_guard
-    res = guard_response(req.text)
+    
+    # Verificar si el usuario es admin - si lo es, aplicar lógica más permisiva
+    roles = getattr(req, "context", {}).get("roles", []) if hasattr(req, "context") else []
+    is_admin = "admin" in roles
+    
+    res = guard_response(req.text, admin_mode=is_admin)
     findings = scan(req.text) if res.action != "PASS" else []
     fps = [f.fingerprint for f in findings]
     logger.info(
-        "OutputGuard [%s] tenant=%s user=%s cats=%s matches=%d risk=%.3f fps=%s",
-        res.action, tenant.tenant_id, req.user_id, res.categories, res.matches, res.risk,
+        "OutputGuard [%s] tenant=%s user=%s is_admin=%s cats=%s matches=%d risk=%.3f fps=%s",
+        res.action, tenant.tenant_id, req.user_id, is_admin, res.categories, res.matches, res.risk,
         [f"sha256:{fp[:12]}" for fp in fps],
     )
     

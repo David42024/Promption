@@ -10,12 +10,20 @@ _RISK = {Severity.LOW: 0.25, Severity.MEDIUM: 0.6, Severity.HIGH: 0.85, Severity
 _ORDER = [Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL]
 
 
-def _action_for(findings: list[Finding]) -> str:
+def _action_for(findings: list[Finding], admin_mode: bool = False) -> str:
     if any(f.severity == Severity.CRITICAL for f in findings):
         return Action.BLOCK
     if any(f.severity == Severity.HIGH for f in findings):
+        # En modo admin, REDACT en lugar de BLOCK para HIGH severity
+        if admin_mode:
+            return Action.REDACT
         return Action.REDACT if len(findings) == 1 else Action.BLOCK
     if any(f.severity == Severity.MEDIUM for f in findings):
+        # En modo admin, PASS para MEDIUM excepto refusal
+        if admin_mode:
+            if any(f.category == "refusal" for f in findings):
+                return Action.BLOCK
+            return Action.PASS
         # Si es un patrón de refusal, hacer BLOCK en lugar de REDACT
         if any(f.category == "refusal" for f in findings):
             return Action.BLOCK
@@ -23,13 +31,13 @@ def _action_for(findings: list[Finding]) -> str:
     return Action.PASS
 
 
-def apply_policy(text: str, findings: list[Finding]) -> GuardResult:
+def apply_policy(text: str, findings: list[Finding], admin_mode: bool = False) -> GuardResult:
     if not findings:
         return GuardResult(action=Action.PASS, risk=0.02)
     top = max(f.severity for f in findings)
     risk = min(0.99, _RISK[top] + 0.02 * (len(findings) - 1))
     cats = sorted({f.category for f in findings})
-    action = _action_for(findings)
+    action = _action_for(findings, admin_mode=admin_mode)
     if action == Action.BLOCK:
         return GuardResult(action=action, risk=risk, categories=cats, matches=len(findings))
     redacted = text

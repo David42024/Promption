@@ -13,7 +13,7 @@ export default function ChatPage() {
   if (!user) redirect("/login");
   return (
     <div className="fullscreen-chat">
-      <ChatProvider>
+      <ChatProvider userId={user.id}>
         <ChatClient user={user} />
       </ChatProvider>
     </div>

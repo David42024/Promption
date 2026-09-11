@@ -279,7 +279,15 @@ export async function POST(req) {
             "Content-Type": "application/json",
             "X-API-Key": PIF_TENANT_KEY,
           },
-          body: JSON.stringify({ text: reply, user_id: user.id }),
+          body: JSON.stringify({ 
+            text: reply, 
+            user_id: user.id,
+            roles: user.roles,
+            context: {
+              channel: "demo-chat",
+              data_tiers: ["publico", "interno", "confidencial"],
+            }
+          }),
         });
         if (g.ok) {
           guard = await g.json();
@@ -308,7 +316,14 @@ export async function POST(req) {
       }
     }
 
-    const leaked = SECRET_MARKERS.some((m) => reply.includes(m));
+    const leaked = SECRET_MARKERS.some((m) => {
+      if (typeof m === 'string') {
+        return reply.includes(m);
+      } else if (m instanceof RegExp) {
+        return m.test(reply);
+      }
+      return false;
+    });
 
     if (!filterOn) {
       reply +=

@@ -60,7 +60,14 @@ export default function LoginForm() {
         setError((await r.json()).error || "Error de autenticación");
         return;
       }
-      router.push("/chat");
+      const data = await r.json();
+      const user = data.user;
+      // Redirigir al panel admin si es admin, sino al chat
+      if (user.roles && user.roles.includes("admin")) {
+        router.push("/admin");
+      } else {
+        router.push("/chat");
+      }
     } finally {
       setLoading(false);
     }
