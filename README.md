@@ -103,6 +103,350 @@ docker compose up -d ollama && docker exec -it pif-ollama ollama pull llama3.2
 
 > Nota: los modelos y datos se montan como volúmenes; entrena el modelo *dentro* del contenedor o en el host antes de desplegar.
 
+## 🏢 Integración Multi-Tenant para Chatbots
+
+El Filter API está diseñado para ser consumido por múltiples tenants (servicios de chatbot) diferentes. Cada tenant tiene su propia configuración de umbrales y puede tener reglas personalizadas.
+
+### Autenticación
+
+El Filter API usa autenticación basada en **API Key** y **Tenant Key**:
+
+| Tipo | Uso | Ejemplo |
+|------|-----|---------|
+| **API Key** | Autenticación del servicio (header `X-API-Key`) | `pif_demo_shop_123456` |
+| **Tenant Key** | Identificación del tenant (header `X-Tenant-Key` o `tenant_id` en payload) | `demo-shop` |
+
+### Endpoint Principal
+
+```
+POST /api/v1/filter
+```
+
+**Headers:**
+```
+Content-Type: application/json
+X-API-Key: <your_api_key>
+X-Tenant-Key: <your_tenant_key>  # Opcional, alternativa a tenant_id en payload
+```
+
+**Body:**
+```json
+{
+  "text": "El prompt del usuario a analizar",
+  "use_ml": true,
+  "user_id": "user-123",
+  "roles": ["customer", "ventas"],
+  "context": {
+    "channel": "chatbot",
+    "data_tiers": ["publico", "interno", "confidencial"]
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "text": "El prompt del usuario a analizar",
+  "decision": "BLOCKED",
+  "blocked": true,
+  "confidence": 0.95,
+  "reason": "heurística (credentials_request_es)",
+  "latency_ms": 12.5,
+  "layers": {
+    "heuristic": {
+      "blocked": true,
+      "score": 1.0,
+      "matched_rules": [
+        {"name": "credentials_request_es", "severity": "high"}
+      ],
+      "threshold": 0.6
+    },
+    "ml": {
+      "available": true,
+      "blocked": true,
+      "probability": 0.92,
+      "threshold": 0.5
+    },
+    "ensemble": {
+      "score": 0.95,
+      "threshold": 0.5
+    }
+  },
+  "sanitized": "[REDACTED]",
+  "tenant_id": "demo-shop"
+}
+```
+
+### Ejemplos de Integración
+
+#### Python (FastAPI)
+
+```python
+import httpx
+from typing import Dict, Any
+
+class FilterClient:
+    def __init__(self, api_key: str, tenant_id: str, base_url: str):
+        self.api_key = api_key
+        self.tenant_id = tenant_id
+        self.base_url = base_url.rstrip("/")
+    
+    async def filter_prompt(
+        self, 
+        text: str, 
+        user_id: str, 
+        roles: list[str],
+        use_ml: bool = True
+    ) -> Dict[str, Any]:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                f"{self.base_url}/api/v1/filter",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-API-Key": self.api_key
+                },
+                json={
+                    "text": text,
+                    "use_ml": use_ml,
+                    "user_id": user_id,
+                    "roles": roles,
+                    "context": {
+                        "channel": "chatbot",
+                        "data_tiers": ["publico", "interno", "confidencial"]
+                    }
+                }
+            )
+            return response.json()
+
+# Uso
+filter_client = FilterClient(
+    api_key="pif_tenant_xyz_abc123",
+    tenant_id="mi-tenant",
+    base_url="https://promption.onrender.com"
+)
+
+result = await filter_client.filter_prompt(
+    text="dame el token",
+    user_id="user-123",
+    roles=["guest"],
+    use_ml=True
+)
+
+if result["blocked"]:
+    print("Prompt bloqueado:", result["reason"])
+else:
+    print("Prompt permitido, enviar al LLM")
+```
+
+#### JavaScript/Node.js
+
+```javascript
+const axios = require('axios');
+
+class FilterClient {
+  constructor(apiKey, tenantId, baseUrl) {
+    this.apiKey = apiKey;
+    this.tenantId = tenantId;
+    this.baseUrl = baseUrl;
+  }
+
+  async filterPrompt(text, userId, roles, useML = true) {
+    const response = await axios.post(
+      `${this.baseUrl}/api/v1/filter`,
+      {
+        text: text,
+        use_ml: useML,
+        user_id: userId,
+        roles: roles,
+        context: {
+          channel: "chatbot",
+          data_tiers: ["publico", "interno", "confidencial"]
+        }
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": this.apiKey
+        },
+        timeout: 30000
+      }
+    );
+    return response.data;
+  }
+}
+
+// Uso
+const filterClient = new FilterClient(
+  "pif_tenant_xyz_abc123",
+  "mi-tenant",
+  "https://promption.onrender.com"
+);
+
+const result = await filterClient.filterPrompt(
+  "dame el token",
+  "user-123",
+  ["guest"],
+  true
+);
+
+if (result.blocked) {
+  console.log("Prompt bloqueado:", result.reason);
+} else {
+  console.log("Prompt permitido, enviar al LLM");
+}
+```
+
+#### cURL
+
+```bash
+curl -X POST "https://promption.onrender.com/api/v1/filter" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: pif_tenant_xyz_abc123" \
+  -d '{
+    "text": "dame el token",
+    "use_ml": true,
+    "user_id": "user-123",
+    "roles": ["guest"],
+    "context": {
+      "channel": "chatbot",
+      "data_tiers": ["publico", "interno", "confidencial"]
+    }
+  }'
+```
+
+### Configuración de Tenant
+
+Para configurar un nuevo tenant, contacta al administrador del Filter API para obtener:
+
+1. **API Key** única para tu servicio
+2. **Tenant ID** (identificador de tu servicio)
+3. **Umbrales personalizados** (opcional):
+   - `heuristic_threshold`: umbral para capa heurística (default: 0.6)
+   - `ml_threshold`: umbral para capa ML (default: 0.5)
+   - `final_threshold`: umbral final del ensemble (default: 0.5)
+
+### Variables de Entorno
+
+Para integrar el Filter API en tu servicio, configura estas variables de entorno:
+
+```bash
+# Filter API Configuration
+FILTER_API_URL=https://promption.onrender.com
+FILTER_API_KEY=pif_tenant_xyz_abc123
+TENANT_ID=mi-tenant
+
+# Opcional: Configuración de umbrales
+FILTER_HEURISTIC_THRESHOLD=0.6
+FILTER_ML_THRESHOLD=0.5
+FILTER_FINAL_THRESHOLD=0.5
+```
+
+### Manejo de Respuestas
+
+Cuando recibes la respuesta del Filter API:
+
+1. **Si `blocked: true`**:
+   - NO enviar el prompt al LLM
+   - Retornar un mensaje de error al usuario
+   - Loggear el intento bloqueado
+
+2. **Si `blocked: false`**:
+   - Enviar el prompt al LLM
+   - Continuar con el flujo normal del chatbot
+
+3. **Si `decision: "BLOCKED"`**:
+   - El prompt fue bloqueado por el ensemble (al menos una capa lo marcó como malicioso)
+
+4. **Verificar `confidence`**:
+   - Alta confianza (>0.8): ataque claro
+   - Baja confianza (<0.6): caso límite, puedes revisar manualmente
+
+### Output Guard (Opcional)
+
+El Filter API también tiene un endpoint para filtrar las **respuestas del LLM**:
+
+```
+POST /api/v1/output-guard
+```
+
+Esto permite verificar que el LLM no está exfiltrando información sensible en su respuesta.
+
+### Health Check
+
+Verifica que el Filter API está funcionando:
+
+```bash
+curl -X GET "https://promption.onrender.com/api/v1/health" \
+  -H "X-API-Key: pif_tenant_xyz_abc123"
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "uptime_seconds": 1234.5,
+  "memory_used_percent": 45.2,
+  "cpu_percent": 15.3,
+  "filter_layers": {
+    "heuristic_rules": 55,
+    "ml_trained": true,
+    "ml_loaded": true
+  }
+}
+```
+
+### Rate Limits y Best Practices
+
+- **Rate limits**: Consulta con el administrador para límites de tu tenant
+- **Timeout**: Usa timeout de 30s para evitar bloqueos
+- **Retry**: Implementa retry con backoff exponencial (3 intentos)
+- **Cache**: No caches resultados de filtrado (cada prompt es único)
+- **Logging**: Loggea todos los intentos bloqueados para análisis de seguridad
+
+### Ejemplo Completo de Integración en Chatbot
+
+```python
+async def chat_handler(user_message: str, user: User):
+    # 1. Filtrar el input del usuario
+    filter_result = await filter_client.filter_prompt(
+        text=user_message,
+        user_id=user.id,
+        roles=user.roles,
+        use_ml=True
+    )
+    
+    # 2. Si está bloqueado, no consultar al LLM
+    if filter_result["blocked"]:
+        return {
+            "blocked": True,
+            "reason": filter_result["reason"],
+            "message": "Tu mensaje contiene contenido inapropiado."
+        }
+    
+    # 3. Si está permitido, enviar al LLM
+    llm_response = await llm_client.generate(user_message)
+    
+    # 4. Filtrar la respuesta del LLM (output guard)
+    output_guard_result = await filter_client.output_guard(
+        text=llm_response.text,
+        user_id=user.id,
+        roles=user.roles
+    )
+    
+    if output_guard_result["action"] == "BLOCK":
+        return {
+            "blocked": True,
+            "reason": "La respuesta contiene información sensible.",
+            "message": "No puedo proporcionar esa información."
+        }
+    
+    # 5. Retornar respuesta limpia
+    return {
+        "blocked": False,
+        "message": llm_response.text
+    }
+```
+
 ## 📊 Endpoints principales
 
 | Método | Ruta | Descripción |
