@@ -3,6 +3,50 @@ import { useEffect, useRef, useState } from "react";
 import { useChat } from "./ChatContext";
 import PermissionsConfig from "./PermissionsConfig";
 
+// Función para formatear mensajes del bot de manera más bonita y estructurada
+function formatBotMessage(text) {
+  if (!text) return "";
+  
+  // Dividir en secciones basadas en encabezados
+  const sections = text.split(/(?=### |## |\*\*[^*]+\*\*:)/);
+  
+  // Si no hay secciones claras, dividir por párrafos
+  if (sections.length <= 1) {
+    const paragraphs = text.split('\n\n').filter(p => p.trim());
+    if (paragraphs.length > 1) {
+      return paragraphs.map((p, i) => {
+        if (i === 0) return p; // Primer párrafo normal
+        return `\n\n${p}`; // Resto con separación
+      }).join('');
+    }
+    return text;
+  }
+  
+  // Formatear secciones con encabezados
+  return sections.map((section, index) => {
+    if (index === 0) return section; // Primera sección normal
+    
+    // Detectar si es un encabezado
+    const headerMatch = section.match(/^(#{1,3})\s+(.+)$/m);
+    if (headerMatch) {
+      const [, hashes, title] = headerMatch;
+      const level = hashes.length;
+      const emoji = level === 1 ? '🎯' : level === 2 ? '📋' : '📌';
+      return `\n\n${emoji} **${title}**\n${section.replace(headerMatch[0], '').trim()}`;
+    }
+    
+    // Detectar si es lista con negritas como títulos
+    const boldMatch = section.match(/^\*\*([^*]+)\*\*:/);
+    if (boldMatch) {
+      const [, title] = boldMatch;
+      const emoji = '📋';
+      return `\n\n${emoji} **${title}**\n${section.replace(boldMatch[0], '').trim()}`;
+    }
+    
+    return `\n\n${section.trim()}`;
+  }).join('');
+}
+
 const SendIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="22" y1="2" x2="11" y2="13" />
@@ -204,16 +248,18 @@ export default function ChatClient({ user }) {
               `\n🔧 ${a.tool} → ${a.allowed ? "ejecutada" : `denegada (${a.reason || "sin permiso"})`}${a.tier ? ` [${a.tier}]` : ""}`
           )
           .join("");
-        // Solo mostrar el modelo si no fue bloqueado por output guard
-        const modelTag = (data.model && data.guard !== "BLOCK" && data.guard !== "REDACT")
-          ? `\n\n<span style="display:inline-block;opacity:.62;font-size:.72rem;font-style:italic;margin-top:6px;">✨ Respuesta generada con ${data.model}</span>`
-          : "";
+        // Ocultar siempre el span del modelo por defecto
+        const modelTag = "";
+        
+        // Formatear la respuesta para que sea más bonita y estructurada
+        const formattedReply = formatBotMessage(data.reply);
+        
         setMsgs(m => [
           ...m,
           {
             from: "bot",
             text:
-              data.reply +
+              formattedReply +
               (data.leaked ? "\n\n⚠️ (el modelo filtró el secreto pero la comprobación local lo detectó)" : "") +
               (data.guard === "BLOCK" || data.guard === "REDACT" ? "\n\n🛡️ (Respuesta filtrada por seguridad)" : "") +
               (trail ? `\n${trail}` : "") +

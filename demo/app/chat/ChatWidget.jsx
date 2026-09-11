@@ -33,6 +33,50 @@ const SettingsIcon = () => (
   </svg>
 );
 
+// Función para formatear mensajes del bot de manera más bonita y estructurada
+function formatBotMessage(text) {
+  if (!text) return "";
+  
+  // Dividir en secciones basadas en encabezados
+  const sections = text.split(/(?=### |## |\*\*[^*]+\*\*:)/);
+  
+  // Si no hay secciones claras, dividir por párrafos
+  if (sections.length <= 1) {
+    const paragraphs = text.split('\n\n').filter(p => p.trim());
+    if (paragraphs.length > 1) {
+      return paragraphs.map((p, i) => {
+        if (i === 0) return p; // Primer párrafo normal
+        return `\n\n${p}`; // Resto con separación
+      }).join('');
+    }
+    return text;
+  }
+  
+  // Formatear secciones con encabezados
+  return sections.map((section, index) => {
+    if (index === 0) return section; // Primera sección normal
+    
+    // Detectar si es un encabezado
+    const headerMatch = section.match(/^(#{1,3})\s+(.+)$/m);
+    if (headerMatch) {
+      const [, hashes, title] = headerMatch;
+      const level = hashes.length;
+      const emoji = level === 1 ? '🎯' : level === 2 ? '📋' : '📌';
+      return `\n\n${emoji} **${title}**\n${section.replace(headerMatch[0], '').trim()}`;
+    }
+    
+    // Detectar si es lista con negritas como títulos
+    const boldMatch = section.match(/^\*\*([^*]+)\*\*:/);
+    if (boldMatch) {
+      const [, title] = boldMatch;
+      const emoji = '📋';
+      return `\n\n${emoji} **${title}**\n${section.replace(boldMatch[0], '').trim()}`;
+    }
+    
+    return `\n\n${section.trim()}`;
+  }).join('');
+}
+
 export default function ChatWidget() {
   const { msgs, setMsgs, isOpen, setIsOpen } = useChat();
   const [input, setInput] = useState("");
@@ -101,16 +145,18 @@ export default function ChatWidget() {
               }`
           )
           .join("");
-        // Solo mostrar el modelo si no fue bloqueado por output guard
-        const modelTag = (data.model && data.guard !== "BLOCK" && data.guard !== "REDACT")
-          ? `\n\n<span style="opacity:.6; font-size:.72rem; font-style:italic;">✨ Respuesta generada con ${data.model}</span>`
-          : "";
+        // Ocultar siempre el span del modelo por defecto
+        const modelTag = ""; 
+        
+        // Formatear la respuesta para que sea más bonita y estructurada
+        const formattedReply = formatBotMessage(data.reply);
+        
         setMsgs((m) => [
           ...m,
           {
             from: "bot",
             text:
-              data.reply +
+              formattedReply +
               (data.leaked ? "\n\n⚠️ (el modelo filtró el secreto)" : "") +
               (data.guard === "BLOCK" || data.guard === "REDACT" ? "\n\n🛡️ (Respuesta filtrada por seguridad)" : "") +
               trail +
