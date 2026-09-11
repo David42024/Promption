@@ -272,7 +272,7 @@ def output_guard(req: OutputGuardRequest, tenant: TenantContext = Depends(requir
     roles = getattr(req, "context", {}).get("roles", []) if hasattr(req, "context") else []
     is_admin = "admin" in roles
     
-    res = guard_response(req.text, admin_mode=is_admin)
+    res = guard_response(req.text)
     findings = scan(req.text) if res.action != "PASS" else []
     fps = [f.fingerprint for f in findings]
     logger.info(
