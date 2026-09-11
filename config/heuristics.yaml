@@ -101,6 +101,12 @@ rules:
     severity: "high"
     enabled: true
 
+  - name: "token_secreto_direct"
+    pattern: "(token|c[óo]digo).{0,10}(secreto|secret|confidencial|interno)"
+    description: "Mención directa de token secreto/código secreto"
+    severity: "high"
+    enabled: true
+
   - name: "ignore_instructions_es"
     pattern: "ignora (todas )?(las )?(instrucciones|[óo]rdenes) (anteriores|previas|dadas|de arriba)"
     description: "ES: orden de ignorar instrucciones previas"
