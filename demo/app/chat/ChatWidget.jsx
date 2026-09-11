@@ -152,12 +152,18 @@ export default function ChatWidget() {
         // Formatear la respuesta para que sea más bonita y estructurada
         const formattedReply = formatBotMessage(data.reply);
         
+        // Indicador de estado del filtro
+        const filterIndicator = data.filter_enabled 
+          ? "\n\n🛡️ Filtro de seguridad ACTIVO" 
+          : "\n\n⚠️ Filtro de seguridad DESACTIVADO";
+        
         setMsgs((m) => [
           ...m,
           {
             from: "bot",
             text:
               formattedReply +
+              filterIndicator +
               (data.leaked ? "\n\n⚠️ (el modelo filtró el secreto)" : "") +
               (data.guard === "BLOCK" || data.guard === "REDACT" ? "\n\n🛡️ (Respuesta filtrada por seguridad)" : "") +
               trail +
