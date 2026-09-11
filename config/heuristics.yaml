@@ -101,6 +101,12 @@ rules:
     severity: "high"
     enabled: true
 
+  - name: "social_engineering_es"
+    pattern: "(eres (un )?(buen|amable|generoso) (bot|asistente|modelo) |por favor|te ruego|te pido|sé amable|ayúdame|ayudame|ayúdame).{0,40}(dame|pasame|pásame|dime|revelame|revélame|entregame|proporcioname).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|clave|credencial|acceso)"
+    description: "ES: social engineering / manipulación afectiva para obtener credenciales"
+    severity: "high"
+    enabled: true
+
   - name: "token_secreto_direct"
     pattern: "(token|c[óo]digo).{0,10}(secreto|secret|confidencial|interno)"
     description: "Mención directa de token secreto/código secreto"
