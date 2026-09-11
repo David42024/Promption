@@ -1,37 +1,40 @@
 """Configuration management for Chat Service"""
 import os
-from typing import Optional
-from pydantic_settings import BaseSettings
+from typing import Optional, List
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings"""
     
     # Filter API Configuration
-    filter_api_url: str = os.getenv("FILTER_API_URL", "https://promption.onrender.com")
-    filter_api_key: str = os.getenv("FILTER_API_KEY", "pif_demo_shop_123456")
-    tenant_id: str = os.getenv("TENANT_ID", "demo-shop")
+    filter_api_url: str = "https://promption.onrender.com"
+    filter_api_key: str = "pif_demo_shop_123456"
+    tenant_id: str = "demo-shop"
     
     # LLM Configuration
-    groq_api_key: Optional[str] = os.getenv("GROQ_API_KEY")
-    openrouter_api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY")
-    default_model: str = os.getenv("DEFAULT_MODEL", "llama-3.1-70b-versatile")
+    groq_api_key: Optional[str] = None
+    openrouter_api_key: Optional[str] = None
+    default_model: str = "llama-3.1-70b-versatile"
     
     # Service Configuration
     service_name: str = "promption-chat-service"
     version: str = "1.0.0"
-    debug: bool = os.getenv("DEBUG", "false").lower() == "true"
+    debug: bool = False
     
-    # CORS Configuration
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "https://promptionsi.vercel.app",
-        "https://promption.shop",
-    ]
+    # CORS Configuration (como string separado por comas)
+    cors_origins_str: str = "http://localhost:3000,https://promptionsi.vercel.app,https://promption.shop"
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    @property
+    def cors_origins(self) -> List[str]:
+        """Parse CORS origins from comma-separated string"""
+        return [origin.strip() for origin in self.cors_origins_str.split(",") if origin.strip()]
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"
+    )
 
 
 settings = Settings()
