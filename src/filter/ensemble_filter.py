@@ -66,12 +66,12 @@ class EnsembleFilter:
         else:
             self.ml = ml or MLFilter()
 
-    def analyze(self, text: str, use_ml: bool = True) -> EnsembleResult:
+    def analyze(self, text: str, use_ml: bool = True, roles: list[str] | None = None) -> EnsembleResult:
         import time
 
         start = time.perf_counter()
         t_heur0 = time.perf_counter()
-        heur = self.heuristic.analyze(text)
+        heur = self.heuristic.analyze(text, roles=roles)
         heuristic_latency = (time.perf_counter() - t_heur0) * 1000
 
         ml_res: MLResult | None = None

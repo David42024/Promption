@@ -38,6 +38,7 @@ class HeuristicFilter:
                 "severity": rule.get("severity", "medium"),
                 "description": rule.get("description", ""),
                 "severity_score": _SCORES.get(rule.get("severity", "medium"), 0.7),
+                "applies_to_roles": [r.lower() for r in rule.get("applies_to_roles", [])],
             })
         scoring = cfg.get("scoring", {})
         self.threshold = threshold if threshold is not None else float(scoring.get("heuristic_threshold", 0.6))
@@ -48,11 +49,23 @@ class HeuristicFilter:
         logger.info("HeuristicFilter initialized with %d rules (threshold=%.2f)", len(self._rules), self.threshold)
 
     # ------------------------------------------------------------------ public
-    def analyze(self, text: str) -> HeuristicResult:
-        """Score a prompt and return the full result object."""
+    def analyze(self, text: str, roles: list[str] | None = None) -> HeuristicResult:
+        """Score a prompt and return the full result object.
+
+        Parameters
+        ----------
+        text:
+            Prompt a analizar.
+        roles:
+            Roles del usuario. Si una regla tiene ``applies_to_roles``, solo
+            se evalúa si el usuario tiene al menos uno de esos roles.
+        """
         text = text or ""
+        user_roles = {r.lower() for r in (roles or [])}
         matches: list[dict] = []
         for rule in self._rules:
+            if rule["applies_to_roles"] and not (user_roles & set(rule["applies_to_roles"])):
+                continue
             if rule["regex"].search(text):
                 matches.append(rule)
             if len(matches) >= self.max_matches:

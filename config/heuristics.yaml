@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # Heuristic Filter — Configurable detection rules
 # Each rule is a regex. A prompt is flagged by a rule when the
 # regex matches (case-insensitive).
@@ -250,24 +250,28 @@ rules:
     description: "ES: petición de email/cliente"
     severity: "high"
     enabled: true
+    applies_to_roles: ["customer"]
 
   - name: "ask_phone_es"
     pattern: "(dame|muéstrame|dime).{0,30}(tel[ée]fono|celular|phone|móvil)"
     description: "ES: petición de teléfono/cliente"
     severity: "high"
     enabled: true
+    applies_to_roles: ["customer"]
 
   - name: "ask_address_es"
-    pattern: "(dame|muéstrame|dirección|domicilio).{0,50}"
+    pattern: "(dame|muéstrame|dime).{0,30}(direcci[oó]n|domicilio|calle|avenida|colonia|c[oó]digo postal|ciudad|ubicaci[oó]n|vivienda)"
     description: "ES: petición de dirección/cliente"
     severity: "high"
     enabled: true
+    applies_to_roles: ["customer"]
 
   - name: "ask_id_es"
     pattern: "(dame|muéstrame|dime).{0,30}(identificacion|id|clave|número)"
     description: "ES: petición de ID/cliente"
     severity: "high"
     enabled: true
+    applies_to_roles: ["customer"]
 
   - name: "ask_api_key_es"
     pattern: "(dame|muéstrame|dime).{0,30}(api.?key|token|clave secreta)"

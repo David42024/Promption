@@ -202,7 +202,8 @@ def reload_filter(tenant: TenantContext = Depends(require_tenant)):
 def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(require_tenant)) -> FilterResponse:
     t0 = time.perf_counter()
     flt = _filter_for(tenant, req.threshold)
-    res = flt.analyze(req.text, use_ml=req.use_ml)
+    merged_roles = list(req.roles) + list(getattr(tenant, "roles", []) or [])
+    res = flt.analyze(req.text, use_ml=req.use_ml, roles=merged_roles)
     latency = (time.perf_counter() - t0) * 1000
 
     rules = [{"name": r["name"], "severity": r["severity"], "description": r.get("description", "")}
