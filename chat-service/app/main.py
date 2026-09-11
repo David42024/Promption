@@ -11,7 +11,7 @@ app = FastAPI(
     version=settings.version,
 )
 
-# CORS middleware
+# CORS middleware - AÑADIDO A LA APP, NO AL ROUTER
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
