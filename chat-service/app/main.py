@@ -36,6 +36,7 @@ def root():
         "health": "/api/v1/health",
         "chat": "POST /api/v1/chat",
         "status": "/api/v1/status",
+        "deployment_marker": "chat-service-2026-09-13",
         "uptime_seconds": time.time() - _start_time
     }
 

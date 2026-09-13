@@ -1,7 +1,7 @@
 {
   "name": "demo-shop",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Tienda demo: landing + login + chatbot protegido por el Filter API multi-tenant",
   "scripts": {
     "dev": "next dev",

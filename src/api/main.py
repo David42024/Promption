@@ -39,6 +39,7 @@ def root():
         "filter": "POST /api/v1/filter",
         "benchmark": "POST /api/v1/benchmark",
         "version": "1.0.0",
+        "deployment_marker": "filter-api-2026-09-13",
     }
 
 
