@@ -17,7 +17,7 @@ chat-service/
 │   ├── main.py           # FastAPI app entry point
 │   ├── routes.py         # API endpoints
 │   ├── models.py         # Pydantic models
-│   ├── llm_client.py     # LLM integration (OpenAI/Gemini/Groq/OpenRouter)
+│   ├── llm_client.py     # LLM integration (Gemini/Groq/OpenRouter)
 │   ├── filter_client.py  # Filter API integration
 │   ├── mcp_tools.py      # MCP tools de negocio
 │   ├── config.py         # Configuration
@@ -39,7 +39,7 @@ chat-service/
 ## 🔗 Integraciones
 
 - **Filter API**: https://promption.onrender.com
-- **LLM**: OpenAI / Gemini / Groq / OpenRouter
+- **LLM**: Gemini / Groq / OpenRouter
 - **MCP Tools**: Tools específicos de la tienda
 
 ## 🚀 Despliegue
@@ -67,8 +67,6 @@ docker run -p 8000:8000 promption-chat-service
 
 - `FILTER_API_URL`: URL del Filter API
 - `FILTER_API_KEY`: API key del tenant
-- `OPENAI_API_KEY`: API key de OpenAI Platform (opcional)
-- `OPENAI_MODEL`: Modelo de OpenAI (default: `gpt-4o-mini`)
 - `GEMINI_API_KEY`: API key de Google AI Studio / Gemini (opcional)
 - `GEMINI_MODEL`: Modelo de Gemini (default: `gemini-3.1-flash`)
 - `GROQ_API_KEY`: API key de Groq (opcional)
@@ -80,7 +78,7 @@ docker run -p 8000:8000 promption-chat-service
 ## 📝 Características
 
 - ✅ Integración completa con Filter API existente
-- ✅ Soporte multi-proveedor LLM (OpenAI/Gemini/Groq/OpenRouter)
+- ✅ Soporte multi-proveedor LLM (Gemini/Groq/OpenRouter)
 - ✅ MCP tools con control de acceso por rol
 - ✅ System prompts dinámicos según rol de usuario
 - ✅ Detección de fugas de información confidencial

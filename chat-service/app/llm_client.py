@@ -1,4 +1,4 @@
-"""LLM client integration (OpenAI/Gemini/Groq/OpenRouter)"""
+"""LLM client integration (Gemini/Groq/OpenRouter)"""
 import httpx
 from typing import Optional, List, Dict, Any
 from .config import settings
@@ -9,7 +9,6 @@ class LLMClient:
     """Client for LLM integration with provider fallback"""
     
     def __init__(self):
-        self.openai_api_key = settings.openai_api_key
         self.gemini_api_key = settings.gemini_api_key
         self.groq_api_key = settings.groq_api_key
         self.openrouter_api_key = settings.openrouter_api_key
@@ -22,7 +21,6 @@ class LLMClient:
     def _get_available_models(self) -> List[Dict[str, Any]]:
         """Get available models with API keys"""
         models_by_provider = {
-            "openai": self._get_openai_models(),
             "gemini": self._get_gemini_models(),
             "groq": self._get_groq_models(),
             "openrouter": self._get_openrouter_models(),
@@ -42,24 +40,6 @@ class LLMClient:
                 models.extend(provider_models)
 
         return models
-
-    def _get_openai_models(self) -> List[Dict[str, Any]]:
-        if not self.openai_api_key:
-            return []
-
-        return [
-            {
-                "id": "openai-primary",
-                "label": f"OpenAI · {settings.openai_model}",
-                "provider": "openai",
-                "api": "openai_compatible",
-                "model": settings.openai_model,
-                "api_key": self.openai_api_key,
-                "base_url": "https://api.openai.com/v1/chat/completions",
-                "temperature": 0.18,
-                "max_tokens": 600
-            }
-        ]
 
     def _get_gemini_models(self) -> List[Dict[str, Any]]:
         if not self.gemini_api_key:
@@ -186,8 +166,8 @@ class LLMClient:
         
         if not self.models:
             raise Exception(
-                "No LLM providers configured. Please set OPENAI_API_KEY, GEMINI_API_KEY, "
-                "GROQ_API_KEY or OPENROUTER_API_KEY environment variables."
+                "No LLM providers configured. Please set GEMINI_API_KEY, GROQ_API_KEY "
+                "or OPENROUTER_API_KEY environment variables."
             )
         
         last_error = None
