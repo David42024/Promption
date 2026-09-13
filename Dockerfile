@@ -7,15 +7,14 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# system deps for ML/native wheels
+# runtime deps for sklearn/native wheels
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libgomp1 curl && \
+    libgomp1 curl && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt requirements-dashboard.txt ./
+COPY requirements-api.txt ./
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt && \
-    pip install -r requirements-dashboard.txt
+    pip install -r requirements-api.txt
 
 COPY . .
 
