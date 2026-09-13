@@ -1,19 +1,15 @@
 import { cookies } from "next/headers";
-import { resolveSessionUser } from "../../../lib/shop.js";
+import { GUEST_USER } from "../../../lib/shop.js";
+import { readSessionToken } from "../../../lib/session.js";
 
-const CHAT_API_URL = (process.env.NEXT_PUBLIC_CHAT_API_URL || "http://localhost:8000").replace(/\/$/, "");
+const CHAT_API_URL = (process.env.NEXT_PUBLIC_CHAT_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
 function session() {
-  try {
-    return JSON.parse(cookies().get("demo_user")?.value || "null");
-  } catch {
-    return null;
-  }
+  return readSessionToken(cookies().get("demo_user")?.value);
 }
 
 export async function POST(req) {
-  const rawUser = session();
-  const user = resolveSessionUser(rawUser);
+  const user = session() || { ...GUEST_USER };
   const { text } = await req.json().catch(() => ({}));
   
   if (!text || !text.trim()) {
@@ -26,6 +22,9 @@ export async function POST(req) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(process.env.CHAT_SERVICE_TOKEN
+          ? { "X-Chat-Service-Token": process.env.CHAT_SERVICE_TOKEN }
+          : {}),
       },
       body: JSON.stringify({
         text,

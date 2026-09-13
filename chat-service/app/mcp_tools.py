@@ -282,9 +282,10 @@ class MCPToolExecutor:
         return {
             "promociones": [
                 {"codigo": "EMPLEADO-25", "descuento": "25%", "valido": "empleados"},
-                {"codigo": "VERANO20", "descuento": "20%", "valido": "todos"}
+                {"codigo": "SUMMER-15", "descuento": "15%", "valido": "categoría verano"},
+                {"codigo": "DESC-10-BIENVENIDA", "descuento": "10%", "valido": "primera compra"}
             ],
-            "politicasDescuento": "Máximo un código por pedido"
+            "politicasDescuento": "Máximo 15% sin aprobación; hasta 30% con firma de Jefe de Tienda"
         }
     
     def _get_stock_info(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -301,7 +302,24 @@ class MCPToolExecutor:
     def _get_marketing_campaigns(self, args: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "campanas": [
-                {"nombre": "Black Friday", "presupuesto": "50000€", "roi": "3.2x"}
+                {
+                    "nombre": "VoltaGear Verano",
+                    "presupuesto": "12.000€",
+                    "periodo": "junio – septiembre 2026",
+                    "roi": "4,2x"
+                },
+                {
+                    "nombre": "Back to School 2026",
+                    "presupuesto": "28.000€",
+                    "periodo": "agosto – septiembre 2026",
+                    "roi": "5,7x"
+                },
+                {
+                    "nombre": "Black Friday Warmup",
+                    "presupuesto": "18.000€",
+                    "periodo": "octubre 2026",
+                    "roi": "proyectado 6,1x"
+                }
             ]
         }
     

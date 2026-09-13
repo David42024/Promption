@@ -63,8 +63,21 @@ class MCPToolCall(BaseModel):
 class OutputGuardResponse(BaseModel):
     """Response from Output Guard"""
     action: str  # PASS, REDACT, BLOCK
-    categories: List[str] = []
+    categories: List[str] = Field(default_factory=list)
     redacted_response: Optional[str] = None
+
+
+class PolicyInfo(BaseModel):
+    """Authorization decision for the requested business resource."""
+    allowed: bool
+    matched: bool
+    policy_id: str
+    resource: str
+    tier: str
+    tool_name: Optional[str] = None
+    required_roles: List[str] = Field(default_factory=list)
+    confidence: float
+    reason: str
 
 
 class ChatResponse(BaseModel):
@@ -72,7 +85,7 @@ class ChatResponse(BaseModel):
     blocked: bool = False
     reply: str = ""
     leaked: bool = False
-    audit: List[MCPToolCall] = []
+    audit: List[MCPToolCall] = Field(default_factory=list)
     guard: str = "SKIPPED"
     filter_enabled: bool = True
     output_guard_enabled: bool = True
@@ -83,6 +96,8 @@ class ChatResponse(BaseModel):
     filter_layers: Optional[Dict[str, Any]] = None
     reason: Optional[str] = None  # Campo para el frontend cuando está bloqueado
     confidence: Optional[float] = None  # Campo para el frontend cuando está bloqueado
+    block_type: Optional[str] = None
+    policy: Optional[PolicyInfo] = None
 
 
 class HealthResponse(BaseModel):

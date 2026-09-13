@@ -3,12 +3,13 @@
 Landing + login con roles + chatbot. Cada mensaje del chat viaja así:
 
 ```
-navegador → /api/chat (Next, servidor) → Filter API (X-API-Key del tenant + user_id/roles)
-        → bloqueado? responde sin gastar tokens : Groq → respuesta
+navegador → /api/chat (Next, servidor) → Chat Service
+        → Filter API (ataques) → Policy Engine + ACL
+        → recuperación MCP autorizada → Gemini/Groq/OpenRouter → Output Guard
 ```
 
-Las keys (`GROQ_API_KEY`, `PIF_TENANT_KEY`) viven solo en el servidor Next,
-nunca llegan al navegador. El login es **demo** (usuarios en `lib/shop.js`).
+Las claves de proveedor viven únicamente en Chat Service. Next usa una sesión
+firmada y un token servidor-a-servidor que nunca llega al navegador.
 
 ## Arranque
 
@@ -16,8 +17,14 @@ nunca llegan al navegador. El login es **demo** (usuarios en `lib/shop.js`).
 # 1) Filter API (raíz del repo)
 uvicorn src.api.main:app --port 8000
 
-# 2) Demo (aquí)
-cp .env.example .env   # pon tu GROQ_API_KEY
+# 2) Chat Service
+cd chat-service
+pip install -r requirements.txt
+uvicorn app.main:app --port 8001
+
+# 3) Demo
+cd demo
+cp .env.example .env.local
 npm install
 npm run dev            # http://localhost:3000
 ```
@@ -50,9 +57,9 @@ no un fallo de la demo.
   `getClientesVip`) con `requiresRoles`. El chat las ofrece a Groq vía tool-calling;
   el ejecutor valida el rol **antes** de correr y audita cada intento, que se ve
   en el chat como `🔧 tool → ejecutada/denegada`.
-- Defensa en profundidad: el filtro frena la *inyección*; el permiso frena el
-  *uso legítimo pero no autorizado* (p. ej. Ana pide sueldos con palabras normales:
-  pasa el filtro, pero `getSueldos` se deniega por rol).
+- Defensa en profundidad: el filtro frena la *inyección*; Policy Engine bloquea
+  el uso legítimo pero no autorizado antes del LLM; la MCP tool vuelve a validar
+  el rol antes de recuperar datos y Output Guard revisa la respuesta final.
 
 Matriz esperada (como ana/ventas): docs visibles = público+interno;
 `getSueldos`/`getClientesVip` denegadas; como jefe: todo visible y ejecutable.

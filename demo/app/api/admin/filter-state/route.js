@@ -1,13 +1,10 @@
 import { cookies } from "next/headers";
 import { getFilterState } from "../../../../lib/filter-state.js";
 import { isAdmin } from "../../../../lib/shop.js";
+import { readSessionToken } from "../../../../lib/session.js";
 
 function session() {
-  try {
-    return JSON.parse(cookies().get("demo_user")?.value || "null");
-  } catch {
-    return null;
-  }
+  return readSessionToken(cookies().get("demo_user")?.value);
 }
 
 export async function GET() {

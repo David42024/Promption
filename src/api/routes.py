@@ -28,35 +28,19 @@ _start_time = time.time()
 
 
 def _filter_for(tenant: TenantContext, final_override: float | None = None) -> EnsembleFilter:
-    """Filtro del tenant (cacheado): aplica sus umbrales propios Y ajusta por rol."""
-    # Ajustar umbrales basados en rol
-    roles = getattr(tenant, "roles", [])
-    is_admin = "admin" in roles
-    
-    # Umbrales base del tenant
+    """Return a cached attack filter configured with tenant thresholds."""
     th = tenant.thresholds or {}
     h_thr = th.get("heuristic")
     m_thr = th.get("ml")
     f_thr = final_override if final_override is not None else th.get("final")
-    
-    # Ajustar por rol: admin gets lower thresholds (more permissive)
-    if is_admin:
-        # Admin: más permisivo, umbrales más bajos
-        if h_thr is None: h_thr = 0.5
-        if m_thr is None: m_thr = 0.3
-        if f_thr is None: f_thr = 0.3
-    else:
-        # Usuario regular/cliente: más restrictivo, umbrales más altos
-        if h_thr is None: h_thr = 0.6
-        if m_thr is None: m_thr = 0.5
-        if f_thr is None: f_thr = 0.5
-    
+
     if h_thr is None and m_thr is None and f_thr is None:
         return _filter
     key = (tenant.tenant_id, h_thr, m_thr, f_thr)
     if key not in _tenant_filters:
         flt = EnsembleFilter(
             heuristic=HeuristicFilter(threshold=float(h_thr)) if h_thr is not None else None,
+            ml_threshold=float(m_thr) if m_thr is not None else None,
         )
         if f_thr is not None:
             flt.final_threshold = float(f_thr)
@@ -267,11 +251,14 @@ def output_guard(req: OutputGuardRequest, tenant: TenantContext = Depends(requir
     from src.output_guard import guard_response, scan
     from src.utils.structured_logger import log_output_guard
     
-    # Verificar si el usuario es admin - si lo es, aplicar lógica más permisiva
-    roles = getattr(req, "context", {}).get("roles", []) if hasattr(req, "context") else []
+    roles = {
+        str(role).strip().lower()
+        for role in [*req.roles, *(req.context.get("roles", []) or [])]
+        if str(role).strip()
+    }
     is_admin = "admin" in roles
     
-    res = guard_response(req.text)
+    res = guard_response(req.text, admin_mode=is_admin)
     findings = scan(req.text) if res.action != "PASS" else []
     fps = [f.fingerprint for f in findings]
     logger.info(

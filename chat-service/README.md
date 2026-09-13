@@ -73,6 +73,7 @@ docker run -p 8000:8000 promption-chat-service
 - `OPENROUTER_API_KEY`: API key de OpenRouter (opcional)
 - `LLM_PROVIDER_ORDER`: Orden de fallback (default: `gemini,groq,openrouter`)
 - `DEFAULT_MODEL`: Modelo LLM legado por defecto
+- `CHAT_SERVICE_TOKEN`: Secreto compartido con el backend de Vercel para impedir llamadas directas con roles falsificados
 - `CORS_ORIGINS`: Orígenes permitidos (comma-separated)
 
 ## 📝 Características
@@ -80,6 +81,9 @@ docker run -p 8000:8000 promption-chat-service
 - ✅ Integración completa con Filter API existente
 - ✅ Soporte multi-proveedor LLM (Gemini/Groq/OpenRouter)
 - ✅ MCP tools con control de acceso por rol
+- ✅ Policy Engine para clasificación de recursos y ACL previa al LLM
+- ✅ Recuperación de datos únicamente después de autorizar su tier
+- ✅ Sesión firmada en el frontend y autenticación servidor-a-servidor opcional
 - ✅ System prompts dinámicos según rol de usuario
 - ✅ Detección de fugas de información confidencial
 - ✅ Output Guard para respuestas del LLM

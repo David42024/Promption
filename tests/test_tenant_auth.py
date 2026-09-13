@@ -42,7 +42,7 @@ def test_default_tenant_uses_global_filter():
 def test_tenant_thresholds_applied():
     flt = _filter_for(TenantContext(tenant_id="y", thresholds={"final": 0.4, "ml": 0.4}))
     assert flt.final_threshold == 0.4
-    assert flt.ml.threshold == 0.4
+    assert flt.ml_threshold == 0.4
 
 
 def test_tenants_file_loads():

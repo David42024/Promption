@@ -19,12 +19,13 @@
 - **Despliegue**: Render (https://promption.onrender.com)
 
 ### 2. **Backend Demo - Chat Service** (Demo específico)
-- **Ubicación**: Servicio separado (no implementado aún)
+- **Ubicación**: `/chat-service`
 - **Propósito**: Backend específico para la demo de la tienda
 - **Tecnologías**: FastAPI/Node.js + Integración con LLM
 - **Componentes**:
   - Lógica del chat completo
-  - Integración con LLM (Groq/OpenRouter)
+  - Integración con LLM (Gemini/Groq/OpenRouter)
+  - Policy Engine de recursos y tiers
   - MCP tools específicos de la tienda
   - Conexión con Backend Principal para filtering
 - **Responsabilidades**:
@@ -58,8 +59,10 @@ Backend Demo (Render)
 Backend Principal (Filter API)
     ↓ [veredicto: BLOCK/PASS]
 Backend Demo
-    ↓ [si PASS: llama a LLM]
-LLM (Groq/OpenRouter)
+    ↓ [Policy Engine: recurso + tier + ACL]
+    ├─ DENY → respuesta determinista, no consume LLM
+    ↓ [ALLOW: recuperación por MCP con segunda ACL]
+LLM (Gemini → Groq → OpenRouter)
     ↓ [respuesta]
 Backend Demo
     ↓ [para output-guard]
@@ -70,24 +73,15 @@ Backend Demo
 Frontend (Vercel)
 ```
 
-## ❌ Arquitectura Actual (Problemática)
+## Capas de decisión
 
-### Problemas:
-1. **Solo existe un backend** (Filter API) cuando deberían ser 2
-2. **Frontend tiene lógica del chat** cuando debería estar en backend
-3. **API keys en frontend** (inseguro)
-4. **Lógica duplicada** entre frontend y backend
+1. **Ataque**: heurísticas + ML del Filter API, independiente del rol.
+2. **Lectura**: Policy Engine clasifica el recurso y aplica ACL por tier.
+3. **Recuperación**: la MCP tool vuelve a validar el rol antes de devolver datos.
+4. **Salida**: Output Guard recibe los roles y bloquea o redacta contenido sensible.
 
-### Flujo actual (incorrecto):
-```
-Frontend (Vercel)
-    ↓ [tiene lógica completa del chat]
-LLM (Groq/OpenRouter) ← API keys en frontend
-    ↓ [para filtering]
-Backend Principal (Filter API)
-    ↓ [solo filtering]
-Frontend (Vercel)
-```
+La KB protegida no se introduce completa en el prompt. El LLM recibe únicamente el
+contexto recuperado después de superar ambas comprobaciones ACL.
 
 ## 🚀 Pasos para Corregir la Arquitectura
 
@@ -121,23 +115,28 @@ PIF_ADMIN_SECRET=tu_secret_seguro
 ```bash
 FILTER_API_URL=https://promption.onrender.com
 FILTER_API_KEY=pif_demo_shop_123456
+GEMINI_API_KEY=tu_key
+GEMINI_MODEL=gemini-3.1-flash
 GROQ_API_KEY=gsk_tu_key
 OPENROUTER_API_KEY=sk-or-tu_key
-PIF_LLM_MODEL=llama-3.1-70b-versatile
+LLM_PROVIDER_ORDER=gemini,groq,openrouter
+CHAT_SERVICE_TOKEN=secreto_compartido_con_vercel
 ```
 
 ### Frontend Demo (Vercel)
 ```bash
 NEXT_PUBLIC_CHAT_API_URL=https://backend-demo.onrender.com
+CHAT_SERVICE_TOKEN=el_mismo_secreto_de_render
+SESSION_SECRET=secreto_independiente_para_firmar_sesiones
 NEXT_PUBLIC_PIF_ADMIN_SECRET=tu_secret_seguro
 ```
 
 ## ⚠️ Estado Actual
 
-- ✅ Backend Principal (Filter API): Funcionando en Render
-- ❌ Backend Demo (Chat Service): NO existe
-- ⚠️ Frontend Demo: Tiene lógica que debería estar en backend
-- ⚠️ Filtro: Funciona pero puede que no esté configurado correctamente en el frontend
+- ✅ Backend Principal: filtro de ataques y Output Guard
+- ✅ Backend Demo: Policy Engine, recuperación MCP, ACL y fallback de LLM
+- ✅ Frontend Demo: proxy servidor y presentación de decisiones
+- ✅ Roles de sesión validados y firmados
 
 ## 🔧 Solución Inmediata (Temporal)
 

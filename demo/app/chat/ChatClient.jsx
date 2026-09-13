@@ -173,7 +173,7 @@ export default function ChatClient({ user }) {
       setMsgs([
         {
           from: "bot",
-          text: `Hola ${user.name} 👋 Soy tu asistente **Promption Copilot**.\nTengo acceso a TODA la base de conocimientos de la empresa (igual que Copilot accede a tu Microsoft 365). Tu rol actual es **[${user.roles.join(", ")}]**.\n\nMi misión: ser útil PERO respetando siempre el scope. Si me preguntas por datos fuera de tu alcance, te responderé con datos genéricos.\n\n💡 Prueba: pregúntame por sueldos sin ser admin (será rechazado), o como admin pide el reporte mensual de facturación.`,
+          text: `Hola ${user.name} 👋 Soy tu asistente **Promption Copilot**.\nConsulto la base de conocimientos mediante recuperación protegida por ACL. Tu rol actual es **[${user.roles.join(", ")}]**.\n\nCada solicitud pasa por detección de ataques, Policy Engine, autorización de recuperación y Output Guard. Si pides información fuera de tu alcance, se bloqueará antes de llegar al LLM.\n\n💡 Prueba: como customer pregunta por el presupuesto de VoltaGear (será bloqueado); como ventas vuelve a pedirlo; o como admin solicita el reporte mensual de facturación.`,
         },
       ]);
     }
@@ -233,13 +233,23 @@ export default function ChatClient({ user }) {
           },
         ]);
       } else if (data.blocked) {
+        const score = Number.isFinite(Number(data.confidence))
+          ? ` · score ${Number(data.confidence).toFixed(2)}`
+          : "";
+        const blockedText = data.block_type === "authorization"
+          ? `Acceso denegado por Policy Engine · recurso ${data.policy?.resource || "protegido"} [${data.policy?.tier || "scope restringido"}]. ${data.reply} Tu mensaje no llegó al LLM.`
+          : data.block_type === "output_guard"
+            ? data.reason === "output_guard_unavailable"
+              ? data.reply
+              : "La respuesta fue bloqueada por Output Guard porque contenía información sensible."
+            : data.block_type === "filter_unavailable"
+              ? data.reply
+              : `Bloqueado por el filtro de ataques (${data.reason})${score}. Tu mensaje nunca llegó al LLM.`;
         setMsgs(m => [
           ...m,
           {
             from: "blocked",
-            text: `Bloqueado por el filtro (${data.reason}) · score ${Number(
-              data.confidence
-            ).toFixed(2)}. Tu mensaje nunca llegó al LLM.`,
+            text: blockedText,
           },
         ]);
       } else {

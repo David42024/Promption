@@ -53,7 +53,8 @@ class EnsembleResult:
 
 
 class EnsembleFilter:
-    def __init__(self, heuristic: HeuristicFilter | None = None, ml: MLFilter | None = None):
+    def __init__(self, heuristic: HeuristicFilter | None = None, ml: MLFilter | None = None,
+                 ml_threshold: float | None = None):
         conf = _CONF.get("ensemble", {})
         self.heuristic_weight = float(conf.get("heuristic_weight", 0.4))
         self.ml_weight = float(conf.get("ml_weight", 0.6))
@@ -65,6 +66,7 @@ class EnsembleFilter:
             self.ml = ml or LightMLFilter()
         else:
             self.ml = ml or MLFilter()
+        self.ml_threshold = ml_threshold
 
     def analyze(self, text: str, use_ml: bool = True, roles: list[str] | None = None) -> EnsembleResult:
         import time
@@ -81,6 +83,9 @@ class EnsembleFilter:
             t_ml0 = time.perf_counter()
             try:
                 ml_res = self.ml.analyze(text)
+                if self.ml_threshold is not None:
+                    ml_res.threshold = self.ml_threshold
+                    ml_res.blocked = ml_res.probability >= self.ml_threshold
             except Exception:
                 ml_res = None
             ml_latency = (time.perf_counter() - t_ml0) * 1000
@@ -122,6 +127,7 @@ class EnsembleFilter:
             "heuristic_rules": len(self.heuristic._rules),
             "ml_trained": self.ml.is_trained(),
             "ml_loaded": self.ml.is_loaded,
+            "ml_threshold": self.ml_threshold if self.ml_threshold is not None else self.ml.threshold,
         }
 
 

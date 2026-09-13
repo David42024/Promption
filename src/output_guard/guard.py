@@ -10,10 +10,10 @@ from .types import GuardResult
 __all__ = ["guard_response", "scan", "GuardResult", "BLOCK_MESSAGE"]
 
 
-def guard_response(text: str) -> GuardResult:
+def guard_response(text: str, admin_mode: bool = False) -> GuardResult:
     """Pipeline completo: scan → policy. Log seguro (sin valores)."""
     findings = scan(text or "")
-    result = apply_policy(text or "", findings)
+    result = apply_policy(text or "", findings, admin_mode=admin_mode)
     if findings:
         logger.info(
             "OutputGuard action=%s matches=%d categories=%s severities=%sfps=%s",

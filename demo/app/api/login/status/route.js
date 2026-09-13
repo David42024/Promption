@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { readSessionToken } from "../../../../lib/session.js";
 
 export async function GET() {
   try {
@@ -9,7 +10,10 @@ export async function GET() {
       return Response.json({ user: null, authenticated: false });
     }
     
-    const user = JSON.parse(userCookie.value);
+    const user = readSessionToken(userCookie.value);
+    if (!user) {
+      return Response.json({ user: null, authenticated: false });
+    }
     return Response.json({ 
       user: {
         id: user.id,

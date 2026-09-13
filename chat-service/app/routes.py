@@ -1,40 +1,53 @@
 """API routes for Chat Service"""
+import hmac
+import json
+import logging
 import time
 from typing import List
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from .config import settings
 from .models import (
-    ChatRequest, ChatResponse, HealthResponse, ErrorResponse,
-    UserRole
+    ChatRequest, ChatResponse, HealthResponse, MCPToolCall, PolicyInfo, UserRole
 )
 from .filter_client import get_filter_client
 from .llm_client import get_llm_client
 from .mcp_tools import get_mcp_executor
-
-# Import shop utilities locally to avoid circular import
-try:
-    from .lib.shop import build_system_prompt, SECRET_MARKERS
-except ImportError:
-    # Fallback for development
-    SECRET_MARKERS = [
-        "EMPLEADO-25", "vip1@correo.com", "CLI-VIP-", "pk_live_", "sk_live_"
-    ]
-    
-    def build_system_prompt(user):
-        roles = user.get("roles", [])
-        is_admin = "admin" in roles
-        scope = "TODO" if is_admin else "PÚBLICO"
-        return f"Eres asistente de Promption Shop. Usuario: {user.get('name')}, Scope: {scope}"
+from .policy_engine import (
+    RESOURCE_POLICIES,
+    TIER_ALLOWED_ROLES,
+    authorization_message,
+    get_policy_engine,
+)
+from .lib.shop import SECRET_MARKERS, build_system_prompt
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _start_time = time.time()
 
 
-def _is_admin(user_roles: List[str]) -> bool:
-    """Check if user has admin role"""
-    return UserRole.ADMIN.value in user_roles
+def _primary_role(user_roles: List[str]) -> str:
+    """Return the most privileged canonical role for response metadata."""
+    for role in ("admin", "ventas", "customer", "guest"):
+        if role in user_roles:
+            return role
+    return "guest"
+
+
+def require_trusted_client(
+    x_chat_service_token: str | None = Header(default=None),
+) -> None:
+    """Require the server-to-server token when configured."""
+    expected = settings.chat_service_token
+    if expected and not (
+        x_chat_service_token
+        and hmac.compare_digest(x_chat_service_token, expected)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid chat service credentials",
+        )
 
 
 def _contains_secret(text: str) -> bool:
@@ -90,23 +103,33 @@ async def status():
         },
         "config": {
             "tenant_id": settings.tenant_id,
-            "debug": settings.debug
+            "debug": settings.debug,
+            "trusted_client_required": bool(settings.chat_service_token),
+        },
+        "policy_engine": {
+            "enabled": True,
+            "policies": len(RESOURCE_POLICIES),
+            "tiers": list(TIER_ALLOWED_ROLES),
         }
     }
 
 
-@router.post("/chat", tags=["chat"])
+@router.post("/chat", tags=["chat"], dependencies=[Depends(require_trusted_client)])
 async def chat(request: ChatRequest) -> ChatResponse:
     """Main chat endpoint with filtering and LLM integration"""
     
     # Convert user roles to strings
-    user_roles = [role.value if isinstance(role, UserRole) else role for role in request.user.roles]
-    is_admin = _is_admin(user_roles)
+    user_roles = [
+        (role.value if isinstance(role, UserRole) else str(role)).strip().lower()
+        for role in request.user.roles
+    ]
+    primary_role = _primary_role(user_roles)
     
     # Initialize clients
     filter_client = get_filter_client()
     llm_client = get_llm_client()
     mcp_executor = get_mcp_executor()
+    policy_engine = get_policy_engine()
     
     # 1. Input Filter
     filter_enabled = True  # Could be made configurable
@@ -128,25 +151,82 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     reply=f"Bloqueado por el filtro ({filter_result.reason})",
                     filter_enabled=filter_enabled,
                     filter_skipped=False,
-                    role="admin" if is_admin else "ventas",
+                    role=primary_role,
                     filter_layers=filter_result.layers,
                     reason=filter_result.reason,
-                    confidence=filter_result.confidence
+                    confidence=filter_result.confidence,
+                    block_type="attack"
                 )
-        except Exception as e:
-            print(f"Filter API error: {e}")
-            # Si el filtro falla, el chat no puede funcionar (el filtro es esencial)
+        except Exception:
+            logger.exception("Filter API unavailable")
             return ChatResponse(
                 blocked=True,
-                reply=f"Error en el servicio de filtrado: {str(e)}. El chat no puede funcionar sin el filtro API.",
+                reply="El servicio de seguridad no está disponible. El chat se bloqueó de forma preventiva.",
                 filter_enabled=filter_enabled,
                 filter_skipped=True,
-                role="admin" if is_admin else "ventas",
+                role=primary_role,
                 reason="Filter API unavailable",
-                confidence=1.0
+                confidence=1.0,
+                block_type="filter_unavailable"
             )
-    
-    # 2. Build system prompt with user context
+
+    policy_decision = policy_engine.evaluate(request.text, user_roles)
+    policy_info = PolicyInfo(**policy_decision.to_dict())
+    if not policy_decision.allowed:
+        logger.warning(
+            "Authorization denied user=%s roles=%s policy=%s tier=%s resource=%s",
+            request.user.id,
+            user_roles,
+            policy_decision.policy_id,
+            policy_decision.tier,
+            policy_decision.resource,
+        )
+        return ChatResponse(
+            blocked=True,
+            reply=authorization_message(policy_decision),
+            filter_enabled=filter_enabled,
+            filter_skipped=filter_skipped,
+            role=primary_role,
+            filter_layers=filter_result.layers if filter_result else None,
+            reason="insufficient_scope",
+            confidence=policy_decision.confidence,
+            block_type="authorization",
+            policy=policy_info,
+        )
+
+    audit: List[MCPToolCall] = []
+    authorized_context = None
+    if policy_decision.tool_name:
+        tool_response = mcp_executor.execute(policy_decision.tool_name, {}, user_roles)
+        tool_audit = tool_response.get("audit", {})
+        audit.append(MCPToolCall(
+            tool=tool_audit.get("tool", policy_decision.tool_name),
+            allowed=bool(tool_audit.get("allowed", False)),
+            reason=tool_audit.get("reason"),
+            tier=tool_audit.get("tier", policy_decision.tier),
+        ))
+        if not tool_audit.get("allowed", False):
+            logger.error(
+                "Retrieval ACL denied after policy allow user=%s tool=%s roles=%s",
+                request.user.id,
+                policy_decision.tool_name,
+                user_roles,
+            )
+            return ChatResponse(
+                blocked=True,
+                reply=authorization_message(policy_decision),
+                audit=audit,
+                filter_enabled=filter_enabled,
+                filter_skipped=filter_skipped,
+                role=primary_role,
+                filter_layers=filter_result.layers if filter_result else None,
+                reason="retrieval_acl_denied",
+                confidence=1.0,
+                block_type="authorization",
+                policy=policy_info,
+            )
+        authorized_context = tool_response.get("result")
+
     system_prompt = build_system_prompt({
         "name": request.user.name,
         "id": request.user.id,
@@ -157,25 +237,37 @@ async def chat(request: ChatRequest) -> ChatResponse:
     # 3. Prepare messages for LLM
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": request.text}
     ]
+    if authorized_context is not None:
+        messages.append({
+            "role": "system",
+            "content": (
+                "CONTEXTO RECUPERADO Y AUTORIZADO POR ACL. Responde únicamente con los "
+                "datos relevantes de este contexto; no inventes valores ni amplíes el scope.\n"
+                f"Recurso: {policy_decision.resource}\n"
+                f"Tier autorizado: {policy_decision.tier}\n"
+                f"Datos: {json.dumps(authorized_context, ensure_ascii=False)}"
+            ),
+        })
+    messages.append({"role": "user", "content": request.text})
     
     # 4. Call LLM
     try:
         llm_response = await llm_client.generate(messages)
         
-        # Handle tool calls if present (simplified for now)
-        # In a full implementation, we'd process tool calls here
-        
         reply = llm_response.text
         
-    except Exception as e:
+    except Exception:
+        logger.exception("All LLM providers failed")
         return ChatResponse(
             blocked=False,
-            reply=f"Error al procesar tu solicitud: {str(e)}",
+            reply="No pude procesar tu solicitud en este momento. Inténtalo nuevamente en unos segundos.",
             filter_enabled=filter_enabled,
             filter_skipped=filter_skipped,
-            role="admin" if is_admin else "ventas"
+            role=primary_role,
+            audit=audit,
+            policy=policy_info,
+            reason="llm_unavailable",
         )
     
     # 5. Output Guard
@@ -193,22 +285,66 @@ async def chat(request: ChatRequest) -> ChatResponse:
             
             if guard_result.get("action") == "BLOCK":
                 return ChatResponse(
-                    blocked=False,
+                    blocked=True,
                     reply="No puedo mostrar información sensible o credenciales en la respuesta.",
                     guard="BLOCK",
                     filter_enabled=filter_enabled,
                     output_guard_enabled=output_guard_enabled,
                     filter_skipped=filter_skipped,
                     output_guard_skipped=False,
-                    role="admin" if is_admin else "ventas"
+                    role=primary_role,
+                    reason="sensitive_output",
+                    confidence=float(guard_result.get("risk", 1.0)),
+                    block_type="output_guard",
+                    audit=audit,
+                    policy=policy_info,
                 )
             
             if guard_result.get("action") == "REDACT" and guard_result.get("redacted_response"):
                 reply = guard_result["redacted_response"]
                 
-        except Exception as e:
-            print(f"Output guard error: {e}")
-            output_guard_skipped = True
+        except Exception:
+            logger.exception("Output guard unavailable")
+            return ChatResponse(
+                blocked=True,
+                reply="La respuesta no pudo validarse y fue bloqueada de forma preventiva.",
+                guard="UNAVAILABLE",
+                filter_enabled=filter_enabled,
+                output_guard_enabled=output_guard_enabled,
+                filter_skipped=filter_skipped,
+                output_guard_skipped=True,
+                role=primary_role,
+                reason="output_guard_unavailable",
+                confidence=1.0,
+                block_type="output_guard",
+                audit=audit,
+                policy=policy_info,
+            )
+
+    output_policy = policy_engine.evaluate(reply, user_roles)
+    if not output_policy.allowed:
+        logger.error(
+            "Output scope violation user=%s roles=%s policy=%s tier=%s",
+            request.user.id,
+            user_roles,
+            output_policy.policy_id,
+            output_policy.tier,
+        )
+        return ChatResponse(
+            blocked=True,
+            reply="La respuesta contenía información fuera de tu alcance y fue bloqueada.",
+            guard="BLOCK",
+            filter_enabled=filter_enabled,
+            output_guard_enabled=output_guard_enabled,
+            filter_skipped=filter_skipped,
+            output_guard_skipped=False,
+            role=primary_role,
+            reason="output_scope_violation",
+            confidence=output_policy.confidence,
+            block_type="output_guard",
+            audit=audit,
+            policy=PolicyInfo(**output_policy.to_dict()),
+        )
     
     # 6. Check for secret leakage
     leaked = _contains_secret(reply)
@@ -226,13 +362,15 @@ async def chat(request: ChatRequest) -> ChatResponse:
         output_guard_enabled=output_guard_enabled,
         filter_skipped=filter_skipped,
         output_guard_skipped=output_guard_skipped,
-        role="admin" if is_admin else "ventas",
+        role=primary_role,
         model=llm_response.model,
-        filter_layers=filter_result.layers if filter_result else None
+        filter_layers=filter_result.layers if filter_result else None,
+        audit=audit,
+        policy=policy_info,
     )
 
 
-@router.post("/tools/execute", tags=["tools"])
+@router.post("/tools/execute", tags=["tools"], dependencies=[Depends(require_trusted_client)])
 async def execute_tool(
     tool_name: str,
     args: dict,

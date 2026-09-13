@@ -120,6 +120,11 @@ class LightMLFilter:
         """Check if model is available."""
         return self.model_path.exists()
 
+    @property
+    def is_loaded(self) -> bool:
+        """Return whether vectorizer and classifier are loaded in memory."""
+        return self._vectorizer is not None and self._classifier is not None
+
 
 # Singleton instance
 _light_filter: LightMLFilter | None = None

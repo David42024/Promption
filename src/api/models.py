@@ -52,6 +52,7 @@ class BenchmarkRequest(BaseModel):
 class OutputGuardRequest(BaseModel):
     text: str = Field(..., min_length=1, description="LLM response to inspect")
     user_id: str | None = None
+    roles: list[str] = Field(default_factory=list, description="End-user roles/scopes")
     context: dict = Field(default_factory=dict)
 
 

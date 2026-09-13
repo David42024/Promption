@@ -1,8 +1,12 @@
 """Filter API client integration"""
+import logging
 import httpx
 from typing import Optional, Dict, Any
 from .config import settings
 from .models import FilterResponse
+
+
+logger = logging.getLogger(__name__)
 
 
 class FilterClient:
@@ -46,7 +50,8 @@ class FilterClient:
                         "roles": roles,
                         "context": {
                             "channel": "demo-chat",
-                            "data_tiers": ["publico", "interno", "confidencial"]
+                            "data_tiers": ["publico", "interno", "confidencial"],
+                            "roles": roles
                         }
                     }
                 )
@@ -59,13 +64,13 @@ class FilterClient:
                     raise Exception(f"Filter API error {response.status_code}: {error_text}")
                 
                 data = response.json()
-                print(f"Filter API response: {data}")  # Debug logging
+                logger.debug("Filter API decision=%s", data.get("decision"))
                 return FilterResponse(**data)
                 
         except httpx.TimeoutException:
             raise Exception("Filter API timeout")
         except Exception as e:
-            print(f"Filter client error: {e}")
+            logger.warning("Filter client error: %s", e)
             raise Exception(f"Filter API error: {str(e)}")
     
     async def output_guard(
@@ -89,18 +94,23 @@ class FilterClient:
                         "roles": roles,
                         "context": {
                             "channel": "demo-chat",
-                            "data_tiers": ["publico", "interno", "confidencial"]
+                            "data_tiers": ["publico", "interno", "confidencial"],
+                            "roles": roles
                         }
                     }
                 )
                 
-                if response.ok:
-                    return response.json()
-                else:
-                    return {"action": "SKIPPED"}
-                    
-        except Exception:
-            return {"action": "SKIPPED"}
+                if response.status_code == 401:
+                    raise ValueError("Invalid Filter API key")
+                if not response.ok:
+                    raise Exception(f"Output Guard error {response.status_code}")
+                return response.json()
+
+        except httpx.TimeoutException as exc:
+            raise Exception("Output Guard timeout") from exc
+        except Exception as exc:
+            logger.warning("Output Guard client error: %s", exc)
+            raise
 
 
 # Singleton instance

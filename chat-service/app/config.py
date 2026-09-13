@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     service_name: str = "promption-chat-service"
     version: str = "1.0.0"
     debug: bool = False
+    chat_service_token: Optional[str] = None
     
     # CORS Configuration (como string separado por comas)
     cors_origins_str: str = "http://localhost:3000,https://promptionsi.vercel.app,https://promption.shop"

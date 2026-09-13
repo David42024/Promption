@@ -1,12 +1,10 @@
 import { cookies } from "next/headers";
 import { getDoc, visibleDocs } from "../../../lib/docs.js";
+import { GUEST_USER } from "../../../lib/shop.js";
+import { readSessionToken } from "../../../lib/session.js";
 
 function session() {
-  try {
-    return JSON.parse(cookies().get("demo_user")?.value || "null");
-  } catch {
-    return null;
-  }
+  return readSessionToken(cookies().get("demo_user")?.value) || { ...GUEST_USER };
 }
 
 export async function GET(req) {
