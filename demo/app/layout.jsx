@@ -52,7 +52,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body>{children}</body>
+      <body data-deployment-marker="promption-shop-2026-09-13">{children}</body>
     </html>
   );
 }
