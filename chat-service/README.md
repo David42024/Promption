@@ -70,10 +70,10 @@ docker run -p 8000:8000 promption-chat-service
 - `OPENAI_API_KEY`: API key de OpenAI Platform (opcional)
 - `OPENAI_MODEL`: Modelo de OpenAI (default: `gpt-4o-mini`)
 - `GEMINI_API_KEY`: API key de Google AI Studio / Gemini (opcional)
-- `GEMINI_MODEL`: Modelo de Gemini (default: `gemini-3.1-pro-preview`)
+- `GEMINI_MODEL`: Modelo de Gemini (default: `gemini-3.1-flash`)
 - `GROQ_API_KEY`: API key de Groq (opcional)
 - `OPENROUTER_API_KEY`: API key de OpenRouter (opcional)
-- `LLM_PROVIDER_ORDER`: Orden de fallback (default: `openai,gemini,groq,openrouter`)
+- `LLM_PROVIDER_ORDER`: Orden de fallback (default: `gemini,groq,openrouter`)
 - `DEFAULT_MODEL`: Modelo LLM legado por defecto
 - `CORS_ORIGINS`: Orígenes permitidos (comma-separated)
 

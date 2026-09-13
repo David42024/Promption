@@ -18,8 +18,8 @@ OPENROUTER_API_KEY=sk-or-TU_OPENROUTER_KEY_REAL
 OPENAI_API_KEY=sk-proj_TU_OPENAI_KEY_REAL
 OPENAI_MODEL=gpt-4o-mini
 GEMINI_API_KEY=TU_GEMINI_KEY_REAL
-GEMINI_MODEL=gemini-3.1-pro-preview
-LLM_PROVIDER_ORDER=openai,gemini,groq,openrouter
+GEMINI_MODEL=gemini-3.1-flash
+LLM_PROVIDER_ORDER=gemini,groq,openrouter
 PIF_LLM_MODEL=llama-3.1-70b-versatile
 PIF_ADMIN_SECRET=TU_SECRET_SUPER_SEGuro_PROD
 ```
@@ -78,8 +78,8 @@ OPENROUTER_API_KEY=sk-or-tu_key_local
 OPENAI_API_KEY=sk-proj_tu_key_local
 OPENAI_MODEL=gpt-4o-mini
 GEMINI_API_KEY=tu_gemini_key_local
-GEMINI_MODEL=gemini-3.1-pro-preview
-LLM_PROVIDER_ORDER=openai,gemini,groq,openrouter
+GEMINI_MODEL=gemini-3.1-flash
+LLM_PROVIDER_ORDER=gemini,groq,openrouter
 PIF_LLM_MODEL=llama-3.1-70b-versatile
 PIF_ADMIN_SECRET=admin_secret_change_me
 
