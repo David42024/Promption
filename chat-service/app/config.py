@@ -13,9 +13,14 @@ class Settings(BaseSettings):
     tenant_id: str = "demo-shop"
     
     # LLM Configuration
+    openai_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
     openrouter_api_key: Optional[str] = None
     default_model: str = "llama-3.1-70b-versatile"
+    openai_model: str = "gpt-4o-mini"
+    gemini_model: str = "gemini-3.1-pro-preview"
+    llm_provider_order: str = "openai,gemini,groq,openrouter"
     
     # Service Configuration
     service_name: str = "promption-chat-service"

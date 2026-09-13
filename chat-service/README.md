@@ -17,7 +17,7 @@ chat-service/
 │   ├── main.py           # FastAPI app entry point
 │   ├── routes.py         # API endpoints
 │   ├── models.py         # Pydantic models
-│   ├── llm_client.py     # LLM integration (Groq/OpenRouter)
+│   ├── llm_client.py     # LLM integration (OpenAI/Gemini/Groq/OpenRouter)
 │   ├── filter_client.py  # Filter API integration
 │   ├── mcp_tools.py      # MCP tools de negocio
 │   ├── config.py         # Configuration
@@ -39,7 +39,7 @@ chat-service/
 ## 🔗 Integraciones
 
 - **Filter API**: https://promption.onrender.com
-- **LLM**: Groq / OpenRouter
+- **LLM**: OpenAI / Gemini / Groq / OpenRouter
 - **MCP Tools**: Tools específicos de la tienda
 
 ## 🚀 Despliegue
@@ -67,15 +67,20 @@ docker run -p 8000:8000 promption-chat-service
 
 - `FILTER_API_URL`: URL del Filter API
 - `FILTER_API_KEY`: API key del tenant
-- `GROQ_API_KEY`: API key de Groq
+- `OPENAI_API_KEY`: API key de OpenAI Platform (opcional)
+- `OPENAI_MODEL`: Modelo de OpenAI (default: `gpt-4o-mini`)
+- `GEMINI_API_KEY`: API key de Google AI Studio / Gemini (opcional)
+- `GEMINI_MODEL`: Modelo de Gemini (default: `gemini-3.1-pro-preview`)
+- `GROQ_API_KEY`: API key de Groq (opcional)
 - `OPENROUTER_API_KEY`: API key de OpenRouter (opcional)
-- `DEFAULT_MODEL`: Modelo LLM por defecto
+- `LLM_PROVIDER_ORDER`: Orden de fallback (default: `openai,gemini,groq,openrouter`)
+- `DEFAULT_MODEL`: Modelo LLM legado por defecto
 - `CORS_ORIGINS`: Orígenes permitidos (comma-separated)
 
 ## 📝 Características
 
 - ✅ Integración completa con Filter API existente
-- ✅ Soporte multi-proveedor LLM (Groq/OpenRouter)
+- ✅ Soporte multi-proveedor LLM (OpenAI/Gemini/Groq/OpenRouter)
 - ✅ MCP tools con control de acceso por rol
 - ✅ System prompts dinámicos según rol de usuario
 - ✅ Detección de fugas de información confidencial

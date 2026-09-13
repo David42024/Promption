@@ -85,6 +85,7 @@ async def status():
         "llm": {
             "default_model": settings.default_model,
             "providers_available": len(llm_client.models),
+            "providers": [model["provider"] for model in llm_client.models],
             "connected": await llm_client.check_health()
         },
         "config": {
