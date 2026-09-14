@@ -8,13 +8,17 @@ UNCERTAIN = "UNCERTAIN"
 def classify_security_result(
     *,
     blocked: bool,
-    score: float,
-    ml_available: bool,
-    benign_threshold: float,
+    ml_probability: float | None,
+    benign_threshold: float = 0.4,
+    malicious_threshold: float = 0.6,
 ) -> tuple[str, bool]:
     """Map a binary filter result to a fail-safe three-state decision."""
     if blocked:
         return MALICIOUS, False
-    if not ml_available or score > benign_threshold:
+    if ml_probability is None:
         return UNCERTAIN, True
-    return BENIGN, False
+    if ml_probability < benign_threshold:
+        return BENIGN, False
+    if ml_probability < malicious_threshold:
+        return UNCERTAIN, True
+    return MALICIOUS, False

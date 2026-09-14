@@ -199,12 +199,14 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(require_te
         "probability": res.ml.probability if res.ml else None,
         "threshold": res.ml.threshold if res.ml else None,
     }
-    benign_threshold = float(_CONF.get("ensemble", {}).get("benign_threshold", 0.30))
+    classification_conf = _CONF.get("classification", {})
+    benign_threshold = float(classification_conf.get("ml_benign_threshold", 0.4))
+    malicious_threshold = float(classification_conf.get("ml_malicious_threshold", 0.6))
     classification, requires_review = classify_security_result(
         blocked=res.blocked,
-        score=res.score,
-        ml_available=res.ml is not None,
+        ml_probability=res.ml.probability if res.ml else None,
         benign_threshold=benign_threshold,
+        malicious_threshold=malicious_threshold,
     )
     layers = {
         "heuristic": {"blocked": res.heuristic.blocked, "score": res.heuristic.score,
@@ -212,11 +214,12 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(require_te
                       "benign_matched": list(res.heuristic.benign_matched)},
         "ml": ml_info,
         "ensemble": {"score": res.score, "threshold": flt.final_threshold,
-                     "benign_threshold": benign_threshold,
                      "benign_matched": list(res.heuristic.benign_matched)},
         "classification": {
             "label": classification,
             "requires_review": requires_review,
+            "ml_benign_threshold": benign_threshold,
+            "ml_malicious_threshold": malicious_threshold,
         },
     }
     logger.info("Filter [%s] tenant=%s user=%s roles=%s in %.1fms: %s",

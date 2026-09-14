@@ -236,6 +236,14 @@ export default function ChatClient({ user }) {
         const score = Number.isFinite(Number(data.confidence))
           ? ` · score ${Number(data.confidence).toFixed(2)}`
           : "";
+        const blockingThreshold = data.filter_layers?.heuristic?.blocked
+          ? data.filter_layers.heuristic.threshold
+          : data.filter_layers?.ml?.blocked
+            ? data.filter_layers.ml.threshold
+            : data.filter_layers?.ensemble?.threshold;
+        const blockingScore = Number.isFinite(Number(blockingThreshold))
+          ? ` · score ${Number(blockingThreshold).toFixed(2)}`
+          : "";
         const blockedText = data.block_type === "authorization"
           ? `Acceso denegado por Policy Engine · recurso ${data.policy?.resource || "protegido"} [${data.policy?.tier || "scope restringido"}]. ${data.reply} Tu mensaje no llegó al LLM.`
           : data.block_type === "security_review"
@@ -244,9 +252,9 @@ export default function ChatClient({ user }) {
             ? data.reason === "output_guard_unavailable"
               ? data.reply
               : "La respuesta fue bloqueada por Output Guard porque contenía información sensible."
-            : data.block_type === "filter_unavailable"
+          : data.block_type === "filter_unavailable"
               ? data.reply
-              : `Bloqueado por el filtro de ataques (${data.reason})${score}. Tu mensaje nunca llegó al LLM.`;
+              : `Bloqueado por el filtro${blockingScore}.`;
         setMsgs(m => [
           ...m,
           {
