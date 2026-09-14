@@ -361,7 +361,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 security_classification=security_classification,
             )
 
-    output_policy = policy_engine.evaluate(reply, user_roles)
+    output_policy = policy_engine.evaluate_output(reply, user_roles)
     if not output_policy.allowed:
         logger.error(
             "Output scope violation user=%s roles=%s policy=%s tier=%s",

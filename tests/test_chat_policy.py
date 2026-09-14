@@ -81,6 +81,23 @@ def test_output_scope_is_checked_with_the_same_policy():
     assert engine.evaluate(response, ["admin"]).allowed is True
 
 
+def test_conceptual_credential_output_is_delegated_to_output_guard():
+    engine = PolicyEngine()
+    response = (
+        "Una API key es una credencial que permite acceder a un sistema interno. "
+        "Debe guardarse de forma segura y nunca publicarse."
+    )
+    assert engine.evaluate(response, ["customer"]).allowed is False
+    assert engine.evaluate_output(response, ["customer"]).allowed is True
+
+
+def test_protected_business_output_remains_scope_checked():
+    engine = PolicyEngine()
+    response = "El presupuesto de la campaña VoltaGear Verano es 12.000€."
+    assert engine.evaluate_output(response, ["customer"]).allowed is False
+    assert engine.evaluate_output(response, ["ventas"]).allowed is True
+
+
 def test_policy_catalog_matches_tool_tiers_and_roles():
     executor = MCPToolExecutor()
     tools = {tool.name: tool for tool in executor.tools}

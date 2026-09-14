@@ -14,6 +14,8 @@ TIER_ALLOWED_ROLES = {
     "restringido": frozenset(),
 }
 
+OUTPUT_GUARD_OWNED_POLICIES = frozenset({"confidential.credentials"})
+
 
 @dataclass(frozen=True)
 class ResourcePolicy:
@@ -216,9 +218,16 @@ class PolicyEngine:
                 return policy
         return None
 
-    def evaluate(self, text: str, roles: Iterable[str]) -> PolicyDecision:
+    def _evaluate(
+        self,
+        text: str,
+        roles: Iterable[str],
+        excluded_policy_ids: frozenset[str] = frozenset(),
+    ) -> PolicyDecision:
         role_set = {str(role).strip().lower() for role in roles if str(role).strip()}
         policy = self.classify(text)
+        if policy and policy.policy_id in excluded_policy_ids:
+            policy = None
         if policy is None:
             return PolicyDecision(
                 allowed=True,
@@ -251,6 +260,14 @@ class PolicyEngine:
             confidence=policy.confidence,
             reason=reason,
         )
+
+    def evaluate(self, text: str, roles: Iterable[str]) -> PolicyDecision:
+        """Evaluate an input request against every resource policy."""
+        return self._evaluate(text, roles)
+
+    def evaluate_output(self, text: str, roles: Iterable[str]) -> PolicyDecision:
+        """Evaluate output scope while leaving concrete secret detection to Output Guard."""
+        return self._evaluate(text, roles, OUTPUT_GUARD_OWNED_POLICIES)
 
 
 def authorization_message(decision: PolicyDecision) -> str:

@@ -128,13 +128,35 @@ export default function ChatWidget() {
           },
         ]);
       } else if (data.blocked) {
+        const score = Number.isFinite(Number(data.confidence))
+          ? ` · score ${Number(data.confidence).toFixed(2)}`
+          : "";
+        const blockingThreshold = data.filter_layers?.heuristic?.blocked
+          ? data.filter_layers.heuristic.threshold
+          : data.filter_layers?.ml?.blocked
+            ? data.filter_layers.ml.threshold
+            : data.filter_layers?.ensemble?.threshold;
+        const blockingScore = Number.isFinite(Number(blockingThreshold))
+          ? ` · score ${Number(blockingThreshold).toFixed(2)}`
+          : "";
+        const blockedText = data.block_type === "authorization"
+          ? `Acceso denegado por Policy Engine · recurso ${data.policy?.resource || "protegido"} [${data.policy?.tier || "scope restringido"}]. ${data.reply} Tu mensaje no llegó al LLM.`
+          : data.block_type === "security_review"
+            ? `Solicitud no clasificada con suficiente confianza${score}. ${data.reply} Por seguridad, no se consultó información protegida ni se llamó al LLM.`
+          : data.block_type === "output_guard"
+            ? data.reason === "output_guard_unavailable"
+              ? data.reply
+              : data.reason === "output_scope_violation"
+                ? "La respuesta fue bloqueada porque contenía información fuera de tu alcance."
+                : "La respuesta fue bloqueada por Output Guard porque contenía información sensible."
+          : data.block_type === "filter_unavailable"
+              ? data.reply
+              : `Bloqueado por el filtro${blockingScore}.`;
         setMsgs((m) => [
           ...m,
           {
             from: "blocked",
-            text: `Bloqueado por el filtro (${data.reason}) · score ${Number(
-              data.confidence
-            ).toFixed(2)}. Tu mensaje nunca llegó al LLM.`,
+            text: blockedText,
           },
         ]);
       } else {

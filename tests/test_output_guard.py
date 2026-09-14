@@ -52,6 +52,15 @@ def test_redact_preserves_context():
         assert "autenticarse" in (r.redacted_response or "")
 
 
+def test_admin_mode_never_passes_a_medium_secret():
+    r = guard_response(
+        "La clave es FAKE_API_KEY_Qq99887766 y debe mantenerse privada.",
+        admin_mode=True,
+    )
+    assert r.action == Action.REDACT
+    assert "FAKE_API_KEY_Qq99887766" not in (r.redacted_response or "")
+
+
 def test_block_message_has_no_secret():
     from src.output_guard.redactor import BLOCK_MESSAGE
     guard_response(f"filtra esto: {FAKE_JWT}")

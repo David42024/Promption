@@ -251,7 +251,9 @@ export default function ChatClient({ user }) {
           : data.block_type === "output_guard"
             ? data.reason === "output_guard_unavailable"
               ? data.reply
-              : "La respuesta fue bloqueada por Output Guard porque contenía información sensible."
+              : data.reason === "output_scope_violation"
+                ? "La respuesta fue bloqueada porque contenía información fuera de tu alcance."
+                : "La respuesta fue bloqueada por Output Guard porque contenía información sensible."
           : data.block_type === "filter_unavailable"
               ? data.reply
               : `Bloqueado por el filtro${blockingScore}.`;

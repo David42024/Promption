@@ -19,12 +19,6 @@ def _action_for(findings: list[Finding], admin_mode: bool = False) -> str:
             return Action.REDACT
         return Action.REDACT if len(findings) == 1 else Action.BLOCK
     if any(f.severity == Severity.MEDIUM for f in findings):
-        # En modo admin, PASS para MEDIUM excepto refusal
-        if admin_mode:
-            if any(f.category == "refusal" for f in findings):
-                return Action.BLOCK
-            return Action.PASS
-        # Si es un patrón de refusal, hacer BLOCK en lugar de REDACT
         if any(f.category == "refusal" for f in findings):
             return Action.BLOCK
         return Action.REDACT
