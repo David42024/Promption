@@ -4,12 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const PIF_API_URL = (process.env.NEXT_PUBLIC_PIF_API_URL || "https://promption.onrender.com").replace(/\/$/, "");
-
-// NOTA: ADMIN_SECRET debe configurarse en .env.local como NEXT_PUBLIC_PIF_ADMIN_SECRET
-// para estar disponible en el cliente. En producción, usar un sistema de autenticación real.
-const ADMIN_SECRET = process.env.NEXT_PUBLIC_PIF_ADMIN_SECRET || "admin_secret_change_me";
-
 // ================ Iconos SVG inline =================
 const BackIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -184,9 +178,8 @@ export default function AdminPanel() {
         ...(filters.level && { level: filters.level }),
         ...(filters.category && { category: filters.category }),
         ...(filters.tenant_id && { tenant_id: filters.tenant_id }),
-        admin_key: ADMIN_SECRET,
       });
-      const r = await fetch(`${PIF_API_URL}/api/v1/logs/structured?${params}`);
+      const r = await fetch(`/api/admin/log-events?${params}`);
       if (!r.ok) {
         const errorText = await r.text().catch(() => "Error desconocido");
         throw new Error(`API Error ${r.status}: ${errorText}`);
@@ -197,7 +190,7 @@ export default function AdminPanel() {
       setTenants(d.tenants || []);
       setError(null);
     } catch (err) {
-      setError(`Error cargando logs: ${err.message}. Verifica que PIF_API_URL y PIF_ADMIN_SECRET estén configurados correctamente.`);
+      setError(`Error cargando logs: ${err.message}. Verifica PROMPTION_ADMIN_API_KEY en Vercel y PROMPTION_ADMIN_API_KEYS en Render.`);
     } finally {
       setLoading(false);
       setReloading(false);
@@ -206,7 +199,7 @@ export default function AdminPanel() {
 
   const fetchStats = async () => {
     try {
-      const r = await fetch(`${PIF_API_URL}/api/v1/logs/stats?admin_key=${ADMIN_SECRET}`);
+      const r = await fetch("/api/admin/log-stats");
       if (!r.ok) {
         const errorText = await r.text().catch(() => "Error desconocido");
         console.error("Error fetching stats:", errorText);
@@ -669,7 +662,7 @@ export default function AdminPanel() {
                           gap: 8,
                           fontWeight: 600,
                           color:
-                            h.action.endsWith("OFF") || h.action.endsWith(":OFF")
+                            String(h.action || "").endsWith("OFF") || String(h.action || "").endsWith(":OFF")
                               ? "var(--danger-400)"
                               : h.action === "filter:RESET"
                                 ? "var(--warning-500)"
@@ -680,15 +673,15 @@ export default function AdminPanel() {
                           style={{
                             width: 8, height: 8, borderRadius: "50%",
                             background:
-                              h.action.endsWith("OFF") ? "var(--danger-500)"
+                              String(h.action || "").endsWith("OFF") ? "var(--danger-500)"
                                 : h.action === "filter:RESET" ? "var(--warning-500)"
                                 : "var(--success-500)",
                           }}
                         />
-                        {h.action}
+                        {h.action || "cambio"}
                       </span>
                       <span style={{ color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
-                        {h.by} · {new Date(h.at).toLocaleString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                        {h.by || "admin"} · {h.at ? new Date(h.at).toLocaleString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "—"}
                       </span>
                     </div>
                   ))
@@ -828,8 +821,8 @@ export default function AdminPanel() {
             <strong>Error:</strong> {error}
           </p>
           <p className="hint" style={{ marginTop: 8, marginBottom: 0 }}>
-            Asegúrate de que el Filter API esté corriendo en {PIF_API_URL} y que el{" "}
-            <code>PIF_ADMIN_SECRET</code> sea correcto.
+            Asegúrate de que el Filter API esté corriendo y que <code>PROMPTION_ADMIN_API_KEY</code>{" "}
+            en Vercel coincida con una entrada de <code>PROMPTION_ADMIN_API_KEYS</code> en Render.
           </p>
         </div>
       )}

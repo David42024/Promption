@@ -1,6 +1,5 @@
 """API routes."""
 import json
-import os
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -112,14 +111,9 @@ def get_structured_logs(
     tenant_id: str | None = None,
     user_id: str | None = None,
     since: str | None = None,
-    admin_key: str | None = Query(None),
+    tenant: TenantContext = Depends(_require_admin),
 ):
-    """Get structured logs with filtering (admin only in production)."""
-    # Simple admin check - in production use proper admin authentication
-    ADMIN_SECRET = os.environ.get("PIF_ADMIN_SECRET", "admin_secret_change_me")
-    if admin_key != ADMIN_SECRET:
-        raise HTTPException(status_code=401, detail="Admin access required")
-    
+    """Get structured logs with filtering."""
     from src.utils.structured_logger import get_structured_logger
     
     logger = get_structured_logger()
@@ -142,14 +136,9 @@ def get_structured_logs(
 
 @router.get("/logs/stats", tags=["system"])
 def get_log_stats(
-    admin_key: str | None = Query(None),
+    tenant: TenantContext = Depends(_require_admin),
 ):
-    """Get statistics about logs (admin only)."""
-    # Simple admin check - in production use proper admin authentication
-    ADMIN_SECRET = os.environ.get("PIF_ADMIN_SECRET", "admin_secret_change_me")
-    if admin_key != ADMIN_SECRET:
-        raise HTTPException(status_code=401, detail="Admin access required")
-    
+    """Get statistics about logs."""
     from src.utils.structured_logger import get_structured_logger
     
     logger = get_structured_logger()

@@ -30,6 +30,8 @@ El sistema implementa logs estructurados en formato JSON que soportan concurrenc
 **Para el Frontend (Vercel):**
 ```env
 NEXT_PUBLIC_CHAT_API_URL=https://tu-chat-service.com
+PIF_API_URL=https://tu-filter-api.com
+PROMPTION_ADMIN_API_KEY=pk-admin-clave-aleatoria
 CHAT_SERVICE_TOKEN=secreto-largo-compartido-con-chat-service
 SESSION_SECRET=otro-secreto-largo-para-firmar-sesiones
 ```
@@ -45,7 +47,6 @@ CHAT_SERVICE_TOKEN=secreto-largo-compartido-con-vercel
 
 **Para el Backend (Filter API):**
 ```env
-PIF_ADMIN_SECRET=tu_secreto_admin_seguro
 PROMPTION_API_KEYS=tenant123.unitru:pk-123-tenant123.unitru,otro-tenant:pk-clave-aleatoria
 PROMPTION_ADMIN_API_KEYS=promption-platform:pk-admin-clave-aleatoria
 PROMPTION_CORS_ORIGINS=https://tu-demo.vercel.app
@@ -69,6 +70,8 @@ El Filter API debe desplegarse en un servidor separado (no Vercel) porque:
 1. **Crea un archivo `.env.local` en el directorio `demo/`:**
 ```env
 NEXT_PUBLIC_CHAT_API_URL=https://tu-chat-service.com
+PIF_API_URL=https://tu-filter-api.com
+PROMPTION_ADMIN_API_KEY=pk-admin-clave-aleatoria
 CHAT_SERVICE_TOKEN=secreto-largo-compartido-con-chat-service
 SESSION_SECRET=otro-secreto-largo-para-firmar-sesiones
 ```
@@ -100,9 +103,11 @@ El panel de admin está disponible en: `https://tu-demo.vercel.app/admin`
 
 ### Autenticación
 
-El panel requiere la variable `PIF_ADMIN_SECRET` para acceder a los logs de la API.
+El panel requiere `PROMPTION_ADMIN_API_KEY` en Vercel. Esa key debe existir en el backend
+Filter API dentro de `PROMPTION_ADMIN_API_KEYS`.
 
-**IMPORTANTE:** Cambia el valor por defecto en producción.
+**IMPORTANTE:** no uses variables `NEXT_PUBLIC_*` para secretos de administración. La key
+de admin vive solo en rutas server-side de Next.
 
 ### Funcionalidades
 
