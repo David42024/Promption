@@ -99,7 +99,10 @@ async def status():
             "default_model": settings.default_model,
             "providers_available": len(llm_client.models),
             "providers": [model["provider"] for model in llm_client.models],
-            "connected": await llm_client.check_health()
+            "connected": await llm_client.check_health(),
+            "provider_timeout_seconds": llm_client.provider_timeout,
+            "total_timeout_seconds": llm_client.total_timeout,
+            "max_attempts": llm_client.max_attempts,
         },
         "config": {
             "tenant_id": settings.tenant_id,
@@ -135,6 +138,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     filter_enabled = True  # Could be made configurable
     filter_skipped = False
     filter_result = None
+    security_classification = "UNCERTAIN"
     
     if filter_enabled:
         try:
@@ -144,6 +148,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 roles=user_roles,
                 use_ml=True  # Usar ML ligero (TF-IDF + LogisticRegression) que funciona en Render free
             )
+            security_classification = filter_result.classification
             
             if filter_result.blocked:
                 return ChatResponse(
@@ -155,7 +160,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     filter_layers=filter_result.layers,
                     reason=filter_result.reason,
                     confidence=filter_result.confidence,
-                    block_type="attack"
+                    block_type="attack",
+                    security_classification="MALICIOUS",
                 )
         except Exception:
             logger.exception("Filter API unavailable")
@@ -167,7 +173,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 role=primary_role,
                 reason="Filter API unavailable",
                 confidence=1.0,
-                block_type="filter_unavailable"
+                block_type="filter_unavailable",
+                security_classification="UNCERTAIN",
             )
 
     policy_decision = policy_engine.evaluate(request.text, user_roles)
@@ -192,6 +199,35 @@ async def chat(request: ChatRequest) -> ChatResponse:
             confidence=policy_decision.confidence,
             block_type="authorization",
             policy=policy_info,
+            security_classification=security_classification,
+        )
+
+    if security_classification == "UNCERTAIN" and policy_decision.tier in {
+        "interno",
+        "confidencial",
+    }:
+        logger.warning(
+            "Security review required user=%s roles=%s policy=%s tier=%s",
+            request.user.id,
+            user_roles,
+            policy_decision.policy_id,
+            policy_decision.tier,
+        )
+        return ChatResponse(
+            blocked=True,
+            reply=(
+                "La solicitud pide información protegida, pero el filtro no pudo "
+                "clasificarla con suficiente confianza. Reformúlala de manera directa."
+            ),
+            filter_enabled=filter_enabled,
+            filter_skipped=filter_skipped,
+            role=primary_role,
+            filter_layers=filter_result.layers if filter_result else None,
+            reason="security_review_required",
+            confidence=filter_result.confidence if filter_result else None,
+            block_type="security_review",
+            policy=policy_info,
+            security_classification=security_classification,
         )
 
     audit: List[MCPToolCall] = []
@@ -224,6 +260,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 confidence=1.0,
                 block_type="authorization",
                 policy=policy_info,
+                security_classification=security_classification,
             )
         authorized_context = tool_response.get("result")
 
@@ -268,6 +305,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             audit=audit,
             policy=policy_info,
             reason="llm_unavailable",
+            security_classification=security_classification,
         )
     
     # 5. Output Guard
@@ -298,6 +336,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     block_type="output_guard",
                     audit=audit,
                     policy=policy_info,
+                    security_classification=security_classification,
                 )
             
             if guard_result.get("action") == "REDACT" and guard_result.get("redacted_response"):
@@ -319,6 +358,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 block_type="output_guard",
                 audit=audit,
                 policy=policy_info,
+                security_classification=security_classification,
             )
 
     output_policy = policy_engine.evaluate(reply, user_roles)
@@ -344,6 +384,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             block_type="output_guard",
             audit=audit,
             policy=PolicyInfo(**output_policy.to_dict()),
+            security_classification=security_classification,
         )
     
     # 6. Check for secret leakage
@@ -367,6 +408,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         filter_layers=filter_result.layers if filter_result else None,
         audit=audit,
         policy=policy_info,
+        security_classification=security_classification,
     )
 
 

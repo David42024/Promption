@@ -238,6 +238,8 @@ export default function ChatClient({ user }) {
           : "";
         const blockedText = data.block_type === "authorization"
           ? `Acceso denegado por Policy Engine · recurso ${data.policy?.resource || "protegido"} [${data.policy?.tier || "scope restringido"}]. ${data.reply} Tu mensaje no llegó al LLM.`
+          : data.block_type === "security_review"
+            ? `Solicitud no clasificada con suficiente confianza${score}. ${data.reply} Por seguridad, no se consultó información protegida ni se llamó al LLM.`
           : data.block_type === "output_guard"
             ? data.reason === "output_guard_unavailable"
               ? data.reply

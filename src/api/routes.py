@@ -9,6 +9,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.api.auth import TenantContext, require_tenant
+from src.api.classification import classify_security_result
 from src.api.models import (BenchmarkRequest, FilterRequest, FilterResponse,
                              OutputGuardRequest, OutputGuardResponse, SystemInfo)
 from src.benchmark.runner import BenchmarkRunner, RunnerOptions, json_safe, sanitize_prompt
@@ -198,13 +199,25 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(require_te
         "probability": res.ml.probability if res.ml else None,
         "threshold": res.ml.threshold if res.ml else None,
     }
+    benign_threshold = float(_CONF.get("ensemble", {}).get("benign_threshold", 0.30))
+    classification, requires_review = classify_security_result(
+        blocked=res.blocked,
+        score=res.score,
+        ml_available=res.ml is not None,
+        benign_threshold=benign_threshold,
+    )
     layers = {
         "heuristic": {"blocked": res.heuristic.blocked, "score": res.heuristic.score,
                       "matched_rules": rules, "threshold": res.heuristic.threshold,
                       "benign_matched": list(res.heuristic.benign_matched)},
         "ml": ml_info,
         "ensemble": {"score": res.score, "threshold": flt.final_threshold,
+                     "benign_threshold": benign_threshold,
                      "benign_matched": list(res.heuristic.benign_matched)},
+        "classification": {
+            "label": classification,
+            "requires_review": requires_review,
+        },
     }
     logger.info("Filter [%s] tenant=%s user=%s roles=%s in %.1fms: %s",
                 res.decision, tenant.tenant_id, req.user_id, req.roles, latency, req.text[:80])
@@ -231,6 +244,8 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(require_te
         layers=layers,
         sanitized=sanitize_prompt(req.text, res) if res.blocked else req.text,
         tenant_id=tenant.tenant_id,
+        classification=classification,
+        requires_review=requires_review,
     )
 
 

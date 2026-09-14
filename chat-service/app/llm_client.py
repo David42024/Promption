@@ -1,8 +1,17 @@
-"""LLM client integration (Gemini/Groq/OpenRouter)"""
+"""LLM client integration (Gemini/Groq/OpenRouter)."""
+import asyncio
+import logging
+import time
+from typing import Any, Dict, List, Optional
+
 import httpx
-from typing import Optional, List, Dict, Any
+
 from .config import settings
 from .models import LLMResponse
+
+
+logger = logging.getLogger(__name__)
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class LLMClient:
@@ -13,7 +22,10 @@ class LLMClient:
         self.groq_api_key = settings.groq_api_key
         self.openrouter_api_key = settings.openrouter_api_key
         self.default_model = settings.default_model
-        self.timeout = 30.0
+        self.provider_timeout = max(0.5, settings.llm_provider_timeout_seconds)
+        self.total_timeout = max(0.5, settings.llm_total_timeout_seconds)
+        self.max_attempts = max(1, settings.llm_max_attempts)
+        self.retry_backoff = max(0.0, settings.llm_retry_backoff_seconds)
         
         # Model fallback chain
         self.models = self._get_available_models()
@@ -31,13 +43,18 @@ class LLMClient:
             for provider in settings.llm_provider_order.split(",")
             if provider.strip()
         ]
-        
-        for provider in provider_order:
-            models.extend(models_by_provider.get(provider, []))
 
-        for provider, provider_models in models_by_provider.items():
-            if provider not in provider_order:
-                models.extend(provider_models)
+        ordered_providers = provider_order + [
+            provider
+            for provider in models_by_provider
+            if provider not in provider_order
+        ]
+        for provider in ordered_providers:
+            provider_models = models_by_provider.get(provider, [])
+            if provider_models:
+                models.append(provider_models[0])
+        for provider in ordered_providers:
+            models.extend(models_by_provider.get(provider, [])[1:])
 
         return models
 
@@ -161,24 +178,35 @@ class LLMClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None
     ) -> LLMResponse:
-        """Generate response from LLM with fallback"""
-        import time
-        
+        """Generate a response using an ordered fallback within one time budget."""
         if not self.models:
             raise Exception(
                 "No LLM providers configured. Please set GEMINI_API_KEY, GROQ_API_KEY "
                 "or OPENROUTER_API_KEY environment variables."
             )
-        
+
+        chain_started = time.perf_counter()
         last_error = None
-        
-        for model_config in self.models:
-            for attempt in range(3):  # 3 retries per model
-                try:
+        async with httpx.AsyncClient() as client:
+            for model_config in self.models:
+                for attempt in range(self.max_attempts):
+                    elapsed = time.perf_counter() - chain_started
+                    remaining = self.total_timeout - elapsed
+                    if remaining <= 0:
+                        last_error = "total timeout exhausted"
+                        break
+
                     headers = {"Content-Type": "application/json"}
-                    
-                    resolved_temperature = temperature or model_config["temperature"]
-                    resolved_max_tokens = max_tokens or model_config["max_tokens"]
+                    resolved_temperature = (
+                        temperature
+                        if temperature is not None
+                        else model_config["temperature"]
+                    )
+                    resolved_max_tokens = (
+                        max_tokens
+                        if max_tokens is not None
+                        else model_config["max_tokens"]
+                    )
                     request_url = model_config["base_url"]
 
                     if model_config["api"] == "gemini":
@@ -186,67 +214,105 @@ class LLMClient:
                         payload = self._build_gemini_payload(
                             messages,
                             resolved_temperature,
-                            resolved_max_tokens
+                            resolved_max_tokens,
                         )
                     else:
                         headers["Authorization"] = f"Bearer {model_config['api_key']}"
-
                         if model_config["provider"] == "openrouter":
                             headers["HTTP-Referer"] = "https://promption.shop"
                             headers["X-Title"] = "Promption Shop Demo"
-                        
                         payload = {
                             "model": model_config["model"],
                             "messages": messages,
                             "temperature": resolved_temperature,
                             "max_tokens": resolved_max_tokens,
-                            "stream": False
+                            "stream": False,
                         }
-                    
-                    start_time = time.perf_counter()
-                    
-                    async with httpx.AsyncClient(timeout=self.timeout) as client:
+
+                    request_timeout = min(self.provider_timeout, remaining)
+                    try:
                         response = await client.post(
                             request_url,
                             headers=headers,
-                            json=payload
+                            json=payload,
+                            timeout=request_timeout,
                         )
-                    
-                    latency = (time.perf_counter() - start_time) * 1000
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        content = self._extract_text(model_config["provider"], data)
-                        if not content:
-                            last_error = f"{model_config['provider'].upper()} returned empty content"
-                            break
-                        return LLMResponse(
-                            text=content,
-                            model=model_config["label"],
-                            latency_ms=latency,
-                            ok=True
+                    except httpx.TimeoutException:
+                        last_error = f"{model_config['provider'].upper()} timeout"
+                        logger.warning(
+                            "LLM timeout provider=%s model=%s attempt=%d timeout=%.1fs",
+                            model_config["provider"],
+                            model_config["model"],
+                            attempt + 1,
+                            request_timeout,
                         )
-                    
-                    # Handle rate limiting with retry
-                    if response.status_code in [429, 500, 502, 503, 504] and attempt < 2:
-                        import asyncio
-                        await asyncio.sleep(1.2 ** attempt)  # Exponential backoff
-                        continue
-                    
-                    last_error = f"{model_config['provider'].upper()} {response.status_code}: {response.text[:100]}"
-                    break  # Try next model
-                    
-                except httpx.TimeoutException:
-                    last_error = f"{model_config['provider'].upper()} timeout"
-                    if attempt < 2:
-                        import asyncio
-                        await asyncio.sleep(1)
-                        continue
+                    except Exception as exc:
+                        last_error = (
+                            f"{model_config['provider'].upper()} "
+                            f"{exc.__class__.__name__}"
+                        )
+                        logger.warning(
+                            "LLM client error provider=%s model=%s attempt=%d error=%s",
+                            model_config["provider"],
+                            model_config["model"],
+                            attempt + 1,
+                            exc.__class__.__name__,
+                        )
+                        break
+                    else:
+                        if response.is_success:
+                            try:
+                                data = response.json()
+                                content = self._extract_text(
+                                    model_config["provider"], data
+                                )
+                            except (IndexError, KeyError, TypeError, ValueError):
+                                content = ""
+                                logger.warning(
+                                    "LLM returned an invalid payload provider=%s model=%s",
+                                    model_config["provider"],
+                                    model_config["model"],
+                                )
+                            if content:
+                                latency = (
+                                    time.perf_counter() - chain_started
+                                ) * 1000
+                                return LLMResponse(
+                                    text=content,
+                                    model=model_config["label"],
+                                    latency_ms=latency,
+                                    ok=True,
+                                )
+                            last_error = f"{model_config['provider'].upper()} invalid or empty content"
+                        else:
+                            last_error = (
+                                f"{model_config['provider'].upper()} "
+                                f"HTTP {response.status_code}"
+                            )
+                            logger.warning(
+                                "LLM rejected provider=%s model=%s attempt=%d status=%d",
+                                model_config["provider"],
+                                model_config["model"],
+                                attempt + 1,
+                                response.status_code,
+                            )
+                            if response.status_code not in _RETRYABLE_STATUS_CODES:
+                                break
+
+                    if attempt + 1 < self.max_attempts:
+                        remaining = self.total_timeout - (
+                            time.perf_counter() - chain_started
+                        )
+                        delay = min(
+                            self.retry_backoff * (2 ** attempt),
+                            max(0.0, remaining),
+                        )
+                        if delay > 0:
+                            await asyncio.sleep(delay)
+
+                if time.perf_counter() - chain_started >= self.total_timeout:
                     break
-                except Exception as e:
-                    last_error = f"{model_config['provider'].upper()} {str(e)}"
-                    break
-        
+
         raise Exception(f"All LLM providers failed: {last_error}")
 
 

@@ -72,14 +72,19 @@ docker run -p 8000:8000 promption-chat-service
 - `GROQ_API_KEY`: API key de Groq (opcional)
 - `OPENROUTER_API_KEY`: API key de OpenRouter (opcional)
 - `LLM_PROVIDER_ORDER`: Orden de fallback (default: `gemini,groq,openrouter`)
+- `LLM_PROVIDER_TIMEOUT_SECONDS`: Máximo por intento/proveedor (default: `8`)
+- `LLM_TOTAL_TIMEOUT_SECONDS`: Presupuesto total de toda la cadena (default: `24`)
+- `LLM_MAX_ATTEMPTS`: Intentos por modelo antes del siguiente fallback (default: `1`)
+- `LLM_RETRY_BACKOFF_SECONDS`: Espera base entre reintentos opcionales (default: `0.35`)
 - `DEFAULT_MODEL`: Modelo LLM legado por defecto
 - `CHAT_SERVICE_TOKEN`: Secreto compartido con el backend de Vercel para impedir llamadas directas con roles falsificados
-- `CORS_ORIGINS`: Orígenes permitidos (comma-separated)
+- `CORS_ORIGINS_STR`: Orígenes permitidos (comma-separated)
 
 ## 📝 Características
 
 - ✅ Integración completa con Filter API existente
-- ✅ Soporte multi-proveedor LLM (Gemini/Groq/OpenRouter)
+- ✅ Clasificación de entrada en `MALICIOUS`, `BENIGN` y `UNCERTAIN`
+- ✅ Fallback multi-proveedor ordenado: Gemini → Groq → OpenRouter, antes de modelos secundarios
 - ✅ MCP tools con control de acceso por rol
 - ✅ Policy Engine para clasificación de recursos y ACL previa al LLM
 - ✅ Recuperación de datos únicamente después de autorizar su tier

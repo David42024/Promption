@@ -1,4 +1,6 @@
 """Pydantic request/response schemas for the API."""
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -41,6 +43,8 @@ class FilterResponse(BaseModel):
     layers: dict
     sanitized: str
     tenant_id: str = "default"
+    classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
+    requires_review: bool = True
 
 
 class BenchmarkRequest(BaseModel):

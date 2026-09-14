@@ -37,6 +37,7 @@ ensemble:
   heuristic_weight: 0.4
   ml_weight: 0.6
   final_threshold: 0.5
+  benign_threshold: 0.30
   require_llm_veto: false
   # Descuento benigno ELIMINADO (revertido tras test adversario: abría hueco).
   # Las señales benignas se detectan y reportan, pero no deciden.

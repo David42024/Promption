@@ -1,7 +1,8 @@
 """Pydantic models for Chat Service"""
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
 from enum import Enum
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, Field
 
 
 class UserRole(str, Enum):
@@ -41,6 +42,8 @@ class FilterResponse(BaseModel):
     text: Optional[str] = None  # Campo adicional del Filter API
     tenant_id: Optional[str] = None  # Campo adicional del Filter API
     latency_ms: Optional[float] = None  # Campo adicional del Filter API
+    classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
+    requires_review: bool = True
 
 
 class LLMResponse(BaseModel):
@@ -98,6 +101,7 @@ class ChatResponse(BaseModel):
     confidence: Optional[float] = None  # Campo para el frontend cuando está bloqueado
     block_type: Optional[str] = None
     policy: Optional[PolicyInfo] = None
+    security_classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
 
 
 class HealthResponse(BaseModel):

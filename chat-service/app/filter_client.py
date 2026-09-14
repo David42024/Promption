@@ -102,7 +102,7 @@ class FilterClient:
                 
                 if response.status_code == 401:
                     raise ValueError("Invalid Filter API key")
-                if not response.ok:
+                if not response.is_success:
                     raise Exception(f"Output Guard error {response.status_code}")
                 return response.json()
 

@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     default_model: str = "llama-3.1-70b-versatile"
     gemini_model: str = "gemini-3.1-flash"
     llm_provider_order: str = "gemini,groq,openrouter"
+    llm_provider_timeout_seconds: float = 8.0
+    llm_total_timeout_seconds: float = 24.0
+    llm_max_attempts: int = 1
+    llm_retry_backoff_seconds: float = 0.35
     
     # Service Configuration
     service_name: str = "promption-chat-service"
