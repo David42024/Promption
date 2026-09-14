@@ -14,7 +14,7 @@ El sistema está diseñado para soportar múltiples usuarios concurrentes en Ver
 **Frontend (Demo Shop):**
 - Next.js desplegado en Vercel
 - Stateless (no mantiene estado local)
-- Se comunica con el Filter API vía HTTP
+- Se comunica con Chat Service; la API key de Promption nunca llega al navegador
 
 ### 2. Sistema de Logs Estructurados
 
@@ -29,19 +29,26 @@ El sistema implementa logs estructurados en formato JSON que soportan concurrenc
 
 **Para el Frontend (Vercel):**
 ```env
-PIF_API_URL=https://tu-filter-api.com
-PIF_TENANT_KEY=pif_demo_shop_123456
-PIF_TENANT_ID=demo-shop
-GROQ_API_KEY=gsk_tu_clave_real
-PIF_LLM_MODEL=openai/gpt-oss-20b
-PIF_ADMIN_SECRET=tu_secreto_admin_seguro
+NEXT_PUBLIC_CHAT_API_URL=https://tu-chat-service.com
+CHAT_SERVICE_TOKEN=secreto-largo-compartido-con-chat-service
+SESSION_SECRET=otro-secreto-largo-para-firmar-sesiones
+```
+
+**Para Chat Service (Render):**
+```env
+FILTER_API_URL=https://tu-filter-api.com
+PROMPTION_API_KEY=pk-123-tenant123.unitru
+TENANT_ID=tenant123.unitru
+GEMINI_API_KEY=tu_clave_de_gemini
+CHAT_SERVICE_TOKEN=secreto-largo-compartido-con-vercel
 ```
 
 **Para el Backend (Filter API):**
 ```env
 PIF_ADMIN_SECRET=tu_secreto_admin_seguro
-PIF_API_KEYS=demo-shop:pif_demo_shop_123456,otro-tenant:otro_key
-GROQ_API_KEY=gsk_tu_clave_real
+PROMPTION_API_KEYS=tenant123.unitru:pk-123-tenant123.unitru,otro-tenant:pk-clave-aleatoria
+PROMPTION_ADMIN_API_KEYS=promption-platform:pk-admin-clave-aleatoria
+PROMPTION_CORS_ORIGINS=https://tu-demo.vercel.app
 ```
 
 ## Despliegue en Vercel
@@ -61,12 +68,9 @@ El Filter API debe desplegarse en un servidor separado (no Vercel) porque:
 
 1. **Crea un archivo `.env.local` en el directorio `demo/`:**
 ```env
-PIF_API_URL=https://tu-filter-api.com
-PIF_TENANT_KEY=pif_demo_shop_123456
-PIF_TENANT_ID=demo-shop
-GROQ_API_KEY=gsk_tu_clave_real
-PIF_LLM_MODEL=openai/gpt-oss-20b
-PIF_ADMIN_SECRET=tu_secreto_admin_seguro
+NEXT_PUBLIC_CHAT_API_URL=https://tu-chat-service.com
+CHAT_SERVICE_TOKEN=secreto-largo-compartido-con-chat-service
+SESSION_SECRET=otro-secreto-largo-para-firmar-sesiones
 ```
 
 2. **Agrega las variables de entorno en Vercel:**

@@ -19,6 +19,16 @@ services:
     envVars:
       - key: PYTHONPATH
         value: /app
+      # Registro multi-tenant. Créalo como Secret en Render; no pongas claves
+      # de producción en este archivo.
+      # - key: PROMPTION_API_KEYS
+      #   sync: false
+      # - key: PROMPTION_ADMIN_API_KEYS
+      #   sync: false
+      # CORS solo es necesario si conscientemente llamas desde un navegador.
+      # Las API keys deben usarse normalmente desde el backend del chatbot.
+      # - key: PROMPTION_CORS_ORIGINS
+      #   value: https://chat.ejemplo.com
       # Render inyecta PORT automáticamente; el CMD del Dockerfile lo usa.
       # Si algún día quieres exponer endpoints que consultan a un LLM remoto:
       #   - key: LLM_PROVIDER

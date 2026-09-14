@@ -32,6 +32,13 @@ def test_spanish_variants():
     assert guard_response("api_key = FAKE_API_KEY_1234567890").action in (Action.BLOCK, Action.REDACT)
 
 
+def test_promption_key_is_never_exposed():
+    key = "pk-123-tenant123.unitru"
+    result = guard_response(f"Tu clave de Promption es {key}")
+    assert result.action in (Action.BLOCK, Action.REDACT)
+    assert key not in (result.redacted_response or "")
+
+
 def test_pass_cases():
     assert guard_response("Una API key permite autenticar una aplicación.").action == Action.PASS
     assert guard_response("Debes almacenar las contraseñas utilizando hashing.").action == Action.PASS

@@ -14,16 +14,40 @@ class FilterClient:
     
     def __init__(self):
         self.base_url = settings.filter_api_url.rstrip("/")
-        self.api_key = settings.filter_api_key
+        self.api_key = settings.promption_api_key or settings.filter_api_key
         self.tenant_id = settings.tenant_id
         self.timeout = 60.0  # Timeout alto para manejar cold starts de Render
+
+    @property
+    def headers(self) -> Dict[str, str]:
+        if not self.api_key:
+            raise RuntimeError("PROMPTION_API_KEY is not configured")
+        return {
+            "Content-Type": "application/json",
+            "X-Promption-API-Key": self.api_key,
+        }
+
+    def _validate_tenant(self, data: Dict[str, Any]) -> None:
+        resolved_tenant = data.get("tenant_id")
+        if self.tenant_id and resolved_tenant != self.tenant_id:
+            raise RuntimeError(
+                f"Promption API key belongs to tenant '{resolved_tenant}', "
+                f"not expected tenant '{self.tenant_id}'"
+            )
     
     async def check_health(self) -> bool:
-        """Check if Filter API is healthy"""
+        """Check that the Filter API is reachable and this business key is valid."""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(f"{self.base_url}/api/v1/health")
-                return response.status_code == 200
+                tenant = await client.get(
+                    f"{self.base_url}/api/v1/tenant",
+                    headers=self.headers,
+                )
+                if tenant.status_code != 200:
+                    return False
+                data = tenant.json()
+                self._validate_tenant(data)
+                return True
         except Exception:
             return False
     
@@ -39,10 +63,7 @@ class FilterClient:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/api/v1/filter",
-                    headers={
-                        "Content-Type": "application/json",
-                        "X-API-Key": self.api_key
-                    },
+                    headers=self.headers,
                     json={
                         "text": text,
                         "use_ml": use_ml,
@@ -64,6 +85,7 @@ class FilterClient:
                     raise Exception(f"Filter API error {response.status_code}: {error_text}")
                 
                 data = response.json()
+                self._validate_tenant(data)
                 logger.debug("Filter API decision=%s", data.get("decision"))
                 return FilterResponse(**data)
                 
@@ -84,10 +106,7 @@ class FilterClient:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/api/v1/output-guard",
-                    headers={
-                        "Content-Type": "application/json",
-                        "X-API-Key": self.api_key
-                    },
+                    headers=self.headers,
                     json={
                         "text": text,
                         "user_id": user_id,
@@ -104,7 +123,9 @@ class FilterClient:
                     raise ValueError("Invalid Filter API key")
                 if not response.is_success:
                     raise Exception(f"Output Guard error {response.status_code}")
-                return response.json()
+                data = response.json()
+                self._validate_tenant(data)
+                return data
 
         except httpx.TimeoutException as exc:
             raise Exception("Output Guard timeout") from exc

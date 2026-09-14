@@ -48,6 +48,8 @@ PATTERNS: list[tuple] = [
     ("slack_token", "cloud", "HIGH", r"\bxox[bap]-[A-Za-z0-9-]{8,}\b", 0.93, True),
     ("google_oauth", "cloud", "HIGH", r"\bya29\.[A-Za-z0-9_-]{10,}\b", 0.9, True),
     ("groq_key", "api_key", "HIGH", r"\bgsk_[A-Za-z0-9]{10,}\b", 0.93, True),
+    ("promption_key", "api_key", "HIGH",
+     r"(?<![A-Za-z0-9._-])(pk-[A-Za-z0-9][A-Za-z0-9._-]{11,})(?![A-Za-z0-9._-])", 0.93, True),
     ("sk_key", "api_key", "HIGH", r"\bsk-(?!test\b)[A-Za-z0-9]{10,}\b", 0.9, True),
     ("bearer_token", "api_key", "HIGH",
      r"(?i)\bbearer\s+([A-Za-z0-9\-._~+/=]{12,})", 0.88, False),

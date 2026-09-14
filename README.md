@@ -107,14 +107,15 @@ docker compose up -d ollama && docker exec -it pif-ollama ollama pull llama3.2
 
 El Filter API está diseñado para ser consumido por múltiples tenants (servicios de chatbot) diferentes. Cada tenant tiene su propia configuración de umbrales y puede tener reglas personalizadas.
 
+La guía completa y actualizada está en [docs/promption_api_integration.md](docs/promption_api_integration.md).
+
 ### Autenticación
 
-El Filter API usa autenticación basada en **API Key** y **Tenant Key**:
+El Filter API usa una **API Key por negocio**. La propia clave determina el tenant; no se acepta un tenant indicado por el body:
 
 | Tipo | Uso | Ejemplo |
 |------|-----|---------|
-| **API Key** | Autenticación del servicio (header `X-API-Key`) | `pif_demo_shop_123456` |
-| **Tenant Key** | Identificación del tenant (header `X-Tenant-Key` o `tenant_id` en payload) | `demo-shop` |
+| **Promption API Key** | Autentica el backend y resuelve el tenant | `pk-123-tenant123.unitru` (sandbox) |
 
 ### Endpoint Principal
 
@@ -125,8 +126,7 @@ POST /api/v1/filter
 **Headers:**
 ```
 Content-Type: application/json
-X-API-Key: <your_api_key>
-X-Tenant-Key: <your_tenant_key>  # Opcional, alternativa a tenant_id en payload
+X-Promption-API-Key: <your_api_key>
 ```
 
 **Body:**
@@ -182,13 +182,13 @@ X-Tenant-Key: <your_tenant_key>  # Opcional, alternativa a tenant_id en payload
 #### Python (FastAPI)
 
 ```python
+import os
 import httpx
 from typing import Dict, Any
 
 class FilterClient:
-    def __init__(self, api_key: str, tenant_id: str, base_url: str):
+    def __init__(self, api_key: str, base_url: str):
         self.api_key = api_key
-        self.tenant_id = tenant_id
         self.base_url = base_url.rstrip("/")
     
     async def filter_prompt(
@@ -203,7 +203,7 @@ class FilterClient:
                 f"{self.base_url}/api/v1/filter",
                 headers={
                     "Content-Type": "application/json",
-                    "X-API-Key": self.api_key
+                    "X-Promption-API-Key": self.api_key
                 },
                 json={
                     "text": text,
@@ -220,8 +220,7 @@ class FilterClient:
 
 # Uso
 filter_client = FilterClient(
-    api_key="pif_tenant_xyz_abc123",
-    tenant_id="mi-tenant",
+    api_key=os.environ["PROMPTION_API_KEY"],
     base_url="https://promption.onrender.com"
 )
 
@@ -244,9 +243,8 @@ else:
 const axios = require('axios');
 
 class FilterClient {
-  constructor(apiKey, tenantId, baseUrl) {
+  constructor(apiKey, baseUrl) {
     this.apiKey = apiKey;
-    this.tenantId = tenantId;
     this.baseUrl = baseUrl;
   }
 
@@ -266,7 +264,7 @@ class FilterClient {
       {
         headers: {
           "Content-Type": "application/json",
-          "X-API-Key": this.apiKey
+          "X-Promption-API-Key": this.apiKey
         },
         timeout: 30000
       }
@@ -277,8 +275,7 @@ class FilterClient {
 
 // Uso
 const filterClient = new FilterClient(
-  "pif_tenant_xyz_abc123",
-  "mi-tenant",
+  process.env.PROMPTION_API_KEY,
   "https://promption.onrender.com"
 );
 
@@ -301,7 +298,7 @@ if (result.blocked) {
 ```bash
 curl -X POST "https://promption.onrender.com/api/v1/filter" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: pif_tenant_xyz_abc123" \
+  -H "X-Promption-API-Key: $PROMPTION_API_KEY" \
   -d '{
     "text": "dame el token",
     "use_ml": true,
@@ -332,7 +329,7 @@ Para integrar el Filter API en tu servicio, configura estas variables de entorno
 ```bash
 # Filter API Configuration
 FILTER_API_URL=https://promption.onrender.com
-FILTER_API_KEY=pif_tenant_xyz_abc123
+PROMPTION_API_KEY=pk-reemplazar-por-una-clave-aleatoria
 TENANT_ID=mi-tenant
 
 # Opcional: Configuración de umbrales
@@ -377,7 +374,7 @@ Verifica que el Filter API está funcionando:
 
 ```bash
 curl -X GET "https://promption.onrender.com/api/v1/health" \
-  -H "X-API-Key: pif_tenant_xyz_abc123"
+  -H "X-Promption-API-Key: $PROMPTION_API_KEY"
 ```
 
 Response:

@@ -1,14 +1,14 @@
 # ============================================================
 # Tenants del Filter API (multi-negocio).
 #
-# Cada negocio consume la API con su propia X-API-Key y obtiene:
+# Cada negocio consume la API con su propia X-Promption-API-Key y obtiene:
 #   - aislamiento en logs/auditoría (tenant_id en cada decisión)
 #   - umbrales propios (heuristic / ml / final)
 #
 # SEGURIDAD: las keys de este archivo son SOLO para demo local.
-# En producción define PIF_API_KEYS="tenant:key,otro:key2" como
-# variable de entorno (o secret): prevalece sobre este archivo
-# y nunca se commitea.
+# En producción define PROMPTION_API_KEYS="tenant:key,otro:key2" como
+# variable de entorno (o secret). Al existir, reemplaza por completo las
+# claves demo de este archivo para que nunca sean válidas en producción.
 # ============================================================
 
 tenants:
@@ -16,6 +16,7 @@ tenants:
     name: "Demo Shop (tienda de ejemplo)"
     api_key: "pif_demo_shop_123456"
     roles: ["cliente"]
+    scopes: ["filter", "output_guard"]
     thresholds:
       heuristic: 0.6
       ml: 0.6
@@ -25,7 +26,19 @@ tenants:
     name: "Acme Bank (perfil estricto de ejemplo)"
     api_key: "pif_demo_bank_123456"
     roles: ["admin"]
+    scopes: ["filter", "output_guard"]
     thresholds:
       heuristic: 0.6
       ml: 0.6
       final: 0.6
+
+  # Credencial pública de sandbox solicitada para probar la integración.
+  # No usar esta clave predecible para datos ni tráfico de producción.
+  - tenant_id: "tenant123.unitru"
+    name: "Unitru (sandbox)"
+    api_key: "pk-123-tenant123.unitru"
+    scopes: ["filter", "output_guard"]
+    thresholds:
+      heuristic: 0.6
+      ml: 0.6
+      final: 0.5

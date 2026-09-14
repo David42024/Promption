@@ -9,8 +9,9 @@ class Settings(BaseSettings):
     
     # Filter API Configuration
     filter_api_url: str = "https://promption.onrender.com"
-    filter_api_key: str = "pif_demo_shop_123456"
-    tenant_id: str = "demo-shop"
+    promption_api_key: Optional[str] = None
+    filter_api_key: Optional[str] = None
+    tenant_id: Optional[str] = None
     
     # LLM Configuration
     gemini_api_key: Optional[str] = None

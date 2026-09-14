@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from src.api.auth import TenantContext, require_tenant
+from src.api.auth import TenantContext, require_scope, require_tenant
 from src.api.classification import classify_security_result
 from src.api.models import (BenchmarkRequest, FilterRequest, FilterResponse,
                              OutputGuardRequest, OutputGuardResponse, SystemInfo)
@@ -26,6 +26,11 @@ _filter = EnsembleFilter()
 _tenant_filters: dict[tuple, EnsembleFilter] = {}
 _ollama = get_llm_client()
 _start_time = time.time()
+_require_filter = require_scope("filter")
+_require_output_guard = require_scope("output_guard")
+_require_admin = require_scope("admin")
+_require_benchmark = require_scope("benchmark")
+_require_metrics = require_scope("metrics")
 
 
 def _filter_for(tenant: TenantContext, final_override: float | None = None) -> EnsembleFilter:
@@ -79,8 +84,19 @@ def health() -> SystemInfo:
     )
 
 
+@router.get("/tenant", tags=["tenant"])
+def tenant_info(tenant: TenantContext = Depends(require_tenant)):
+    """Validate an API key and return only its resolved tenant metadata."""
+    return {
+        "tenant_id": tenant.tenant_id,
+        "name": tenant.name or tenant.tenant_id,
+        "thresholds": tenant.thresholds,
+        "scopes": tenant.scopes,
+    }
+
+
 @router.get("/system/logs", tags=["system"])
-def tail_logs(lines: int = 100, tenant: TenantContext = Depends(require_tenant)):
+def tail_logs(lines: int = 100, tenant: TenantContext = Depends(_require_admin)):
     log_file = Path(_CONF["logging"].get("file", "logs/system.log"))
     if not log_file.exists():
         return {"logs": []}
@@ -169,12 +185,12 @@ def get_log_stats(
 
 
 @router.get("/system/config", tags=["system"])
-def get_config(tenant: TenantContext = Depends(require_tenant)):
+def get_config(tenant: TenantContext = Depends(_require_admin)):
     return _CONF
 
 
 @router.post("/system/reload", tags=["system"])
-def reload_filter(tenant: TenantContext = Depends(require_tenant)):
+def reload_filter(tenant: TenantContext = Depends(_require_admin)):
     """Reload the heuristic rules / ML model without restarting the API."""
     global _filter
     _filter = EnsembleFilter()
@@ -184,7 +200,7 @@ def reload_filter(tenant: TenantContext = Depends(require_tenant)):
 
 # ------------------------------------------------------------------ filtering
 @router.post("/filter", tags=["filter"])
-def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(require_tenant)) -> FilterResponse:
+def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_filter)) -> FilterResponse:
     t0 = time.perf_counter()
     flt = _filter_for(tenant, req.threshold)
     merged_roles = list(req.roles) + list(getattr(tenant, "roles", []) or [])
@@ -253,7 +269,7 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(require_te
 
 
 @router.post("/filter/batch", tags=["filter"])
-def filter_batch(reqs: list[FilterRequest], tenant: TenantContext = Depends(require_tenant)):
+def filter_batch(reqs: list[FilterRequest], tenant: TenantContext = Depends(_require_filter)):
     t0 = time.perf_counter()
     out = []
     for req in reqs:
@@ -264,7 +280,7 @@ def filter_batch(reqs: list[FilterRequest], tenant: TenantContext = Depends(requ
 
 # ------------------------------------------------------------------ output guard
 @router.post("/output-guard", tags=["output-guard"])
-def output_guard(req: OutputGuardRequest, tenant: TenantContext = Depends(require_tenant)) -> OutputGuardResponse:
+def output_guard(req: OutputGuardRequest, tenant: TenantContext = Depends(_require_output_guard)) -> OutputGuardResponse:
     """Inspecciona una respuesta del LLM antes de entregarla (PASS/REDACT/BLOCK)."""
     from src.output_guard import guard_response, scan
     from src.utils.structured_logger import log_output_guard
@@ -300,7 +316,7 @@ def output_guard(req: OutputGuardRequest, tenant: TenantContext = Depends(requir
 
 # ------------------------------------------------------------------ benchmark
 @router.post("/benchmark", tags=["benchmark"])
-def run_benchmark(req: BenchmarkRequest, tenant: TenantContext = Depends(require_tenant)):
+def run_benchmark(req: BenchmarkRequest, tenant: TenantContext = Depends(_require_benchmark)):
     opts = RunnerOptions(sample_size=req.sample_size, use_llm=req.use_llm, save=True)
     runner = BenchmarkRunner(filter=_filter, ollama=_ollama, opts=opts)
     df, metrics = runner.run()
@@ -310,18 +326,18 @@ def run_benchmark(req: BenchmarkRequest, tenant: TenantContext = Depends(require
 
 
 @router.get("/benchmark/latest", tags=["benchmark"])
-def benchmark_latest(tenant: TenantContext = Depends(require_tenant)):
+def benchmark_latest(tenant: TenantContext = Depends(_require_benchmark)):
     return _latest_payload()
 
 
 @router.get("/benchmark/results", tags=["benchmark"])
-def benchmark_results(tenant: TenantContext = Depends(require_tenant)):
+def benchmark_results(tenant: TenantContext = Depends(_require_benchmark)):
     df = _results_df()
     return {"n_rows": len(df), "columns": list(df.columns), "data": json_safe(df.to_dict(orient="records"))}
 
 
 @router.get("/benchmark/history", tags=["benchmark"])
-def benchmark_history(tenant: TenantContext = Depends(require_tenant)):
+def benchmark_history(tenant: TenantContext = Depends(_require_benchmark)):
     hist = Path(_CONF["benchmark"].get("history_dir", "data/results/history"))
     if not hist.exists():
         return {"runs": []}
@@ -339,7 +355,7 @@ def benchmark_history(tenant: TenantContext = Depends(require_tenant)):
 
 # ------------------------------------------------------------------ metrics / model
 @router.get("/metrics", tags=["metrics"])
-def metrics_endpoint(tenant: TenantContext = Depends(require_tenant)):
+def metrics_endpoint(tenant: TenantContext = Depends(_require_metrics)):
     df = _results_df()
     from src.benchmark.metrics import all_metrics, by_attack_type, by_dataset
     return json_safe({
@@ -350,7 +366,7 @@ def metrics_endpoint(tenant: TenantContext = Depends(require_tenant)):
 
 
 @router.get("/model/features", tags=["model"])
-def model_features(top: int = 384, tenant: TenantContext = Depends(require_tenant)):
+def model_features(top: int = 384, tenant: TenantContext = Depends(_require_metrics)):
     if not _filter.ml.is_loaded:
         try:
             _filter.ml._ensure_loaded()
@@ -361,7 +377,7 @@ def model_features(top: int = 384, tenant: TenantContext = Depends(require_tenan
 
 
 @router.get("/model/predict", tags=["model"])
-def model_predict(text: str, tenant: TenantContext = Depends(require_tenant)):
+def model_predict(text: str, tenant: TenantContext = Depends(_require_filter)):
     if not text:
         raise HTTPException(status_code=422, detail="Parámetro 'text' requerido")
     return filter_prompt(FilterRequest(text=text), tenant)
@@ -369,7 +385,7 @@ def model_predict(text: str, tenant: TenantContext = Depends(require_tenant)):
 
 # ------------------------------------------------------------------ misc
 @router.get("/files", tags=["system"])
-def list_output_files(tenant: TenantContext = Depends(require_tenant)):
+def list_output_files(tenant: TenantContext = Depends(_require_admin)):
     base = Path(_CONF["paths"]["results"])
     files = []
     for p in sorted(base.rglob("*")):

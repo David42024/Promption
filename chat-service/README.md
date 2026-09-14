@@ -66,7 +66,8 @@ docker run -p 8000:8000 promption-chat-service
 ## 🔧 Variables de Entorno
 
 - `FILTER_API_URL`: URL del Filter API
-- `FILTER_API_KEY`: API key del tenant
+- `PROMPTION_API_KEY`: API key del negocio; el tenant se resuelve automáticamente
+- `FILTER_API_KEY`: nombre anterior, aceptado temporalmente por compatibilidad
 - `GEMINI_API_KEY`: API key de Google AI Studio / Gemini (opcional)
 - `GEMINI_MODEL`: Modelo de Gemini (default: `gemini-3.1-flash`)
 - `GROQ_API_KEY`: API key de Groq (opcional)
