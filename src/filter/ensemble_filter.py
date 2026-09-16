@@ -6,6 +6,8 @@ Decision strategy (default OR):
 
 The OR logic keeps the system safe (fail-safe): any layer flagging is enough.
 """
+import re
+import unicodedata
 from dataclasses import dataclass
 
 from src.filter.heuristic_filter import HeuristicFilter, HeuristicResult
@@ -19,6 +21,42 @@ _USE_LIGHTWEIGHT = _MODEL_CONF.get("use_lightweight_ml", False)
 
 logger.info(f"DEBUG: use_lightweight_ml = {_USE_LIGHTWEIGHT}")
 logger.info(f"DEBUG: _MODEL_CONF keys = {list(_MODEL_CONF.keys()) if _MODEL_CONF else 'None'}")
+
+_SAFE_SUPPORT_INTENT = re.compile(
+    r"\b("
+    r"consultas?\s+frecuentes|preguntas?\s+frecuentes|\bfaq\b|"
+    r"atencion\s+al\s+cliente|soporte|"
+    r"ideas?\s+para\s+responder|responder\s+consultas?|"
+    r"redactar\s+(?:un\s+)?(?:correo|mensaje|respuesta)|"
+    r"politicas?\s+publicas?"
+    r")\b",
+    re.IGNORECASE,
+)
+_RISKY_SAFE_INTENT_TERMS = re.compile(
+    r"\b("
+    r"ignora|olvida|bypass|desactiva|system\s+prompt|instrucciones|"
+    r"api\s*key|apikey|token|password|contrasena|contraseña|credencial(?:es)?|"
+    r"secreto(?:s|as)?|clave(?:s)?|sueldo(?:s)?|nomina|n[oó]mina|facturacion|facturaci[oó]n|"
+    r"presupuesto|roi|jwt|admin|root"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _normalize_for_safe_intent(text: str) -> str:
+    value = unicodedata.normalize("NFKD", text or "")
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    return re.sub(r"\s+", " ", value.lower()).strip()
+
+
+def _is_ml_only_safe_support_intent(text: str, probability: float, threshold: float) -> bool:
+    normalized = _normalize_for_safe_intent(text)
+    margin = max(0.04, threshold * 0.10)
+    return (
+        probability <= threshold + margin
+        and bool(_SAFE_SUPPORT_INTENT.search(normalized))
+        and not _RISKY_SAFE_INTENT_TERMS.search(normalized)
+    )
 
 # Import lightweight ML filter if enabled
 if _USE_LIGHTWEIGHT:
@@ -97,9 +135,23 @@ class EnsembleFilter:
         if ml_res is not None:
             score = self.heuristic_weight * heur.score + self.ml_weight * ml_res.probability
             blocked = heur.blocked or ml_res.blocked or score >= self.final_threshold
+            safe_intent_override = (
+                blocked
+                and not heur.blocked
+                and not heur.matched_rules
+                and _is_ml_only_safe_support_intent(
+                    text,
+                    ml_res.probability,
+                    self.ml_threshold if self.ml_threshold is not None else ml_res.threshold,
+                )
+            )
+            if safe_intent_override:
+                ml_res.blocked = False
+                blocked = False
         else:
             score = heur.score
             blocked = heur.blocked
+            safe_intent_override = False
 
         merged = {
             "heuristic_score": heur.score,
@@ -108,6 +160,7 @@ class EnsembleFilter:
             "ensemble_score": score,
             "matched_rules": [r["name"] for r in heur.matched_rules],
             "ml_available": ml_res is not None,
+            "safe_intent_override": safe_intent_override,
         }
         latency_ms = (time.perf_counter() - start) * 1000
         return EnsembleResult(
