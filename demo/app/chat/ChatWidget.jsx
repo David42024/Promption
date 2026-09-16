@@ -131,13 +131,11 @@ export default function ChatWidget() {
         const score = Number.isFinite(Number(data.confidence))
           ? ` · score ${Number(data.confidence).toFixed(2)}`
           : "";
-        const blockingThreshold = data.filter_layers?.heuristic?.blocked
-          ? data.filter_layers.heuristic.threshold
-          : data.filter_layers?.ml?.blocked
-            ? data.filter_layers.ml.threshold
-            : data.filter_layers?.ensemble?.threshold;
-        const blockingScore = Number.isFinite(Number(blockingThreshold))
-          ? ` · score ${Number(blockingThreshold).toFixed(2)}`
+        const fallbackScore = data.filter_layers?.ensemble?.score
+          ?? data.filter_layers?.heuristic?.score
+          ?? data.filter_layers?.ml?.probability;
+        const blockingScore = Number.isFinite(Number(data.confidence ?? fallbackScore))
+          ? ` · score ${Number(data.confidence ?? fallbackScore).toFixed(2)}`
           : "";
         const blockedText = data.block_type === "authorization"
           ? `Acceso denegado por Policy Engine · recurso ${data.policy?.resource || "protegido"} [${data.policy?.tier || "scope restringido"}]. ${data.reply} Tu mensaje no llegó al LLM.`
