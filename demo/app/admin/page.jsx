@@ -155,20 +155,6 @@ export default function AdminPanel() {
     checkAuth();
   }, [router]);
 
-  if (authLoading) {
-    return (
-      <div style={{ 
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "center", 
-        height: "100vh",
-        fontSize: "1.2rem"
-      }}>
-        Verificando autenticación...
-      </div>
-    );
-  }
-
   const fetchLogs = async () => {
     try {
       setLoading(true);
@@ -223,6 +209,20 @@ export default function AdminPanel() {
     fetchStats();
     fetchFilterState();
   }, []);
+
+  if (authLoading) {
+    return (
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100vh",
+        fontSize: "1.2rem"
+      }}>
+        Verificando autenticación...
+      </div>
+    );
+  }
 
   const toggleFilter = async () => {
     if (!filterState || toggling) return;
