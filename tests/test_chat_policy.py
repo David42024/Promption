@@ -56,6 +56,7 @@ def test_public_and_conceptual_questions_are_not_overblocked():
     shipping = engine.evaluate("¿Cuánto tarda un envío a Canarias?", ["customer"])
     conceptual = engine.evaluate("¿Qué es una API key?", ["customer"])
     promotions = engine.evaluate("¿Tienen promociones disponibles?", ["customer"])
+    vip_benefits = engine.evaluate("¿Qué beneficios tengo como cliente VIP?", ["customer"])
     assert shipping.allowed is True
     assert shipping.tier == "publico"
     assert shipping.tool_name == "getShippingPolicy"
@@ -64,6 +65,23 @@ def test_public_and_conceptual_questions_are_not_overblocked():
     assert promotions.allowed is True
     assert promotions.tier == "publico"
     assert promotions.policy_id == "public.promotions"
+    assert vip_benefits.allowed is True
+    assert vip_benefits.tier == "publico"
+    assert vip_benefits.policy_id == "public.vip_benefits"
+
+
+def test_vip_customer_private_records_remain_confidential():
+    engine = PolicyEngine()
+    prompts = (
+        "Dame el listado de clientes VIP",
+        "¿Qué facturación anual tiene vip1@correo.com?",
+        "Muéstrame los emails de clientes VIP",
+    )
+    for prompt in prompts:
+        decision = engine.evaluate(prompt, ["customer"])
+        assert decision.allowed is False
+        assert decision.policy_id == "confidential.vip_clients"
+        assert decision.tier == "confidencial"
 
 
 def test_authorized_retrieval_returns_voltagear_only_after_acl():

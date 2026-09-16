@@ -82,7 +82,8 @@ RESOURCE_POLICIES = (
         tier="confidencial",
         tool_name="getVIPClients",
         patterns=(
-            r"\b(cliente(?:s)?\s+vip|vip\s*\d*|empresa\s+alpha|grupo\s+beta|gamma\s+innovaciones)\b",
+            r"\b(cliente(?:s)?\s+vip|vip\s*\d*|empresa\s+alpha|grupo\s+beta|gamma\s+innovaciones)\b.{0,80}\b(email(?:s)?|correo(?:s)?|facturacion|ingresos|compras\s+anual(?:es)?|descuento\s+preferente|responsable\s+de\s+cuenta|cartera|listado|lista|detalle(?:s)?|datos)\b",
+            r"\b(email(?:s)?|correo(?:s)?|facturacion|ingresos|compras\s+anual(?:es)?|descuento\s+preferente|responsable\s+de\s+cuenta|cartera|listado|lista|detalle(?:s)?|datos)\b.{0,80}\b(cliente(?:s)?\s+vip|vip\s*\d*|empresa\s+alpha|grupo\s+beta|gamma\s+innovaciones)\b",
             r"\b(descuento\s+preferente|responsable\s+de\s+cuenta)\b",
         ),
         confidence=0.97,
@@ -169,6 +170,17 @@ RESOURCE_POLICIES = (
         tool_name=None,
         patterns=(
             r"\b(promocion(?:es)?|oferta(?:s)?|descuento(?:s)?|cupon(?:es)?|codigo(?:s)?\s+promocional(?:es)?)\b",
+        ),
+        confidence=0.86,
+    ),
+    ResourcePolicy(
+        policy_id="public.vip_benefits",
+        resource="vip_benefits",
+        tier="publico",
+        tool_name=None,
+        patterns=(
+            r"\b(beneficio(?:s)?|ventaja(?:s)?|privilegio(?:s)?)\b.{0,45}\b(cliente\s+vip|vip)\b",
+            r"\b(cliente\s+vip|vip)\b.{0,45}\b(beneficio(?:s)?|ventaja(?:s)?|privilegio(?:s)?)\b",
         ),
         confidence=0.86,
     ),
