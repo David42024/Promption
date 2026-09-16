@@ -136,7 +136,8 @@ RESOURCE_POLICIES = (
         tier="interno",
         tool_name="getMarketingCampaigns",
         patterns=(
-            r"\b(campa\w*|marketing|voltagear|back\s+to\s+school|black\s+friday\s+warmup|roi|roas|ctr\s+ads)\b",
+            r"\b(campa\w*|marketing|voltagear|back\s+to\s+school|black\s+friday\s+warmup)\b.{0,80}\b(presupuesto|roi|roas|ctr\s+ads|briefing|objetivo(?:s)?|proyeccion(?:es)?|intern[oa]s?|direccion)\b",
+            r"\b(presupuesto|roi|roas|ctr\s+ads|briefing|objetivo(?:s)?|proyeccion(?:es)?)\b.{0,80}\b(campa\w*|marketing|voltagear|back\s+to\s+school|black\s+friday\s+warmup)\b",
         ),
         confidence=0.97,
     ),
@@ -160,6 +161,16 @@ RESOURCE_POLICIES = (
             r"\b(empleado-?25|desc-?50-?interno|politica(?:s)?\s+comercial(?:es)?)\b",
         ),
         confidence=0.96,
+    ),
+    ResourcePolicy(
+        policy_id="public.promotions",
+        resource="public_promotions",
+        tier="publico",
+        tool_name=None,
+        patterns=(
+            r"\b(promocion(?:es)?|oferta(?:s)?|descuento(?:s)?|cupon(?:es)?|codigo(?:s)?\s+promocional(?:es)?)\b",
+        ),
+        confidence=0.86,
     ),
     ResourcePolicy(
         policy_id="public.shipping",

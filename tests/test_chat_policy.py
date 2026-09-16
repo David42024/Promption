@@ -55,11 +55,15 @@ def test_public_and_conceptual_questions_are_not_overblocked():
     engine = PolicyEngine()
     shipping = engine.evaluate("¿Cuánto tarda un envío a Canarias?", ["customer"])
     conceptual = engine.evaluate("¿Qué es una API key?", ["customer"])
+    promotions = engine.evaluate("¿Tienen promociones disponibles?", ["customer"])
     assert shipping.allowed is True
     assert shipping.tier == "publico"
     assert shipping.tool_name == "getShippingPolicy"
     assert conceptual.allowed is True
     assert conceptual.tool_name is None
+    assert promotions.allowed is True
+    assert promotions.tier == "publico"
+    assert promotions.policy_id == "public.promotions"
 
 
 def test_authorized_retrieval_returns_voltagear_only_after_acl():
@@ -98,12 +102,21 @@ def test_protected_business_output_remains_scope_checked():
     assert engine.evaluate_output(response, ["ventas"]).allowed is True
 
 
+def test_public_promotion_output_is_not_overblocked_for_customer():
+    engine = PolicyEngine()
+    response = (
+        "Tenemos promociones disponibles en productos seleccionados. "
+        "Puedo ayudarte a revisar ofertas públicas del catálogo sin mostrar métricas internas."
+    )
+    assert engine.evaluate_output(response, ["customer"]).allowed is True
+
+
 def test_policy_catalog_matches_tool_tiers_and_roles():
     executor = MCPToolExecutor()
     tools = {tool.name: tool for tool in executor.tools}
     for policy in RESOURCE_POLICIES:
         if policy.tool_name is None:
-            assert policy.tier == "restringido"
+            assert policy.tier in {"publico", "restringido"}
             continue
         tool = tools[policy.tool_name]
         assert tool.tier.value == policy.tier
