@@ -54,7 +54,7 @@ export default function LoginForm() {
       const r = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password: password.trim() }),
       });
       if (!r.ok) {
         setError((await r.json()).error || "Error de autenticación");
@@ -64,8 +64,10 @@ export default function LoginForm() {
       const user = data.user;
       // Redirigir al panel admin si es admin, sino al chat
       if (user.roles && user.roles.includes("admin")) {
+        router.refresh();
         router.push("/admin");
       } else {
+        router.refresh();
         router.push("/chat");
       }
     } finally {

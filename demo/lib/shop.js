@@ -56,7 +56,11 @@ export const DEMO_USERS = [
 ];
 
 export function findUser(email, password) {
-  return DEMO_USERS.find(user => user.email === email && user.password === password) || null;
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedPassword = String(password || "").trim();
+  return DEMO_USERS.find(
+    user => user.email === normalizedEmail && user.password === normalizedPassword
+  ) || null;
 }
 
 export function publicUser(user) {
