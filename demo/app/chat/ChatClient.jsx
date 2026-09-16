@@ -154,6 +154,11 @@ export default function ChatClient({ user }) {
   const [filterStatus, setFilterStatus] = useState({ filterEnabled: true, outputGuardEnabled: true });
   const [showConfig, setShowConfig] = useState(false);
   const scrollRef = useRef(null);
+  const isAdminUser = user.roles?.includes("admin");
+  const isCustomerUser = user.roles?.includes("customer");
+  const adminScopeNote = isAdminUser
+    ? "\n\nComo admin puedes consultar información confidencial autorizada: KPIs, facturación, sueldos y reportes internos. Aun así, **no puedo mostrar TIER RESTRINGIDO**: API keys, tokens, JWT, passwords, claves privadas, hostnames internos ni secretos de producción."
+    : "";
 
   const loadFilterStatus = async () => {
     try {
@@ -173,7 +178,7 @@ export default function ChatClient({ user }) {
       setMsgs([
         {
           from: "bot",
-          text: `Hola ${user.name} 👋 Soy tu asistente **Promption Copilot**.\nConsulto la base de conocimientos mediante recuperación protegida por ACL. Tu rol actual es **[${user.roles.join(", ")}]**.\n\nCada solicitud pasa por detección de ataques, Policy Engine, autorización de recuperación y Output Guard. Si pides información fuera de tu alcance, se bloqueará antes de llegar al LLM.\n\n💡 Prueba: como customer pregunta por el presupuesto de VoltaGear (será bloqueado); como ventas vuelve a pedirlo; o como admin solicita el reporte mensual de facturación.`,
+          text: `Hola ${user.name} 👋 Soy tu asistente **Promption Copilot**.\nConsulto la base de conocimientos mediante recuperación protegida por ACL. Tu rol actual es **[${user.roles.join(", ")}]**.\n\nCada solicitud pasa por detección de ataques, Policy Engine, autorización de recuperación y Output Guard. Si pides información fuera de tu alcance, se bloqueará antes de llegar al LLM.${adminScopeNote}\n\n💡 Prueba: como customer pregunta por el presupuesto de VoltaGear (será bloqueado); como ventas vuelve a pedirlo; o como admin solicita el reporte mensual de facturación.`,
         },
       ]);
     }
@@ -301,9 +306,6 @@ export default function ChatClient({ user }) {
     await fetch("/api/login", { method: "DELETE" });
     window.location.href = "/";
   }
-
-  const isAdminUser = user.roles?.includes("admin");
-  const isCustomerUser = user.roles?.includes("customer");
 
   return (
     <div className="chat-container">

@@ -62,6 +62,27 @@ def _contains_secret(text: str) -> bool:
     return False
 
 
+def _allowed_confidential_reply(
+    *,
+    roles: List[str],
+    audit: List[MCPToolCall],
+    policy: PolicyInfo,
+) -> bool:
+    """Return true when sensitive business data was explicitly authorized."""
+    if "admin" not in roles:
+        return False
+    if policy.tier != "confidencial":
+        return False
+    if policy.policy_id == "confidential.credentials":
+        return False
+    if policy.tool_name:
+        return any(
+            item.allowed and item.tool == policy.tool_name and item.tier == "confidencial"
+            for item in audit
+        )
+    return True
+
+
 @router.get("/health", tags=["system"])
 async def health() -> HealthResponse:
     """Health check endpoint"""
@@ -387,8 +408,15 @@ async def chat(request: ChatRequest) -> ChatResponse:
             security_classification=security_classification,
         )
     
-    # 6. Check for secret leakage
-    leaked = _contains_secret(reply)
+    # 6. Check for unauthorized secret leakage.
+    # Exact confidential business values are expected in admin answers when an
+    # ACL-authorized confidential tool was executed. Critical credentials still
+    # never pass because Output Guard / restricted policy handles them earlier.
+    leaked = _contains_secret(reply) and not _allowed_confidential_reply(
+        roles=user_roles,
+        audit=audit,
+        policy=policy_info,
+    )
     
     # 7. Add warning if filter was disabled
     if not filter_enabled:
