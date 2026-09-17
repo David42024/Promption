@@ -47,6 +47,7 @@ python scripts/download_datasets.py
 
 # 2) Preprocesar datos, entrenar el modelo y ejecutar el benchmark (ASR proxy, sin LLM)
 python scripts/run_benchmark.py --no-llm
+python scripts/run_gemma_benchmark.py
 
 # 3) Generar el reporte con gráficas (Markdown + PDF estilizado)
 python scripts/generate_report.py --pdf

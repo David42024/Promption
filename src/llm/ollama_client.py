@@ -17,6 +17,11 @@ class LLMResponse:
     model: str
     latency_ms: float
     ok: bool = True
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    cached_tokens: int = 0
+    reasoning_tokens: int = 0
 
 
 class OllamaClient:
@@ -68,7 +73,16 @@ class OllamaClient:
         data = r.json()
         latency = (time.perf_counter() - start) * 1000
         logger.debug("LLM call: %s chars in %.1fms", len(data.get("response", "")), latency)
-        return LLMResponse(text=data.get("response", ""), model=self.model, latency_ms=latency)
+        input_tokens = int(data.get("prompt_eval_count") or 0)
+        output_tokens = int(data.get("eval_count") or 0)
+        return LLMResponse(
+            text=data.get("response", ""),
+            model=self.model,
+            latency_ms=latency,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
+        )
 
 
 if __name__ == "__main__":

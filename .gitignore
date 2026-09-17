@@ -36,6 +36,7 @@ data/pdf_payloads/
 data/audio_payloads/
 data/results/history/
 data/results/plots/
+data/results/backups/
 # (payloads in data/raw y resultados de ejemplo se versionan)
 
 # Tests / reports / logs

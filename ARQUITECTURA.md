@@ -47,7 +47,7 @@
   - Solo la UI del chat
   - Enviar prompts al Backend Demo
   - Recibir y mostrar respuestas
-  - Panel admin en tres módulos: operaciones/auditoría, estadísticas operativas y evaluación del modelo
+  - Panel admin en tres módulos: operaciones/auditoría, estadísticas operativas y evaluación del modelo con tokens y coste evitado
 - **Despliegue**: Vercel (https://promptionsi.vercel.app)
 
 ## 🔗 Flujo de Datos Correcto

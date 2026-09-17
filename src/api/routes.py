@@ -479,10 +479,16 @@ def metrics_endpoint(
         df["filter_blocked"] = (scores >= threshold).astype(int)
     from src.benchmark.metrics import all_metrics, by_attack_type, by_dataset
     results_path = Path(_CONF["paths"]["results"]) / "benchmark_results.csv"
+    latest_payload = _latest_payload()
     return json_safe({
         "overall": all_metrics(df),
         "by_dataset": by_dataset(df),
         "by_attack_type": by_attack_type(df),
+        "token_usage": latest_payload.get("overall", {}).get("token_usage", {}),
+        "benchmark_options": latest_payload.get("options", {}),
+        "token_usage_scope": latest_payload.get("overall", {}).get(
+            "token_usage", {}
+        ).get("scope", "unknown"),
         "available_datasets": available_datasets,
         "filters": {"dataset": dataset, "threshold": threshold},
         "generated_at": datetime.fromtimestamp(

@@ -28,6 +28,18 @@ function decimal(value, digits = 3) {
 }
 
 
+function integer(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? new Intl.NumberFormat("es-ES").format(number) : "—";
+}
+
+
+function usd(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `$${number.toFixed(4)}` : "—";
+}
+
+
 function MetricCard({ label, value, note, tone }) {
   return (
     <article className="card" style={{ padding: 20, minHeight: 132 }}>
@@ -185,6 +197,11 @@ export default function ModelPerformancePage() {
   }, [authLoading, loadMetrics]);
 
   const metrics = payload?.overall || {};
+  const tokenUsage = payload?.token_usage || {};
+  const benchmarkOptions = payload?.benchmark_options || {};
+  const coverage = benchmarkOptions?.coverage || metrics?.llm_coverage || {};
+  const isPartial = benchmarkOptions?.partial === true || coverage?.status === "partial";
+  const hasTokenUsage = Number(tokenUsage?.benchmark_observed?.total_tokens || 0) > 0;
   const generatedAt = payload?.generated_at
     ? new Date(payload.generated_at).toLocaleString("es-ES")
     : "Sin ejecución registrada";
@@ -239,6 +256,15 @@ export default function ModelPerformancePage() {
         </div>
       </section>
 
+      {isPartial && (
+        <section className="card" style={{ padding: 16, marginBottom: 22, borderColor: "rgba(251,191,36,.45)", background: "rgba(251,191,36,.07)" }}>
+          <strong style={{ color: "#fbbf24" }}>Benchmark LLM parcial</strong>
+          <p className="hint" style={{ margin: "6px 0 0", lineHeight: 1.55 }}>
+            Las métricas del filtro usan los {integer(metrics.n_total)} casos. ASR, fugas y comparación de tokens usan únicamente {integer(coverage.evaluable_attacks)} ataques con resultados A/B completos. Se conservaron {integer(coverage.observed_calls)} de {integer(coverage.expected_calls)} llamadas ({percentage(coverage.call_coverage_rate)} de cobertura), sin proyectar las llamadas faltantes como resultados reales.
+          </p>
+        </section>
+      )}
+
       {error && <div className="card" style={{ padding: 18, marginBottom: 22, color: "#fca5a5", borderColor: "rgba(239,68,68,.45)" }}>{error}</div>}
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginBottom: 22, opacity: loading ? .62 : 1 }}>
@@ -247,6 +273,39 @@ export default function ModelPerformancePage() {
         ))}
         <MetricCard label="ROC-AUC" value={metrics.roc?.auc == null ? "—" : decimal(metrics.roc.auc)} note="Capacidad de separar ambas clases" tone="#c084fc" />
         <MetricCard label="Reducción ASR" value={percentage(metrics.asr_reduction)} note={`Medición original · ${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+      </section>
+
+      <section className="card" style={{ padding: 22, marginBottom: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Tokens y coste evitado por el filtro</h3>
+            <p className="hint" style={{ marginTop: 4 }}>Compara el tráfico malicioso llegando directamente al LLM frente al escenario protegido.</p>
+          </div>
+          {hasTokenUsage && <span className="hint">Modelo: {tokenUsage.model} · alcance: {isPartial ? "muestra parcial observada" : "benchmark completo"}</span>}
+        </div>
+        {!hasTokenUsage ? (
+          <div style={{ marginTop: 16, padding: 16, border: "1px dashed var(--border)", borderRadius: "var(--radius-md)" }}>
+            <p className="hint" style={{ margin: 0 }}>Este benchmark todavía no contiene telemetría de tokens. Aparecerá después de una ejecución con un proveedor que reporte uso.</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 18 }}>
+              <MetricCard label="Tokens sin filtro" value={integer(tokenUsage.without_filter?.total_tokens)} note={`${integer(tokenUsage.calls_without_filter)} llamadas potenciales`} tone="#fb7185" />
+              <MetricCard label="Tokens con filtro" value={integer(tokenUsage.with_filter?.total_tokens)} note={`${integer(tokenUsage.calls_with_filter)} ataques alcanzaron el LLM`} tone="#22d3ee" />
+              <MetricCard label="Tokens evitados" value={integer(tokenUsage.saved_by_blocking?.total_tokens)} note={`${integer(tokenUsage.calls_avoided)} llamadas bloqueadas antes del LLM`} tone="#34d399" />
+              <MetricCard label="Ahorro de tokens" value={percentage(tokenUsage.token_savings_rate)} note="Sobre el consumo potencial sin filtro" tone="#a78bfa" />
+              <MetricCard label="Coste sin filtro" value={usd(tokenUsage.estimated_cost_without_filter_usd)} note="Proyección con la tarifa configurada" tone="#fb7185" />
+              <MetricCard label="Coste con filtro" value={usd(tokenUsage.estimated_cost_with_filter_usd)} note="Solo solicitudes permitidas" tone="#22d3ee" />
+              <MetricCard label="Coste evitado" value={usd(tokenUsage.estimated_cost_saved_usd)} note="Ahorro por bloquear antes del modelo" tone="#34d399" />
+              <MetricCard label="Uso del benchmark" value={integer(tokenUsage.benchmark_observed?.total_tokens)} note={`${integer(tokenUsage.benchmark_calls)} llamadas A/B realmente ejecutadas`} tone="#fbbf24" />
+            </div>
+            <div className="hint" style={{ marginTop: 14 }}>
+              {tokenUsage.pricing_mode === "free_tier"
+                ? "Gemma 4 está configurado con tarifa oficial gratuita; el coste monetario es $0. Los tokens y llamadas evitados siguen representando capacidad y latencia ahorradas."
+                : `Tarifa aplicada: $${tokenUsage.input_usd_per_million}/M tokens de entrada y $${tokenUsage.output_usd_per_million}/M de salida.`}
+            </div>
+          </>
+        )}
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(360px,1fr))", gap: 18 }}>

@@ -134,6 +134,24 @@ class OpenAICompatibleClient:
         choices = data.get("choices") or []
         message = choices[0].get("message") if choices else {}
         content = message.get("content") or ""
+        usage = data.get("usage") or {}
+        input_details = usage.get("prompt_tokens_details") or {}
+        output_details = usage.get("completion_tokens_details") or {}
+        input_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+        output_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
+        total_tokens = int(usage.get("total_tokens") or input_tokens + output_tokens)
+        reasoning_tokens = int(output_details.get("reasoning_tokens") or 0)
+        if reasoning_tokens == 0:
+            reasoning_tokens = max(0, total_tokens - input_tokens - output_tokens)
         latency = (time.perf_counter() - start) * 1000
         logger.debug("LLM call: %s chars in %.1fms", len(content), latency)
-        return LLMResponse(text=content, model=self.model, latency_ms=latency)
+        return LLMResponse(
+            text=content,
+            model=self.model,
+            latency_ms=latency,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            cached_tokens=int(input_details.get("cached_tokens") or 0),
+            reasoning_tokens=reasoning_tokens,
+        )
