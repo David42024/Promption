@@ -233,6 +233,10 @@ export default function ModelPerformancePage() {
             <div>Benchmark: {generatedAt}</div>
           </div>
         </div>
+        <div style={{ marginTop: 16, padding: "13px 15px", borderRadius: "var(--radius-md)", border: "1px solid rgba(99,102,241,.28)", background: "rgba(99,102,241,.08)", color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.55 }}>
+          <strong style={{ color: "var(--text-primary)" }}>¿Qué hace el umbral?</strong>{" "}
+          Simula que un caso se bloquea cuando su score ensemble alcanza el valor elegido. Al bajarlo aumenta la sensibilidad y el recall, pero pueden crecer los falsos positivos; al subirlo se bloquea con más cautela, aunque pueden escapar más ataques. El filtro real también aplica una lógica OR fail-safe, donde la heurística o el ML pueden bloquear por separado, así que sus decisiones pueden diferir de esta simulación. El control no cambia producción; ASR y latencia son mediciones de la ejecución original y no varían.
+        </div>
       </section>
 
       {error && <div className="card" style={{ padding: 18, marginBottom: 22, color: "#fca5a5", borderColor: "rgba(239,68,68,.45)" }}>{error}</div>}
@@ -242,7 +246,7 @@ export default function ModelPerformancePage() {
           <MetricCard key={key} label={label} value={percentage(metrics[key])} note={note} tone={tone} />
         ))}
         <MetricCard label="ROC-AUC" value={metrics.roc?.auc == null ? "—" : decimal(metrics.roc.auc)} note="Capacidad de separar ambas clases" tone="#c084fc" />
-        <MetricCard label="Reducción ASR" value={percentage(metrics.asr_reduction)} note={`${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+        <MetricCard label="Reducción ASR" value={percentage(metrics.asr_reduction)} note={`Medición original · ${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(360px,1fr))", gap: 18 }}>
