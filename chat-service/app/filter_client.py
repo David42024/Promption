@@ -133,6 +133,36 @@ class FilterClient:
             logger.warning("Output Guard client error: %s", exc)
             raise
 
+    async def audit_event(
+        self,
+        *,
+        event_type: str,
+        user_id: str,
+        roles: list[str],
+        details: Dict[str, Any],
+        level: str = "INFO",
+    ) -> None:
+        """Emit a sanitized chat lifecycle event without affecting the user response."""
+        try:
+            async with httpx.AsyncClient(timeout=min(self.timeout, 2.0)) as client:
+                response = await client.post(
+                    f"{self.base_url}/api/v1/audit/events",
+                    headers=self.headers,
+                    json={
+                        "category": "chat",
+                        "event_type": event_type,
+                        "level": level,
+                        "message": f"Chat request completed: {details.get('decision', 'UNKNOWN')}",
+                        "user_id": user_id,
+                        "roles": roles,
+                        "details": details,
+                    },
+                )
+                if not response.is_success:
+                    logger.warning("Audit API rejected event status=%s", response.status_code)
+        except Exception as exc:
+            logger.warning("Audit event unavailable: %s", exc.__class__.__name__)
+
 
 # Singleton instance
 _filter_client: Optional[FilterClient] = None

@@ -31,6 +31,12 @@ class ChatRequest(BaseModel):
     context: Optional[Dict[str, Any]] = None
 
 
+class SecurityStateUpdate(BaseModel):
+    action: Literal["filter", "output_guard", "reset"]
+    enabled: Optional[bool] = None
+    updated_by: str = Field(default="admin", max_length=128)
+
+
 class FilterResponse(BaseModel):
     """Response from Filter API"""
     decision: str

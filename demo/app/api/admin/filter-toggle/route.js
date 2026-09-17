@@ -1,11 +1,8 @@
 import { cookies } from "next/headers";
-import {
-  setFilterEnabled,
-  setOutputGuardEnabled,
-  resetFilterState,
-} from "../../../../lib/filter-state.js";
 import { isAdmin } from "../../../../lib/shop.js";
 import { readSessionToken } from "../../../../lib/session.js";
+
+const CHAT_API_URL = (process.env.NEXT_PUBLIC_CHAT_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
 function session() {
   return readSessionToken(cookies().get("demo_user")?.value);
@@ -23,22 +20,34 @@ export async function POST(req) {
   const { action, enabled } = payload;
   const by = user.email || user.id || "admin";
 
-  if (action === "reset") {
-    return Response.json(resetFilterState(by));
+  const normalizedAction = action === "output-guard" ? "output_guard" : (action || "filter");
+  if (!["filter", "output_guard", "reset"].includes(normalizedAction)) {
+    return Response.json({ error: "Acción desconocida: " + action }, { status: 400 });
   }
-
-  if (action === "output-guard") {
-    return Response.json(
-      setOutputGuardEnabled(Boolean(enabled), by)
-    );
+  const response = await fetch(`${CHAT_API_URL}/api/v1/security/state`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(process.env.CHAT_SERVICE_TOKEN
+        ? { "X-Chat-Service-Token": process.env.CHAT_SERVICE_TOKEN }
+        : {}),
+    },
+    body: JSON.stringify({
+      action: normalizedAction,
+      enabled: normalizedAction === "reset" ? null : Boolean(enabled),
+      updated_by: by,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    return Response.json({ error: detail || "Chat Service no disponible" }, { status: 502 });
   }
-
-  // Default: action "filter" (o vacío)
-  if (action === "filter" || typeof enabled === "boolean" || !action) {
-    return Response.json(
-      setFilterEnabled(Boolean(enabled), by)
-    );
-  }
-
-  return Response.json({ error: "Acción desconocida: " + action }, { status: 400 });
+  const state = await response.json();
+  return Response.json({
+    filterEnabled: state.filter_enabled,
+    outputGuardEnabled: state.output_guard_enabled,
+    updatedAt: state.updated_at,
+    updatedBy: state.updated_by,
+    history: state.history || [],
+  });
 }

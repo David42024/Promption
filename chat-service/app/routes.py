@@ -3,12 +3,15 @@ import hmac
 import json
 import logging
 import time
+import uuid
+from functools import wraps
 from typing import List
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from .config import settings
 from .models import (
-    ChatRequest, ChatResponse, HealthResponse, MCPToolCall, PolicyInfo, UserRole
+    ChatRequest, ChatResponse, HealthResponse, MCPToolCall, PolicyInfo,
+    SecurityStateUpdate, UserRole
 )
 from .filter_client import get_filter_client
 from .llm_client import get_llm_client
@@ -20,6 +23,7 @@ from .policy_engine import (
     get_policy_engine,
 )
 from .lib.shop import SECRET_MARKERS, build_system_prompt
+from .security_state import get_security_state, update_security_state
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -40,6 +44,13 @@ def require_trusted_client(
 ) -> None:
     """Require the server-to-server token when configured."""
     expected = settings.chat_service_token
+    if not expected:
+        if settings.debug:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="CHAT_SERVICE_TOKEN is not configured",
+        )
     if expected and not (
         x_chat_service_token
         and hmac.compare_digest(x_chat_service_token, expected)
@@ -81,6 +92,54 @@ def _allowed_confidential_reply(
             for item in audit
         )
     return True
+
+
+def audit_chat_endpoint(handler):
+    """Record one sanitized transaction event for every chat response."""
+    @wraps(handler)
+    async def wrapped(request: ChatRequest):
+        started = time.perf_counter()
+        request_id = str(uuid.uuid4())
+        response = await handler(request)
+        state = get_security_state()
+        response.filter_enabled = state["filter_enabled"]
+        response.output_guard_enabled = state["output_guard_enabled"]
+        if not state["filter_enabled"]:
+            response.filter_skipped = True
+        if not state["output_guard_enabled"]:
+            response.output_guard_skipped = True
+        roles = [
+            (role.value if isinstance(role, UserRole) else str(role)).strip().lower()
+            for role in request.user.roles
+        ]
+        details = {
+            "request_id": request_id,
+            "event_type": "chat_completed",
+            "decision": "BLOCKED" if response.blocked else "ALLOWED",
+            "blocked": response.blocked,
+            "block_type": response.block_type,
+            "reason": response.reason,
+            "security_classification": response.security_classification,
+            "filter_enabled": response.filter_enabled,
+            "output_guard_enabled": response.output_guard_enabled,
+            "filter_skipped": response.filter_skipped,
+            "output_guard_skipped": response.output_guard_skipped,
+            "guard": response.guard,
+            "model": response.model or None,
+            "policy": response.policy.model_dump() if response.policy else None,
+            "tools": [item.model_dump(exclude={"result"}) for item in response.audit],
+            "latency_ms": round((time.perf_counter() - started) * 1000, 2),
+        }
+        await get_filter_client().audit_event(
+            event_type="chat_completed",
+            user_id=request.user.id,
+            roles=roles,
+            details=details,
+            level="WARNING" if response.blocked else "INFO",
+        )
+        return response
+
+    return wrapped
 
 
 @router.get("/health", tags=["system"])
@@ -138,7 +197,29 @@ async def status():
     }
 
 
+@router.get(
+    "/security/state",
+    tags=["security"],
+    dependencies=[Depends(require_trusted_client)],
+)
+async def security_state():
+    return get_security_state()
+
+
+@router.post(
+    "/security/state",
+    tags=["security"],
+    dependencies=[Depends(require_trusted_client)],
+)
+async def change_security_state(update: SecurityStateUpdate):
+    try:
+        return update_security_state(update.action, update.enabled, update.updated_by)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/chat", tags=["chat"], dependencies=[Depends(require_trusted_client)])
+@audit_chat_endpoint
 async def chat(request: ChatRequest) -> ChatResponse:
     """Main chat endpoint with filtering and LLM integration"""
     
@@ -156,8 +237,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
     policy_engine = get_policy_engine()
     
     # 1. Input Filter
-    filter_enabled = True  # Could be made configurable
-    filter_skipped = False
+    security_state = get_security_state()
+    filter_enabled = security_state["filter_enabled"]
+    filter_skipped = not filter_enabled
     filter_result = None
     security_classification = "UNCERTAIN"
     
@@ -223,7 +305,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             security_classification=security_classification,
         )
 
-    if security_classification == "UNCERTAIN" and policy_decision.tier in {
+    if filter_enabled and security_classification == "UNCERTAIN" and policy_decision.tier in {
         "interno",
         "confidencial",
     }:
@@ -330,8 +412,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
     
     # 5. Output Guard
-    output_guard_enabled = True
-    output_guard_skipped = False
+    output_guard_enabled = security_state["output_guard_enabled"]
+    output_guard_skipped = not output_guard_enabled
     guard_result = None
     
     if output_guard_enabled:

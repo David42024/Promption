@@ -47,6 +47,7 @@
   - Solo la UI del chat
   - Enviar prompts al Backend Demo
   - Recibir y mostrar respuestas
+  - Panel admin en dos módulos: operaciones/auditoría y estadísticas
 - **Despliegue**: Vercel (https://promptionsi.vercel.app)
 
 ## 🔗 Flujo de Datos Correcto
@@ -72,6 +73,14 @@ Backend Demo
     ↓ [respuesta final]
 Frontend (Vercel)
 ```
+
+Cada solicitud del Chat Service emite además un evento transaccional sanitizado
+al Filter API. El evento contiene la decisión, clasificación, Policy Engine,
+tools MCP, Output Guard, modelo y latencia, pero nunca el prompt ni la respuesta
+completos. El panel admin usa esos eventos para auditoría y estadísticas.
+
+Los interruptores del panel se guardan en el Chat Service y son consultados por
+cada petición; el estado mostrado por React es el mismo que aplica el backend.
 
 ## Capas de decisión
 

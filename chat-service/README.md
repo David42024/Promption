@@ -35,6 +35,8 @@ chat-service/
 - `GET /api/v1/health` - Health check
 - `GET /api/v1/status` - Estado del servicio
 - `POST /api/v1/tools/execute` - Ejecutar MCP tools
+- `GET /api/v1/security/state` - Estado efectivo del filtro y Output Guard
+- `POST /api/v1/security/state` - Actualizar controles desde el panel admin
 
 ## 🔗 Integraciones
 
@@ -79,6 +81,7 @@ docker run -p 8000:8000 promption-chat-service
 - `LLM_RETRY_BACKOFF_SECONDS`: Espera base entre reintentos opcionales (default: `0.35`)
 - `DEFAULT_MODEL`: Modelo LLM legado por defecto
 - `CHAT_SERVICE_TOKEN`: Secreto compartido con el backend de Vercel para impedir llamadas directas con roles falsificados
+- `SECURITY_STATE_PATH`: Ruta opcional del estado operativo (por defecto `data/security-state.json`)
 - `CORS_ORIGINS_STR`: Orígenes permitidos (comma-separated)
 
 ## 📝 Características

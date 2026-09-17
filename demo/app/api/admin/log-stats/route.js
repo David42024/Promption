@@ -9,7 +9,7 @@ function session() {
   return readSessionToken(cookies().get("demo_user")?.value);
 }
 
-export async function GET() {
+export async function GET(req) {
   const user = session();
   if (!user || !isAdmin(user)) {
     return Response.json(
@@ -24,7 +24,8 @@ export async function GET() {
     );
   }
 
-  const r = await fetch(`${FILTER_API_URL}/api/v1/logs/stats`, {
+  const params = new URL(req.url).searchParams.toString();
+  const r = await fetch(`${FILTER_API_URL}/api/v1/logs/stats${params ? `?${params}` : ""}`, {
     headers: {
       "X-Promption-API-Key": ADMIN_API_KEY,
     },

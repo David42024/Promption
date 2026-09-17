@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.api.auth import TenantContext, require_scope, require_tenant
 from src.api.classification import classify_security_result
-from src.api.models import (BenchmarkRequest, FilterRequest, FilterResponse,
-                             OutputGuardRequest, OutputGuardResponse, SystemInfo)
+from src.api.models import (AuditEventRequest, BenchmarkRequest, FilterRequest,
+                             FilterResponse, OutputGuardRequest,
+                             OutputGuardResponse, SystemInfo)
 from src.benchmark.runner import BenchmarkRunner, RunnerOptions, json_safe, sanitize_prompt
 from src.filter.ensemble_filter import EnsembleFilter
 from src.filter.heuristic_filter import HeuristicFilter
@@ -30,6 +31,24 @@ _require_output_guard = require_scope("output_guard")
 _require_admin = require_scope("admin")
 _require_benchmark = require_scope("benchmark")
 _require_metrics = require_scope("metrics")
+_AUDIT_PRIVATE_KEYS = {"prompt", "reply", "text", "content", "password", "token", "secret"}
+
+
+def _sanitize_audit_value(value, key: str = ""):
+    normalized_key = key.strip().lower()
+    if normalized_key in _AUDIT_PRIVATE_KEYS or any(
+        private in normalized_key for private in ("password", "token", "secret")
+    ):
+        return "[REDACTED]"
+    if isinstance(value, dict):
+        return {str(k)[:80]: _sanitize_audit_value(v, str(k)) for k, v in list(value.items())[:80]}
+    if isinstance(value, list):
+        return [_sanitize_audit_value(item) for item in value[:80]]
+    if isinstance(value, str):
+        return value[:500]
+    if isinstance(value, (bool, int, float)) or value is None:
+        return value
+    return str(value)[:500]
 
 
 def _filter_for(tenant: TenantContext, final_override: float | None = None) -> EnsembleFilter:
@@ -136,41 +155,140 @@ def get_structured_logs(
 
 @router.get("/logs/stats", tags=["system"])
 def get_log_stats(
+    tenant_id: str | None = None,
+    since: str | None = None,
     tenant: TenantContext = Depends(_require_admin),
 ):
-    """Get statistics about logs."""
+    """Get dashboard-ready security statistics from structured audit events."""
     from src.utils.structured_logger import get_structured_logger
-    
-    logger = get_structured_logger()
-    logs = logger.get_logs(limit=10000)  # Get more for stats
-    
+
+    structured = get_structured_logger()
+    logs = structured.get_logs(limit=10000, tenant_id=tenant_id, since=since)
+
     stats = {
         "total": len(logs),
         "by_level": {},
         "by_category": {},
         "by_tenant": {},
         "recent_24h": 0,
+        "summary": {
+            "requests": 0,
+            "allowed": 0,
+            "blocked": 0,
+            "uncertain": 0,
+            "redacted": 0,
+            "errors": 0,
+        },
+        "classifications": {},
+        "block_reasons": {},
+        "guard_actions": {},
+        "top_rules": {},
+        "top_users": {},
+        "by_role": {},
+        "timeline": {},
+        "latency": {"average_ms": 0.0, "p95_ms": 0.0, "count": 0},
     }
-    
+
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
-    
+    latencies: list[float] = []
+    has_chat_transactions = any(
+        log.get("category") == "chat"
+        and (log.get("details") or {}).get("event_type") == "chat_completed"
+        for log in logs
+    )
+
     for log in logs:
-        # Count by level
         stats["by_level"][log["level"]] = stats["by_level"].get(log["level"], 0) + 1
-        
-        # Count by category
         stats["by_category"][log["category"]] = stats["by_category"].get(log["category"], 0) + 1
-        
-        # Count by tenant
         if log["tenant_id"]:
             stats["by_tenant"][log["tenant_id"]] = stats["by_tenant"].get(log["tenant_id"], 0) + 1
-        
-        # Count recent
-        log_time = datetime.fromisoformat(log["timestamp"])
+        log_time = datetime.fromisoformat(log["timestamp"].replace("Z", "+00:00"))
         if log_time >= cutoff:
             stats["recent_24h"] += 1
-    
+        bucket = log_time.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:00Z")
+        stats["timeline"][bucket] = stats["timeline"].get(bucket, 0) + 1
+
+        details = log.get("details") or {}
+        if log["category"] == "chat" and details.get("event_type") == "chat_completed":
+            stats["summary"]["requests"] += 1
+            blocked = bool(details.get("blocked"))
+            key = "blocked" if blocked else "allowed"
+            stats["summary"][key] += 1
+            classification = str(details.get("security_classification") or "UNCERTAIN")
+            stats["classifications"][classification] = stats["classifications"].get(classification, 0) + 1
+            if classification == "UNCERTAIN":
+                stats["summary"]["uncertain"] += 1
+            block_type = details.get("block_type")
+            if block_type:
+                stats["block_reasons"][block_type] = stats["block_reasons"].get(block_type, 0) + 1
+            guard = details.get("guard")
+            if guard:
+                stats["guard_actions"][guard] = stats["guard_actions"].get(guard, 0) + 1
+                if guard == "REDACT":
+                    stats["summary"]["redacted"] += 1
+            latency = details.get("latency_ms")
+            if isinstance(latency, (int, float)):
+                latencies.append(float(latency))
+        elif log["category"] == "filter":
+            if not has_chat_transactions:
+                stats["summary"]["requests"] += 1
+                decision = details.get("decision")
+                stats["summary"]["blocked" if decision == "BLOCKED" else "allowed"] += 1
+                classification = (
+                    details.get("layers", {}).get("classification", {}).get("label")
+                    or "UNCERTAIN"
+                )
+                stats["classifications"][classification] = stats["classifications"].get(classification, 0) + 1
+                if classification == "UNCERTAIN":
+                    stats["summary"]["uncertain"] += 1
+            for rule in details.get("layers", {}).get("heuristic", {}).get("matched_rules", []):
+                name = rule.get("name") if isinstance(rule, dict) else str(rule)
+                if name:
+                    stats["top_rules"][name] = stats["top_rules"].get(name, 0) + 1
+
+        if log["level"] == "ERROR":
+            stats["summary"]["errors"] += 1
+        if log.get("user_id"):
+            user_id = str(log["user_id"])
+            stats["top_users"][user_id] = stats["top_users"].get(user_id, 0) + 1
+        for role in log.get("roles") or []:
+            stats["by_role"][role] = stats["by_role"].get(role, 0) + 1
+
+    if latencies:
+        ordered = sorted(latencies)
+        p95_index = min(len(ordered) - 1, int((len(ordered) - 1) * 0.95))
+        stats["latency"] = {
+            "average_ms": round(sum(ordered) / len(ordered), 2),
+            "p95_ms": round(ordered[p95_index], 2),
+            "count": len(ordered),
+        }
+    stats["timeline"] = [
+        {"bucket": bucket, "count": count}
+        for bucket, count in sorted(stats["timeline"].items())
+    ]
     return stats
+
+
+@router.post("/audit/events", tags=["audit"])
+def ingest_audit_event(
+    req: AuditEventRequest,
+    tenant: TenantContext = Depends(_require_filter),
+):
+    """Accept a sanitized lifecycle event from an authenticated tenant backend."""
+    from src.utils.structured_logger import log_external_event
+
+    details = _sanitize_audit_value(dict(req.details))
+    details["event_type"] = req.event_type
+    log_external_event(
+        level=req.level,
+        category=req.category,
+        message=req.message or req.event_type,
+        tenant_id=tenant.tenant_id,
+        user_id=req.user_id,
+        roles=req.roles,
+        details=details,
+    )
+    return {"status": "accepted", "tenant_id": tenant.tenant_id}
 
 
 @router.get("/system/config", tags=["system"])
@@ -227,8 +345,8 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
             "ml_malicious_threshold": malicious_threshold,
         },
     }
-    logger.info("Filter [%s] tenant=%s user=%s roles=%s in %.1fms: %s",
-                res.decision, tenant.tenant_id, req.user_id, req.roles, latency, req.text[:80])
+    logger.info("Filter [%s] tenant=%s user=%s roles=%s length=%d in %.1fms",
+                res.decision, tenant.tenant_id, req.user_id, req.roles, len(req.text), latency)
     
     # Structured logging
     from src.utils.structured_logger import log_filter_decision

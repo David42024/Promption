@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
+import os
 import threading
 from collections import deque
 from dataclasses import dataclass, asdict
@@ -13,7 +15,7 @@ from typing import Any
 from src.utils.config import load_config
 
 _config = load_config()
-MAX_LOG_ENTRIES = 1000  # Keep last 1000 log entries in memory
+MAX_LOG_ENTRIES = max(1000, int(os.environ.get("PROMPTION_MAX_LOG_ENTRIES", "10000")))
 
 
 @dataclass
@@ -39,6 +41,22 @@ class StructuredLogger:
         self._lock = threading.Lock()
         self._file_path = Path(_config["logging"].get("file", "logs/system.log"))
         self._file_path.parent.mkdir(parents=True, exist_ok=True)
+        self._load_from_file()
+
+    def _load_from_file(self) -> None:
+        """Restore structured JSONL entries after a process restart."""
+        if not self._file_path.exists():
+            return
+        try:
+            lines = self._file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            return
+        for line in lines[-self._logs.maxlen:]:
+            try:
+                payload = json.loads(line)
+                self._logs.append(LogEntry(**payload))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
 
     def log(
         self,
@@ -102,11 +120,16 @@ class StructuredLogger:
         if user_id:
             logs = [log for log in logs if log.user_id == user_id]
         if since:
-            since_dt = datetime.fromisoformat(since)
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            if since_dt.tzinfo is None:
+                since_dt = since_dt.replace(tzinfo=timezone.utc)
             logs = [log for log in logs if datetime.fromisoformat(log.timestamp) >= since_dt]
 
         # Return most recent first, limited
-        return [log.to_dict() for log in reversed(logs[:limit])]
+        safe_limit = max(0, min(int(limit), self._logs.maxlen))
+        if safe_limit == 0:
+            return []
+        return [log.to_dict() for log in reversed(logs[-safe_limit:])]
 
     def get_categories(self) -> list[str]:
         """Get all unique log categories."""
@@ -148,7 +171,8 @@ def log_filter_decision(
         details={
             "decision": decision,
             "confidence": confidence,
-            "text_preview": text[:100] if text else "",
+            "text_fingerprint": hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:16] if text else None,
+            "text_length": len(text or ""),
             "layers": layers,
         },
     )
@@ -199,6 +223,28 @@ def log_output_guard(
             "matches": matches,
             "risk": risk,
         },
+    )
+
+
+def log_external_event(
+    *,
+    level: str,
+    category: str,
+    message: str,
+    tenant_id: str,
+    user_id: str | None = None,
+    roles: list[str] | None = None,
+    details: dict[str, Any] | None = None,
+) -> None:
+    """Store a sanitized event emitted by another trusted backend service."""
+    _structured_logger.log(
+        level=level,
+        category=category,
+        message=message,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        roles=roles,
+        details=details or {},
     )
 
 

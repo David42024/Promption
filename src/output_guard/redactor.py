@@ -28,7 +28,7 @@ def _action_for(findings: list[Finding], admin_mode: bool = False) -> str:
 def apply_policy(text: str, findings: list[Finding], admin_mode: bool = False) -> GuardResult:
     if not findings:
         return GuardResult(action=Action.PASS, risk=0.02)
-    top = max(f.severity for f in findings)
+    top = max((f.severity for f in findings), key=_ORDER.index)
     risk = min(0.99, _RISK[top] + 0.02 * (len(findings) - 1))
     cats = sorted({f.category for f in findings})
     action = _action_for(findings, admin_mode=admin_mode)

@@ -1,5 +1,5 @@
 """Pydantic request/response schemas for the API."""
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -67,6 +67,16 @@ class OutputGuardResponse(BaseModel):
     matches: int = 0
     redacted_response: str | None = None
     tenant_id: str = "default"
+
+
+class AuditEventRequest(BaseModel):
+    category: str = Field(..., min_length=1, max_length=64)
+    event_type: str = Field(..., min_length=1, max_length=96)
+    level: Literal["INFO", "WARNING", "ERROR"] = "INFO"
+    message: str = Field(default="", max_length=240)
+    user_id: str | None = Field(default=None, max_length=128)
+    roles: list[str] = Field(default_factory=list)
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class SystemInfo(BaseModel):

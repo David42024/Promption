@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import AdminNavigation from "./components/AdminNavigation.jsx";
 
 // ================ Iconos SVG inline =================
 const BackIcon = () => (
@@ -110,6 +111,7 @@ function getCategoryBadge(cat) {
     case "filter": return "badge-filter";
     case "authorization": return "badge-auth";
     case "output_guard": return "badge-guard";
+    case "chat": return "badge-info";
     default: return "badge-default";
   }
 }
@@ -326,6 +328,8 @@ export default function AdminPanel() {
           </button>
         </div>
       </div>
+
+      <AdminNavigation />
 
       {/* ============== TARJETA DE CONTROL DEL FILTRO (nueva) ============== */}
       {filterState && (
@@ -909,7 +913,30 @@ export default function AdminPanel() {
                     <td style={{ color: "var(--text-secondary)" }}>
                       {log.user_id || "—"}
                     </td>
-                    <td className="message">{log.message || "—"}</td>
+                    <td className="message">
+                      <div>{log.message || "—"}</div>
+                      {log.details && Object.keys(log.details).length > 0 && (
+                        <details style={{ marginTop: 8 }}>
+                          <summary style={{ cursor: "pointer", color: "var(--accent-400)", fontSize: 12 }}>
+                            Ver recorrido y metadatos
+                          </summary>
+                          <pre style={{
+                            margin: "8px 0 0",
+                            padding: 12,
+                            maxWidth: 620,
+                            maxHeight: 300,
+                            overflow: "auto",
+                            borderRadius: 8,
+                            background: "rgba(2, 6, 23, .72)",
+                            color: "var(--text-secondary)",
+                            fontSize: 11,
+                            whiteSpace: "pre-wrap",
+                          }}>
+                            {JSON.stringify(log.details, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

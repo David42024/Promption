@@ -4,7 +4,12 @@ import { resolveSessionUser } from "./shop.js";
 const DEVELOPMENT_SECRET = "promption-demo-session-development-only";
 
 function sessionSecret() {
-  return process.env.SESSION_SECRET || process.env.CHAT_SERVICE_TOKEN || DEVELOPMENT_SECRET;
+  const configured = process.env.SESSION_SECRET || process.env.CHAT_SERVICE_TOKEN;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET is required in production");
+  }
+  return DEVELOPMENT_SECRET;
 }
 
 function signature(payload) {
