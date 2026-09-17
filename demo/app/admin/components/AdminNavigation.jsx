@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 const ITEMS = [
   { href: "/admin", label: "Operaciones y auditoría", icon: "🛡️" },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: "📊" },
+  { href: "/admin/rendimiento", label: "Evaluación del modelo", icon: "🎯" },
 ];
 
 

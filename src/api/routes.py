@@ -462,13 +462,32 @@ def benchmark_history(tenant: TenantContext = Depends(_require_benchmark)):
 
 # ------------------------------------------------------------------ metrics / model
 @router.get("/metrics", tags=["metrics"])
-def metrics_endpoint(tenant: TenantContext = Depends(_require_metrics)):
+def metrics_endpoint(
+    dataset: str | None = Query(default=None),
+    threshold: float | None = Query(default=None, ge=0.0, le=1.0),
+    tenant: TenantContext = Depends(_require_metrics),
+):
     df = _results_df()
+    available_datasets = sorted(str(value) for value in df["dataset"].dropna().unique())
+    if dataset:
+        if dataset not in available_datasets:
+            raise HTTPException(status_code=404, detail=f"Dataset no encontrado: {dataset}")
+        df = df[df["dataset"].astype(str) == dataset].copy()
+    if threshold is not None:
+        df = df.copy()
+        scores = pd.to_numeric(df["ensemble_score"], errors="coerce").fillna(0.0)
+        df["filter_blocked"] = (scores >= threshold).astype(int)
     from src.benchmark.metrics import all_metrics, by_attack_type, by_dataset
+    results_path = Path(_CONF["paths"]["results"]) / "benchmark_results.csv"
     return json_safe({
         "overall": all_metrics(df),
         "by_dataset": by_dataset(df),
         "by_attack_type": by_attack_type(df),
+        "available_datasets": available_datasets,
+        "filters": {"dataset": dataset, "threshold": threshold},
+        "generated_at": datetime.fromtimestamp(
+            results_path.stat().st_mtime, tz=timezone.utc
+        ).isoformat(),
     })
 
 

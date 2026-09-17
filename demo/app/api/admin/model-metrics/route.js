@@ -1,0 +1,37 @@
+import { cookies } from "next/headers";
+import { isAdmin } from "../../../../lib/shop.js";
+import { readSessionToken } from "../../../../lib/session.js";
+
+const FILTER_API_URL = (process.env.PIF_API_URL || process.env.NEXT_PUBLIC_PIF_API_URL || "https://promption.onrender.com").replace(/\/$/, "");
+const ADMIN_API_KEY = process.env.PROMPTION_ADMIN_API_KEY || process.env.PIF_ADMIN_API_KEY || "";
+
+function session() {
+  return readSessionToken(cookies().get("demo_user")?.value);
+}
+
+export async function GET(req) {
+  const user = session();
+  if (!user || !isAdmin(user)) {
+    return Response.json(
+      { error: "No autorizado: solo admin puede leer métricas del modelo" },
+      { status: 403 }
+    );
+  }
+  if (!ADMIN_API_KEY) {
+    return Response.json(
+      { error: "Falta PROMPTION_ADMIN_API_KEY en Vercel" },
+      { status: 500 }
+    );
+  }
+
+  const params = new URL(req.url).searchParams.toString();
+  const response = await fetch(`${FILTER_API_URL}/api/v1/metrics${params ? `?${params}` : ""}`, {
+    headers: { "X-Promption-API-Key": ADMIN_API_KEY },
+    cache: "no-store",
+  });
+  const body = await response.text();
+  return new Response(body, {
+    status: response.status,
+    headers: { "Content-Type": response.headers.get("Content-Type") || "application/json" },
+  });
+}

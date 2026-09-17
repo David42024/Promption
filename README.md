@@ -453,7 +453,7 @@ async def chat_handler(user_message: str, user: User):
 | POST | `/api/v1/benchmark` | Ejecuta un benchmark completo |
 | GET | `/api/v1/benchmark/latest` | Últimos resultados en JSON |
 | GET | `/api/v1/benchmark/history` | Historial de ejecuciones |
-| GET | `/api/v1/metrics` | Métricas globales y por dataset |
+| GET | `/api/v1/metrics` | Métricas globales y por dataset; admite `dataset` y `threshold` |
 | GET | `/api/v1/health` | Estado de API, Ollama y capas del filtro |
 | GET | `/api/v1/model/features` | Feature importance del Random Forest |
 | GET | `/api/v1/...` | (ver Swagger) |

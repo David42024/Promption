@@ -134,7 +134,7 @@ export default function AdminStatistics() {
   if (authLoading) return <div style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>Verificando autenticación…</div>;
 
   return (
-    <main className="container" style={{ maxWidth: 1440, paddingTop: 28, paddingBottom: 56 }}>
+    <main className="admin-container">
       <Link href="/" className="linkbtn" style={{ padding: 0, marginBottom: 14 }}>← Volver a la tienda</Link>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", marginBottom: 22 }}>
         <div>
