@@ -52,6 +52,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-attempts", type=int, default=5)
     parser.add_argument("--input-usd-per-million", type=float, default=0.0)
     parser.add_argument("--output-usd-per-million", type=float, default=0.0)
+    parser.add_argument("--pricing-reference-model", default="")
+    parser.add_argument("--pricing-source-url", default="")
     parser.add_argument(
         "--finalize-only",
         action="store_true",
@@ -277,13 +279,17 @@ def main() -> None:
     without_filter_totals = token_totals(raw_results)
     with_filter_totals = token_totals(filtered_results)
     saved_totals = token_totals(blocked_raw_results)
+    is_legacy = args.finalize_only and len(required_results) < len(jobs)
     token_usage = {
         "model": model_name,
-        "scope": "partial_evaluable_cohort" if len(required_results) < len(jobs) else "full_benchmark",
+        "scope": "legacy_observed_cohort" if is_legacy else "full_benchmark",
         "pricing_currency": "USD",
-        "pricing_mode": "free_tier" if (
-            args.input_usd_per_million == 0 and args.output_usd_per_million == 0
-        ) else "configured",
+        "pricing_mode": "reference_estimate" if args.pricing_reference_model else (
+            "free_tier" if args.input_usd_per_million == 0 and args.output_usd_per_million == 0
+            else "configured"
+        ),
+        "pricing_reference_model": args.pricing_reference_model or model_name,
+        "pricing_source_url": args.pricing_source_url,
         "input_usd_per_million": args.input_usd_per_million,
         "output_usd_per_million": args.output_usd_per_million,
         "benchmark_calls": len(required_results),
@@ -305,7 +311,7 @@ def main() -> None:
         "benchmark_observed_cost_usd": estimated_cost(benchmark_totals),
     }
     coverage = {
-        "status": "partial" if len(required_results) < len(jobs) else "complete",
+        "status": "legacy" if is_legacy else "complete",
         "observed_calls": len(required_results),
         "expected_calls": len(jobs),
         "call_coverage_rate": len(required_results) / len(jobs) if jobs else 0.0,
@@ -325,7 +331,8 @@ def main() -> None:
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "options": {
             "use_llm": True,
-            "partial": coverage["status"] == "partial",
+            "partial": False,
+            "legacy": coverage["status"] == "legacy",
             "completion_status": coverage["status"],
             "coverage": coverage,
             "n_rows": int(len(output)),

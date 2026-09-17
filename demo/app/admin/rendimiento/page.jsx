@@ -200,7 +200,7 @@ export default function ModelPerformancePage() {
   const tokenUsage = payload?.token_usage || {};
   const benchmarkOptions = payload?.benchmark_options || {};
   const coverage = benchmarkOptions?.coverage || metrics?.llm_coverage || {};
-  const isPartial = benchmarkOptions?.partial === true || coverage?.status === "partial";
+  const isLegacy = benchmarkOptions?.legacy === true || coverage?.status === "legacy";
   const hasTokenUsage = Number(tokenUsage?.benchmark_observed?.total_tokens || 0) > 0;
   const generatedAt = payload?.generated_at
     ? new Date(payload.generated_at).toLocaleString("es-ES")
@@ -256,23 +256,36 @@ export default function ModelPerformancePage() {
         </div>
       </section>
 
-      {isPartial && (
-        <section className="card" style={{ padding: 16, marginBottom: 22, borderColor: "rgba(251,191,36,.45)", background: "rgba(251,191,36,.07)" }}>
-          <strong style={{ color: "#fbbf24" }}>Benchmark LLM parcial</strong>
-          <p className="hint" style={{ margin: "6px 0 0", lineHeight: 1.55 }}>
-            Las métricas del filtro usan los {integer(metrics.n_total)} casos. ASR, fugas y comparación de tokens usan únicamente {integer(coverage.evaluable_attacks)} ataques con resultados A/B completos. Se conservaron {integer(coverage.observed_calls)} de {integer(coverage.expected_calls)} llamadas ({percentage(coverage.call_coverage_rate)} de cobertura), sin proyectar las llamadas faltantes como resultados reales.
-          </p>
-        </section>
-      )}
-
       {error && <div className="card" style={{ padding: 18, marginBottom: 22, color: "#fca5a5", borderColor: "rgba(239,68,68,.45)" }}>{error}</div>}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
+        <div>
+          <h3 style={{ margin: 0 }}>Rendimiento del filtro</h3>
+          <p className="hint" style={{ margin: "4px 0 0" }}>Clasificación local contra las etiquetas ataque/benigno del dataset.</p>
+        </div>
+        <span className="hint">Benchmark local · legacy</span>
+      </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginBottom: 22, opacity: loading ? .62 : 1 }}>
         {PERCENT_METRICS.map(([key, label, note, tone]) => (
           <MetricCard key={key} label={label} value={percentage(metrics[key])} note={note} tone={tone} />
         ))}
         <MetricCard label="ROC-AUC" value={metrics.roc?.auc == null ? "—" : decimal(metrics.roc.auc)} note="Capacidad de separar ambas clases" tone="#c084fc" />
-        <MetricCard label="Reducción ASR" value={percentage(metrics.asr_reduction)} note={`Medición original · ${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+      </section>
+
+      <section className="card" style={{ padding: 22, marginBottom: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Resistencia del LLM</h3>
+            <p className="hint" style={{ marginTop: 4 }}>Ataques ejecutados contra Gemma 4 antes y después de aplicar el filtro.</p>
+          </div>
+          {isLegacy && <span className="hint">Benchmark Gemma 4 · legacy · {integer(coverage.evaluable_attacks)} ataques A/B</span>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 18 }}>
+          <MetricCard label="ASR sin filtro" value={percentage(metrics.asr_without_filter)} note="Ataques exitosos contra Gemma sin protección" tone="#fb7185" />
+          <MetricCard label="ASR con filtro" value={percentage(metrics.asr_with_filter)} note="Ataques exitosos después del filtro" tone="#fbbf24" />
+          <MetricCard label="Reducción ASR" value={percentage(metrics.asr_reduction)} note={`${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+        </div>
       </section>
 
       <section className="card" style={{ padding: 22, marginBottom: 22 }}>
@@ -281,7 +294,7 @@ export default function ModelPerformancePage() {
             <h3 style={{ margin: 0 }}>Tokens y coste evitado por el filtro</h3>
             <p className="hint" style={{ marginTop: 4 }}>Compara el tráfico malicioso llegando directamente al LLM frente al escenario protegido.</p>
           </div>
-          {hasTokenUsage && <span className="hint">Modelo: {tokenUsage.model} · alcance: {isPartial ? "muestra parcial observada" : "benchmark completo"}</span>}
+          {hasTokenUsage && <span className="hint">Modelo medido: {tokenUsage.model}{isLegacy ? " · benchmark legacy" : ""}</span>}
         </div>
         {!hasTokenUsage ? (
           <div style={{ marginTop: 16, padding: 16, border: "1px dashed var(--border)", borderRadius: "var(--radius-md)" }}>
@@ -300,9 +313,14 @@ export default function ModelPerformancePage() {
               <MetricCard label="Uso del benchmark" value={integer(tokenUsage.benchmark_observed?.total_tokens)} note={`${integer(tokenUsage.benchmark_calls)} llamadas A/B realmente ejecutadas`} tone="#fbbf24" />
             </div>
             <div className="hint" style={{ marginTop: 14 }}>
-              {tokenUsage.pricing_mode === "free_tier"
-                ? "Gemma 4 está configurado con tarifa oficial gratuita; el coste monetario es $0. Los tokens y llamadas evitados siguen representando capacidad y latencia ahorradas."
-                : `Tarifa aplicada: $${tokenUsage.input_usd_per_million}/M tokens de entrada y $${tokenUsage.output_usd_per_million}/M de salida.`}
+              {tokenUsage.pricing_mode === "reference_estimate"
+                ? `Coste estimado con la tarifa de referencia de ${tokenUsage.pricing_reference_model}: $${tokenUsage.input_usd_per_million}/M tokens de entrada y $${tokenUsage.output_usd_per_million}/M de salida, incluido el razonamiento. No representa un cobro real de Gemma.`
+                : tokenUsage.pricing_mode === "free_tier"
+                  ? "El proveedor está configurado con tarifa gratuita; los tokens y llamadas evitados representan capacidad y latencia ahorradas."
+                  : `Tarifa aplicada: $${tokenUsage.input_usd_per_million}/M tokens de entrada y $${tokenUsage.output_usd_per_million}/M de salida.`}
+              {tokenUsage.pricing_source_url && (
+                <> <a href={tokenUsage.pricing_source_url} target="_blank" rel="noreferrer" className="linkbtn" style={{ padding: 0 }}>Ver tarifa oficial</a>.</>
+              )}
             </div>
           </>
         )}
@@ -316,8 +334,6 @@ export default function ModelPerformancePage() {
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14, marginTop: 20 }}>
         <MetricCard label="Latencia media" value={`${decimal(metrics.latency?.mean, 1)} ms`} note="Tiempo promedio por prompt" tone="#22d3ee" />
         <MetricCard label="Latencia p95" value={`${decimal(metrics.latency?.p95, 1)} ms`} note="El 95% termina antes de este valor" tone="#818cf8" />
-        <MetricCard label="ASR sin filtro" value={percentage(metrics.asr_without_filter)} note="Ataques exitosos sin protección" tone="#fb7185" />
-        <MetricCard label="ASR con filtro" value={percentage(metrics.asr_with_filter)} note="Ataques exitosos tras aplicar el filtro" tone="#34d399" />
       </section>
 
       <ComparisonTable title="Rendimiento por dataset" rows={payload?.by_dataset} nameKey="dataset" nameLabel="Dataset" />
