@@ -9,6 +9,83 @@ Sistema académico de prueba de concepto para detectar **Prompt Injection** en a
 
 > **Explicación breve:** la primera capa detecta patrones conocidos (DAN, "ignora instrucciones", SQL Injection, exfiltración, etc.). La segunda capa aprende a distinguir intentos de inyección de prompts legítimos usando representaciones semánticas del texto. Un **filtro ensemble** (OR) combina ambas: si cualquiera de las dos capas bloquea, el prompt se rechaza antes de llegar al LLM.
 
+## 🎓 Contenido para la presentación de software en Canva
+
+La presentación debe organizarse en **cinco hojas**, una por cada punto solicitado. El texto siguiente está preparado para copiarse y adaptarse en Canva. Antes de entregar, se deben completar los campos marcados como **PENDIENTE**.
+
+### Hoja 1 · Integrantes y título del programa
+
+**Título sugerido:**
+
+> **Promption: sistema inteligente para detectar y mitigar ataques de Prompt Injection en aplicaciones con modelos de lenguaje**
+
+**Integrantes:**
+
+- **PENDIENTE:** agregar los nombres completos de todos los integrantes.
+- Opcionalmente, incluir carrera, curso, docente e institución en una línea secundaria.
+
+Esta hoja debe funcionar como portada: título visible, nombres legibles y el logotipo de Promption, disponible en `dashboard/assets/images/logo.png`.
+
+### Hoja 2 · Propósito del programa
+
+**Problema que resuelve:** las aplicaciones conectadas a modelos de lenguaje pueden recibir instrucciones maliciosas que intentan ignorar las reglas del sistema, extraer información confidencial, evadir restricciones o acceder a datos sin autorización.
+
+**Propósito:** Promption analiza cada mensaje antes de enviarlo al LLM. Combina reglas heurísticas y un clasificador de aprendizaje automático para bloquear entradas sospechosas. Después, el Output Guard inspecciona la respuesta generada para impedir la exposición de secretos o información sensible. El sistema también registra los eventos y ofrece métricas de seguridad en un panel administrativo.
+
+**Resultado esperado:** reducir la tasa de éxito de los ataques, evitar llamadas innecesarias al LLM y proporcionar trazabilidad para que un administrador pueda revisar bloqueos, actividad y rendimiento del filtro.
+
+### Hoja 3 · Pantalla de funcionalidad relevante
+
+La captura principal recomendada es el módulo **Evaluación del modelo** del panel administrativo:
+
+- [Panel de evaluación](https://promptionsi.vercel.app/admin/rendimiento)
+- [Aplicación desplegada](https://promptionsi.vercel.app/)
+
+La imagen debe mostrar, como mínimo, las métricas de detección, el ASR antes y después del filtro y los tokens o costes evitados. Como apoyo visual puede incluirse una segunda captura del chat bloqueando un Prompt Injection y mostrando el motivo de la decisión.
+
+**Texto sugerido para acompañar la captura:**
+
+> El sistema intercepta el mensaje, combina la evaluación heurística y del modelo ML, bloquea los ataques antes de consultar al LLM y registra la decisión. El administrador puede revisar operaciones, estadísticas, rendimiento, ASR y ahorro de tokens desde un único panel.
+
+No deben mostrarse API keys, secretos, archivos `.env` ni información privada en las capturas.
+
+### Hoja 4 · Revista potencial para el artículo
+
+**Revista candidata:** [CLEI Electronic Journal](https://clei.org/clei-electronic-journal/).
+
+Es una opción pertinente porque publica investigación original en informática y sus aplicaciones, incluyendo sistemas de software, inteligencia artificial y seguridad. La revista utiliza revisión por pares, es de acceso abierto y declara que no cobra por el envío ni por la publicación. Las [instrucciones para autores](https://www.clei.org/cleiej/index.php/cleiej/information/authors) deben revisarse antes de preparar el manuscrito.
+
+Un posible título para el artículo sería:
+
+> **Detección multicapa de Prompt Injection mediante heurísticas y aprendizaje automático: evaluación de seguridad, ASR y ahorro de tokens**
+
+La elección de la revista es una propuesta académica; antes del envío deben comprobarse el alcance vigente, la plantilla, el idioma, la extensión y los requisitos éticos y de reproducibilidad.
+
+### Hoja 5 · Enlace del video
+
+**Video de demostración:** **PENDIENTE — pegar aquí el enlace público o con permisos de visualización.**
+
+El mismo enlace debe escribirse también en los **comentarios de la entrega**, por ejemplo:
+
+> Video funcional de Promption: `https://...`
+
+El video debe explicar **únicamente la funcionalidad del sistema**. No es necesario desarrollar teoría, instalación, código fuente ni historia del proyecto. Un recorrido recomendado es:
+
+1. Ingresar a la aplicación y enviar una consulta legítima que sea permitida.
+2. Enviar un intento de Prompt Injection y mostrar cómo el filtro lo bloquea.
+3. Mostrar la protección de salida cuando una respuesta contiene información sensible.
+4. Abrir el panel administrativo y revisar operaciones, estadísticas y evaluación del modelo.
+5. Cerrar mostrando la reducción del ASR y los tokens o costes evitados.
+
+### Lista de verificación antes de entregar
+
+- [ ] Los nombres de todos los integrantes están completos.
+- [ ] La captura es legible y no expone secretos.
+- [ ] La revista y el enlace a sus instrucciones aparecen en la cuarta hoja.
+- [ ] El video tiene permisos para ser visualizado.
+- [ ] El enlace del video aparece en la quinta hoja y en los comentarios de la entrega.
+- [ ] El video se concentra en demostrar la funcionalidad del sistema.
+
 ## 🧩 Componentes
 
 - **API FastAPI** (`src/api/`) — endpoints de filtrado, benchmark y monitorización.

@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +20,8 @@ sys.path.insert(0, str(ROOT))
 
 from src.benchmark.metrics import all_metrics, by_attack_type, by_dataset  # noqa: E402
 from src.benchmark.runner import (BenchmarkRunner, RunnerOptions, SYSTEM_PROMPT,  # noqa: E402
-                                  contains_secret, is_compromised, sanitize_prompt)
+                                  contains_secret, is_compromised, is_refusal,
+                                  sanitize_prompt)
 from src.filter.ensemble_filter import build_default  # noqa: E402
 from src.llm import get_llm_client  # noqa: E402
 from src.utils.logger import logger  # noqa: E402
@@ -42,18 +45,54 @@ class EvenRateLimiter:
             time.sleep(delay)
 
 
+class TokenWindowLimiter:
+    """Reserve estimated tokens inside a rolling 60-second window."""
+
+    def __init__(self, tokens_per_minute: int):
+        self.limit = tokens_per_minute
+        self.entries: deque[dict[str, float]] = deque()
+        self.lock = threading.Lock()
+
+    def wait(self, estimated_tokens: int) -> dict[str, float]:
+        reserved = max(1, min(estimated_tokens, self.limit))
+        while True:
+            delay = 0.0
+            with self.lock:
+                now = time.monotonic()
+                while self.entries and now - self.entries[0]["at"] >= 60.0:
+                    self.entries.popleft()
+                used = sum(entry["tokens"] for entry in self.entries)
+                if used + reserved <= self.limit:
+                    ticket = {"at": now, "tokens": float(reserved)}
+                    self.entries.append(ticket)
+                    return ticket
+                if self.entries:
+                    delay = max(0.05, 60.0 - (now - self.entries[0]["at"]) + 0.05)
+            time.sleep(delay or 0.05)
+
+    def reconcile(self, ticket: dict[str, float], actual_tokens: int) -> None:
+        with self.lock:
+            ticket["tokens"] = float(max(ticket["tokens"], actual_tokens))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-csv", type=Path, default=Path("data/results/benchmark_results.csv"))
     parser.add_argument("--checkpoint", type=Path,
                         default=Path("data/results/backups/gemma_benchmark_checkpoint.jsonl"))
     parser.add_argument("--rpm", type=float, default=15.0)
+    parser.add_argument("--tpm", type=int, default=10000)
+    parser.add_argument("--max-output-tokens", type=int, default=200)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--max-attempts", type=int, default=5)
     parser.add_argument("--input-usd-per-million", type=float, default=0.0)
     parser.add_argument("--output-usd-per-million", type=float, default=0.0)
     parser.add_argument("--pricing-reference-model", default="")
     parser.add_argument("--pricing-source-url", default="")
+    parser.add_argument("--malicious-sample", type=int)
+    parser.add_argument("--benign-sample", type=int)
+    parser.add_argument("--sample-seed", type=int, default=42)
+    parser.add_argument("--include-benign-llm", action="store_true")
     parser.add_argument(
         "--finalize-only",
         action="store_true",
@@ -85,7 +124,26 @@ def append_checkpoint(path: Path, item: dict, lock: threading.Lock) -> None:
             stream.flush()
 
 
-def build_filter_rows(source: pd.DataFrame) -> tuple[list[dict], list[tuple[int, str, str]]]:
+def balanced_sample(source: pd.DataFrame, malicious: int | None, benign: int | None,
+                    seed: int) -> pd.DataFrame:
+    if malicious is None and benign is None:
+        return source.reset_index(drop=True)
+    if malicious is None or benign is None or malicious <= 0 or benign <= 0:
+        raise SystemExit("--malicious-sample y --benign-sample deben ser enteros positivos")
+    malicious_rows = source[source["label"].astype(int) == 1]
+    benign_rows = source[source["label"].astype(int) == 0]
+    if len(malicious_rows) < malicious or len(benign_rows) < benign:
+        raise SystemExit(
+            f"Muestra solicitada no disponible: ataques={len(malicious_rows)}, benignos={len(benign_rows)}"
+        )
+    sampled = pd.concat([
+        malicious_rows.sample(n=malicious, random_state=seed),
+        benign_rows.sample(n=benign, random_state=seed),
+    ])
+    return sampled.sample(frac=1, random_state=seed).reset_index(drop=True)
+
+
+def build_filter_rows(source: pd.DataFrame, include_benign_llm: bool = False) -> tuple[list[dict], list[tuple[int, str, str]]]:
     detector = build_default()
     rows: list[dict] = []
     jobs: list[tuple[int, str, str]] = []
@@ -120,7 +178,7 @@ def build_filter_rows(source: pd.DataFrame) -> tuple[list[dict], list[tuple[int,
             "response_no_filter": "(no aplica)",
             "response_filtered": "(no aplica)",
         }
-        if is_attack:
+        if is_attack or include_benign_llm:
             jobs.append((position, "raw", str(item["prompt"])))
             row["response_no_filter"] = "(no medido)"
             if result.blocked:
@@ -138,13 +196,18 @@ def main() -> None:
     args = parse_args()
     if args.rpm <= 0 or args.rpm > 30:
         raise SystemExit("--rpm debe estar entre 0 y 30")
+    if args.tpm <= 0 or args.max_output_tokens <= 0:
+        raise SystemExit("--tpm y --max-output-tokens deben ser positivos")
     source = pd.read_csv(args.input_csv, encoding="utf-8")
     required = {"prompt", "dataset", "attack_type", "source", "label"}
     missing = required.difference(source.columns)
     if missing:
         raise SystemExit(f"Faltan columnas: {sorted(missing)}")
+    source = balanced_sample(
+        source, args.malicious_sample, args.benign_sample, args.sample_seed,
+    )
 
-    rows, jobs = build_filter_rows(source)
+    rows, jobs = build_filter_rows(source, include_benign_llm=args.include_benign_llm)
     completed = load_checkpoint(args.checkpoint)
     if args.finalize_only and not completed:
         raise SystemExit(f"El checkpoint no contiene resultados válidos: {args.checkpoint}")
@@ -166,10 +229,11 @@ def main() -> None:
             raise SystemExit(f"LLM no disponible: {health.get('error')}")
         model_name = str(health.get("default_model") or model_name)
         logger.info(
-            "Benchmark externo: filas=%d llamadas=%d reanudadas=%d pendientes=%d modelo=%s rpm=%.1f",
-            len(source), len(jobs), len(completed), len(pending), model_name, args.rpm,
+            "Benchmark externo: filas=%d llamadas=%d reanudadas=%d pendientes=%d modelo=%s rpm=%.1f tpm=%d",
+            len(source), len(jobs), len(completed), len(pending), model_name, args.rpm, args.tpm,
         )
         limiter = EvenRateLimiter(args.rpm)
+        token_limiter = TokenWindowLimiter(args.tpm)
         checkpoint_lock = threading.Lock()
 
         def execute(job: tuple[int, str, str]) -> dict:
@@ -177,8 +241,18 @@ def main() -> None:
             error = None
             for attempt in range(1, args.max_attempts + 1):
                 limiter.wait()
+                estimated_tokens = (
+                    math.ceil((len(SYSTEM_PROMPT) + len(prompt)) / 3)
+                    + args.max_output_tokens
+                )
+                token_ticket = token_limiter.wait(estimated_tokens)
                 try:
-                    response = client.generate(prompt, system=SYSTEM_PROMPT)
+                    response = client.generate(
+                        prompt,
+                        system=SYSTEM_PROMPT,
+                        max_tokens=args.max_output_tokens,
+                    )
+                    token_limiter.reconcile(token_ticket, response.total_tokens)
                     return {
                         "index": index,
                         "kind": kind,
@@ -202,42 +276,62 @@ def main() -> None:
             raise RuntimeError(f"Fallo definitivo fila={index} tipo={kind}: {error}")
 
         processed = 0
+        failed_jobs: list[tuple[int, str, str]] = []
         with ThreadPoolExecutor(max_workers=max(1, args.workers)) as executor:
             futures = {executor.submit(execute, job): job for job in pending}
             for future in as_completed(futures):
-                result = future.result()
+                job = futures[future]
+                try:
+                    result = future.result()
+                except Exception as exc:  # noqa: BLE001
+                    failed_jobs.append(job)
+                    logger.error(
+                        "Gemma falló definitivamente: fila=%d tipo=%s error=%s",
+                        job[0], job[1], exc,
+                    )
+                    continue
                 completed[(result["index"], result["kind"])] = result
                 append_checkpoint(args.checkpoint, result, checkpoint_lock)
                 processed += 1
-                if processed % 25 == 0 or processed == len(pending):
-                    logger.info("Gemma completado: %d/%d llamadas pendientes", processed, len(pending))
+                done = processed + len(failed_jobs)
+                if done % 25 == 0 or done == len(pending):
+                    logger.info(
+                        "Gemma completado: %d exitosas, %d fallidas, %d/%d procesadas",
+                        processed, len(failed_jobs), done, len(pending),
+                    )
 
     evaluable_indices: list[int] = []
+    attack_evaluable_indices: list[int] = []
+    benign_evaluable_indices: list[int] = []
     for position, row in enumerate(rows):
-        if row["label"] != 1:
-            continue
         raw = completed.get((position, "raw"))
         if raw is None:
             continue
         row["response_no_filter"] = raw["response"]
         if row["filter_blocked"]:
-            row["llm_success_no_filter"] = float(is_compromised(raw["response"]))
-            row["llm_success_with_filter"] = 0.0
+            if row["label"] == 1:
+                row["llm_success_no_filter"] = float(is_compromised(raw["response"]))
+                row["llm_success_with_filter"] = 0.0
             row["llm_latency_ms"] = raw["latency_ms"]
             evaluable_indices.append(position)
         else:
             filtered = completed.get((position, "filtered"))
             if filtered is None:
                 continue
-            row["llm_success_no_filter"] = float(is_compromised(raw["response"]))
             row["response_filtered"] = filtered["response"]
-            row["llm_success_with_filter"] = float(is_compromised(filtered["response"]))
+            if row["label"] == 1:
+                row["llm_success_no_filter"] = float(is_compromised(raw["response"]))
+                row["llm_success_with_filter"] = float(is_compromised(filtered["response"]))
             row["llm_latency_ms"] = max(raw["latency_ms"], filtered["latency_ms"])
             evaluable_indices.append(position)
+        if row["label"] == 1:
+            attack_evaluable_indices.append(position)
+        else:
+            benign_evaluable_indices.append(position)
 
     output = pd.DataFrame(rows, columns=BenchmarkRunner.COLUMNS)
     metrics = all_metrics(output)
-    attack_rows = output.iloc[evaluable_indices]
+    attack_rows = output.iloc[attack_evaluable_indices]
     strict_no_filter = int(attack_rows["response_no_filter"].map(contains_secret).sum())
     strict_with_filter = int(attack_rows["response_filtered"].map(contains_secret).sum())
     attack_count = int(len(attack_rows))
@@ -254,10 +348,19 @@ def main() -> None:
         for index in evaluable_indices
         if rows[index]["filter_blocked"]
     ]
-    observed_raw_count = sum(1 for index, row in enumerate(rows)
-                             if row["label"] == 1 and (index, "raw") in completed)
-    observed_filtered_count = sum(1 for index, row in enumerate(rows)
-                                  if row["label"] == 1 and (index, "filtered") in completed)
+    observed_raw_count = sum(1 for index, _ in enumerate(rows) if (index, "raw") in completed)
+    observed_filtered_count = sum(
+        1 for index, _ in enumerate(rows) if (index, "filtered") in completed
+    )
+    benign_refusals_without = sum(
+        is_refusal(completed[(index, "raw")]["response"])
+        for index in benign_evaluable_indices
+    )
+    benign_rejections_with = sum(
+        bool(rows[index]["filter_blocked"])
+        or is_refusal(completed[(index, "filtered")]["response"])
+        for index in benign_evaluable_indices
+    )
 
     def token_totals(items: list[dict]) -> dict[str, int]:
         return {
@@ -280,9 +383,10 @@ def main() -> None:
     with_filter_totals = token_totals(filtered_results)
     saved_totals = token_totals(blocked_raw_results)
     is_legacy = args.finalize_only and len(required_results) < len(jobs)
+    is_incomplete = len(required_results) < len(jobs)
     token_usage = {
         "model": model_name,
-        "scope": "legacy_observed_cohort" if is_legacy else "full_benchmark",
+        "scope": "legacy_observed_cohort" if is_incomplete else "full_benchmark",
         "pricing_currency": "USD",
         "pricing_mode": "reference_estimate" if args.pricing_reference_model else (
             "free_tier" if args.input_usd_per_million == 0 and args.output_usd_per_million == 0
@@ -311,7 +415,7 @@ def main() -> None:
         "benchmark_observed_cost_usd": estimated_cost(benchmark_totals),
     }
     coverage = {
-        "status": "legacy" if is_legacy else "complete",
+        "status": "legacy" if is_incomplete else "complete",
         "observed_calls": len(required_results),
         "expected_calls": len(jobs),
         "call_coverage_rate": len(required_results) / len(jobs) if jobs else 0.0,
@@ -319,13 +423,30 @@ def main() -> None:
         "observed_filtered_calls": observed_filtered_count,
         "evaluable_attacks": attack_count,
         "total_attacks": int(sum(int(row["label"]) == 1 for row in rows)),
-        "attack_coverage_rate": attack_count / sum(int(row["label"]) == 1 for row in rows),
+        "attack_coverage_rate": (
+            attack_count / sum(int(row["label"]) == 1 for row in rows)
+            if any(int(row["label"]) == 1 for row in rows) else 0.0
+        ),
+        "evaluable_benign": len(benign_evaluable_indices),
+        "total_benign": int(sum(int(row["label"]) == 0 for row in rows)),
+        "benign_coverage_rate": (
+            len(benign_evaluable_indices) / sum(int(row["label"]) == 0 for row in rows)
+            if any(int(row["label"]) == 0 for row in rows) else 0.0
+        ),
     }
     metrics.update({
         "strict_leaks_without_filter": strict_no_filter,
         "strict_leaks_with_filter": strict_with_filter,
         "strict_leak_rate_without_filter": strict_no_filter / attack_count if attack_count else 0.0,
         "strict_leak_rate_with_filter": strict_with_filter / attack_count if attack_count else 0.0,
+        "benign_refusal_rate_without_filter": (
+            benign_refusals_without / len(benign_evaluable_indices)
+            if benign_evaluable_indices else 0.0
+        ),
+        "benign_rejection_rate_with_filter": (
+            benign_rejections_with / len(benign_evaluable_indices)
+            if benign_evaluable_indices else 0.0
+        ),
         "token_usage": token_usage,
         "llm_coverage": coverage,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -338,6 +459,12 @@ def main() -> None:
             "n_rows": int(len(output)),
             "model": model_name,
             "requests_per_minute": args.rpm,
+            "tokens_per_minute": args.tpm,
+            "max_output_tokens": args.max_output_tokens,
+            "malicious_sample": args.malicious_sample,
+            "benign_sample": args.benign_sample,
+            "sample_seed": args.sample_seed,
+            "include_benign_llm": args.include_benign_llm,
             "input_usd_per_million": args.input_usd_per_million,
             "output_usd_per_million": args.output_usd_per_million,
         },
@@ -345,6 +472,12 @@ def main() -> None:
         "by_attack_type": by_attack_type(output),
     })
     save_client = client if client is not None else object()
+    if is_incomplete and not args.finalize_only:
+        logger.error(
+            "Benchmark incompleto: %d/%d llamadas guardadas en checkpoint. No se sobreescriben resultados activos.",
+            len(required_results), len(jobs),
+        )
+        raise SystemExit(2)
     saver = BenchmarkRunner(filter=build_default(), ollama=save_client, opts=RunnerOptions(save=True))
     saver._save(output, metrics)
     logger.info(

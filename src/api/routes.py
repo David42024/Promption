@@ -480,11 +480,26 @@ def metrics_endpoint(
     from src.benchmark.metrics import all_metrics, by_attack_type, by_dataset
     results_path = Path(_CONF["paths"]["results"]) / "benchmark_results.csv"
     latest_payload = _latest_payload()
+    latest_overall = latest_payload.get("overall", {})
+    llm_evaluation = {
+        key: latest_overall[key]
+        for key in (
+            "strict_leaks_without_filter",
+            "strict_leaks_with_filter",
+            "strict_leak_rate_without_filter",
+            "strict_leak_rate_with_filter",
+            "benign_refusal_rate_without_filter",
+            "benign_rejection_rate_with_filter",
+            "llm_coverage",
+        )
+        if key in latest_overall
+    }
     return json_safe({
         "overall": all_metrics(df),
         "by_dataset": by_dataset(df),
         "by_attack_type": by_attack_type(df),
         "token_usage": latest_payload.get("overall", {}).get("token_usage", {}),
+        "llm_evaluation": llm_evaluation,
         "benchmark_options": latest_payload.get("options", {}),
         "token_usage_scope": latest_payload.get("overall", {}).get(
             "token_usage", {}

@@ -50,6 +50,10 @@ def _format_http_error(r: requests.Response, model: str) -> str:
     return f"LLM {r.status_code} en {r.url}: {body}.{hint}"
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def _resolve_setting(env_name: str) -> str:
     """Lee un ajuste desde el entorno o desde los secrets de Streamlit."""
     val = os.environ.get(env_name, "").strip()
@@ -130,13 +134,22 @@ class OpenAICompatibleClient:
             r.raise_for_status()
         except requests.HTTPError as exc:
             raise RuntimeError(_format_http_error(r, self.model)) from exc
-        data = r.json()
-        choices = data.get("choices") or []
-        message = choices[0].get("message") if choices else {}
-        content = message.get("content") or ""
-        usage = data.get("usage") or {}
-        input_details = usage.get("prompt_tokens_details") or {}
-        output_details = usage.get("completion_tokens_details") or {}
+        data = _as_dict(r.json())
+        choices = data.get("choices") if isinstance(data.get("choices"), list) else []
+        first_choice = _as_dict(choices[0]) if choices else {}
+        message = _as_dict(first_choice.get("message"))
+        content = message.get("content")
+        if isinstance(content, list):
+            content = "".join(
+                str(part.get("text") or "")
+                for part in content
+                if isinstance(part, dict)
+            )
+        if not isinstance(content, str):
+            content = ""
+        usage = _as_dict(data.get("usage"))
+        input_details = _as_dict(usage.get("prompt_tokens_details"))
+        output_details = _as_dict(usage.get("completion_tokens_details"))
         input_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
         output_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
         total_tokens = int(usage.get("total_tokens") or input_tokens + output_tokens)

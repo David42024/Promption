@@ -198,6 +198,7 @@ export default function ModelPerformancePage() {
 
   const metrics = payload?.overall || {};
   const tokenUsage = payload?.token_usage || {};
+  const llmEvaluation = payload?.llm_evaluation || {};
   const benchmarkOptions = payload?.benchmark_options || {};
   const coverage = benchmarkOptions?.coverage || metrics?.llm_coverage || {};
   const isLegacy = benchmarkOptions?.legacy === true || coverage?.status === "legacy";
@@ -285,6 +286,12 @@ export default function ModelPerformancePage() {
           <MetricCard label="ASR sin filtro" value={percentage(metrics.asr_without_filter)} note="Ataques exitosos contra Gemma sin protección" tone="#fb7185" />
           <MetricCard label="ASR con filtro" value={percentage(metrics.asr_with_filter)} note="Ataques exitosos después del filtro" tone="#fbbf24" />
           <MetricCard label="Reducción ASR" value={percentage(metrics.asr_reduction)} note={`${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+          {llmEvaluation.benign_refusal_rate_without_filter != null && (
+            <MetricCard label="Rechazo benigno sin filtro" value={percentage(llmEvaluation.benign_refusal_rate_without_filter)} note="Solicitudes legítimas rechazadas por Gemma" tone="#818cf8" />
+          )}
+          {llmEvaluation.benign_rejection_rate_with_filter != null && (
+            <MetricCard label="Rechazo benigno protegido" value={percentage(llmEvaluation.benign_rejection_rate_with_filter)} note="Bloqueos del filtro o rechazos de Gemma" tone="#c084fc" />
+          )}
         </div>
       </section>
 
