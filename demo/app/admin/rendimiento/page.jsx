@@ -460,11 +460,12 @@ export default function ModelPerformancePage() {
         <span className="hint">Benchmark {tokenUsage.model || "guardado"}{isLegacy ? " · legacy" : ""}</span>
       </div>
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginBottom: 22, opacity: loading ? .62 : 1 }}>
+      <section className="kpi-grid-4" style={{ marginBottom: 22, opacity: loading ? .62 : 1 }}>
         {PERCENT_METRICS.map(([key, label, note, tone]) => (
           <MetricCard key={key} label={label} value={percentage(metrics[key])} note={note} tone={tone} />
         ))}
         <MetricCard label="ROC-AUC" value={metrics.roc?.auc == null ? "—" : percentage(metrics.roc.auc)} note="Capacidad de separar ambas clases" tone="#c084fc" />
+        <MetricCard label="Especificidad (TNR)" value={percentage(metrics.tnr != null ? metrics.tnr : (1 - (metrics.fpr || 0)))} note="Benignos identificados correctamente" tone="#22d3ee" />
       </section>
 
       <section className="card" style={{ padding: 22, marginBottom: 22 }}>
@@ -475,10 +476,20 @@ export default function ModelPerformancePage() {
           </div>
           {isLegacy && <span className="hint">Benchmark legacy · {integer(coverage.evaluable_attacks)} ataques A/B</span>}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 18 }}>
+        <div className="kpi-grid-4" style={{ marginTop: 18 }}>
           <MetricCard label="ASR amplio sin filtro" value={percentage(metrics.asr_without_filter)} note="Incluye toda respuesta no reconocida como negativa, incluso vacía" tone="#fb7185" />
           <MetricCard label="ASR amplio protegido" value={percentage(metrics.asr_with_filter)} note="Criterio conservador; no equivale a fuga de credenciales" tone="#fbbf24" />
           <MetricCard label="Reducción ASR amplio" value={percentage(metrics.asr_reduction)} note={`${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+          <MetricCard
+            label="Reducción de fugas"
+            value={percentage(
+              llmEvaluation.strict_leak_rate_without_filter > 0
+                ? (1 - (llmEvaluation.strict_leak_rate_with_filter || 0) / llmEvaluation.strict_leak_rate_without_filter)
+                : 1.0
+            )}
+            note={`${integer(llmEvaluation.strict_leaks_without_filter || 0)} → ${integer(llmEvaluation.strict_leaks_with_filter || 0)} credenciales expuestas`}
+            tone="#34d399"
+          />
           {llmEvaluation.strict_leak_rate_without_filter != null && (
             <MetricCard label="Fuga estricta sin filtro" value={percentage(llmEvaluation.strict_leak_rate_without_filter)} note={`${integer(llmEvaluation.strict_leaks_without_filter)} respuestas expusieron la credencial`} tone="#fb7185" />
           )}
@@ -516,7 +527,7 @@ export default function ModelPerformancePage() {
           </div>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 18 }}>
+            <div className="kpi-grid-4" style={{ marginTop: 18 }}>
               <MetricCard label="Tokens sin filtro" value={integer(tokenUsage.without_filter?.total_tokens)} note={`${integer(tokenUsage.calls_without_filter)} llamadas potenciales`} tone="#fb7185" />
               <MetricCard label="Tokens con filtro" value={integer(tokenUsage.with_filter?.total_tokens)} note={`${integer(tokenUsage.calls_with_filter)} solicitudes alcanzaron el LLM`} tone="#22d3ee" />
               <MetricCard label="Tokens evitados" value={integer(tokenUsage.saved_by_blocking?.total_tokens)} note={`${integer(tokenUsage.calls_avoided)} llamadas bloqueadas antes del LLM`} tone="#34d399" />
@@ -650,7 +661,7 @@ export default function ModelPerformancePage() {
                   Ahorro sostenido: <strong style={{ color: "#a78bfa" }}>{percentage(projection.tokenSavingsRate)}</strong>
                 </span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginBottom: 20 }}>
+              <div className="kpi-grid-4" style={{ marginBottom: 20 }}>
                 <MetricCard
                   label="Coste sin filtro"
                   value={usd(projection.costWithoutFilter)}
