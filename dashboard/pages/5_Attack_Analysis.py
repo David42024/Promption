@@ -56,10 +56,10 @@ with c1:
         st.dataframe(t.reset_index(drop=True), hide_index=True)
 
 with c2:
-    st.subheader("🔥 Top 10 — más peligrosos (engañaron al LLM)")
+    st.subheader("🔥 Top 10 — ASR amplio positivo")
     p = attacks[(pd.to_numeric(attacks["llm_success_with_filter"], errors="coerce") == 1)]
     if p.empty:
-        st.info("Ningún prompt seleccionado logró engañar al LLM.")
+        st.info("Ningún prompt seleccionado tuvo ASR amplio positivo.")
     else:
         t = p.sort_values("filter_latency_ms")[["prompt", "attack_type", "dataset", "ensemble_score"]]
         t = t.rename(columns={"prompt": "Prompt", "attack_type": "Tipo", "dataset": "Dataset",

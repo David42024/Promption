@@ -7,7 +7,7 @@ Sistema académico de prueba de concepto para detectar **Prompt Injection** en a
 | 1 · Heurística | Reglas regex configurables (`config/heuristics.yaml`) | < 1 ms |
 | 2 · ML | Embeddings `all-MiniLM-L6-v2` + `RandomForestClassifier` | ~10-50 ms |
 
-> **Explicación breve:** la primera capa detecta patrones conocidos (DAN, "ignora instrucciones", SQL Injection, exfiltración, etc.). La segunda capa aprende a distinguir intentos de inyección de prompts legítimos usando representaciones semánticas del texto. Un **filtro ensemble** (OR) combina ambas: si cualquiera de las dos capas bloquea, el prompt se rechaza antes de llegar al LLM.
+> **Explicación breve:** la primera capa detecta patrones conocidos (DAN, "ignora instrucciones", SQL Injection, exfiltración, etc.) y reconoce expresiones benignas completas. La segunda capa aprende a distinguir intentos de inyección mediante representaciones semánticas. El **ensemble** aplica lógica OR salvo cuando existe una coincidencia benigna explícita y ninguna regla maliciosa; los textos sin coincidencias quedan como `unknown`, no como benignos.
 
 ## 🎓 Contenido para la presentación de software en Canva
 
@@ -431,6 +431,8 @@ Cuando recibes la respuesta del Filter API:
 
 3. **Si `decision: "BLOCKED"`**:
    - El prompt fue bloqueado por el ensemble (al menos una capa lo marcó como malicioso)
+
+   Una coincidencia benigna explícita puede omitir el veto ML cuando no existe ninguna coincidencia maliciosa. La ausencia de reglas se clasifica como `unknown` y conserva la lógica OR.
 
 4. **Verificar `confidence`**:
    - Alta confianza (>0.8): ataque claro

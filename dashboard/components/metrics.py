@@ -1,4 +1,4 @@
-"""Reusable metric cards with threshold-based colors."""
+"""Reusable metric cards with severity-based colors."""
 import streamlit as st
 
 from dashboard.utils.theme import get_palette

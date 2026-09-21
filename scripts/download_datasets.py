@@ -17,6 +17,7 @@ No añade dependencias: usa la API REST de Hugging Face (datasets-server) + requ
 """
 import argparse
 import io
+import re
 import sys
 import time
 from pathlib import Path
@@ -35,6 +36,17 @@ HF_BASE = "https://datasets-server.huggingface.co/rows"
 HF_RESOLVE = "https://huggingface.co/datasets/{id}/resolve/main/{path}"
 PAGE = 100
 _UA = {"User-Agent": "prompt-injection-filter-dataset-builder/1.0"}
+_CONTROL_OVERRIDE = re.compile(
+    r"ignore (?:all )?(?:previous|prior) (?:instructions|commands)|"
+    r"from now on|no longer chatgpt|system prompt|do anything now|"
+    r"does not follow (?:openai|the) policies|bypass (?:the )?(?:rules|filter)",
+    re.IGNORECASE,
+)
+
+
+def looks_like_control_override(prompt: str) -> bool:
+    """Identify control-plane overrides inside nominally regular prompts."""
+    return bool(_CONTROL_OVERRIDE.search(prompt or ""))
 
 
 def fetch_bytes(url: str) -> bytes:
@@ -222,7 +234,12 @@ def collect_jailbreak_github():
         for prompt in df[col].dropna().astype(str):
             prompt = prompt.strip()
             if prompt:
-                ben.append({"prompt": prompt, "category": "general", "source": "jailbreak_llms"})
+                if looks_like_control_override(prompt):
+                    mal.append({"prompt": prompt, "dataset": "Jailbreak",
+                                "attack_type": "prompt_injection",
+                                "source": "jailbreak_llms_regular_reclassified"})
+                else:
+                    ben.append({"prompt": prompt, "category": "general", "source": "jailbreak_llms"})
     except Exception as exc:  # noqa: BLE001
         logger.warning("regular GitHub skip: %s", exc)
     return mal, ben

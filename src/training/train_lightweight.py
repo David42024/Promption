@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import FeatureUnion
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -24,6 +25,7 @@ from sklearn.metrics import (
 import joblib
 
 from src.training.dataset import load_training_data
+from src.training.split import stratified_split
 from src.utils.config import load_config
 from src.utils.logger import logger
 
@@ -51,14 +53,24 @@ def train_lightweight_model(df: pd.DataFrame, max_features: int = 10000) -> tupl
     logger.info("Cleaned training samples: %d", len(df))
     
     # Configurar TF-IDF con límites para mantener el modelo pequeño
-    vectorizer = TfidfVectorizer(
-        max_features=max_features,
-        ngram_range=(1, 2),
-        min_df=2,
-        max_df=0.95,
-        lowercase=True,
-        stop_words=None  # Podríamos añadir stopwords de español/inglés
-    )
+    vectorizer = FeatureUnion([
+        ("word", TfidfVectorizer(
+            max_features=max_features,
+            ngram_range=(1, 2),
+            min_df=2,
+            max_df=0.95,
+            lowercase=True,
+            sublinear_tf=True,
+        )),
+        ("char", TfidfVectorizer(
+            analyzer="char_wb",
+            max_features=max_features,
+            ngram_range=(3, 5),
+            min_df=2,
+            lowercase=True,
+            sublinear_tf=True,
+        )),
+    ])
     
     X = vectorizer.fit_transform(df["prompt"].tolist())
     
@@ -142,11 +154,20 @@ def main():
     df = load_training_data(args.data)
     logger.info("Loaded %d training samples", len(df))
     
-    # Entrenar modelo ligero
-    vectorizer, classifier, y = train_lightweight_model(df, max_features=args.max_features)
-    
-    # Evaluar
-    metrics = evaluate_model(vectorizer, classifier, df, y)
+    test_indices = stratified_split(
+        df,
+        seed=int(_CONF["model"].get("random_state", 42)),
+    )
+    test_set = set(test_indices.tolist())
+    train_indices = np.array([index for index in range(len(df)) if index not in test_set])
+    train_df = df.iloc[train_indices].reset_index(drop=True)
+    test_df = df.iloc[test_indices].reset_index(drop=True)
+
+    vectorizer, classifier, _ = train_lightweight_model(train_df, max_features=args.max_features)
+    y_test = test_df["label"].to_numpy(int)
+    metrics = evaluate_model(vectorizer, classifier, test_df, y_test)
+    metrics["n_train"] = int(len(train_df))
+    metrics["n_test"] = int(len(test_df))
     
     # Guardar modelo
     out_path = Path(args.out)
@@ -157,7 +178,8 @@ def main():
         'classifier': classifier,
         'metrics': metrics,
         'model_type': 'tfidf_logistic_regression',
-        'max_features': args.max_features
+        'max_features': args.max_features,
+        'feature_mode': 'word_and_char_ngrams',
     }
     
     joblib.dump(model_data, out_path)

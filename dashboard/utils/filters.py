@@ -27,7 +27,7 @@ def filter_df(df: pd.DataFrame, datasets: list[str], decision: str, attack_succe
         col = "llm_success_with_filter"
         if col in out.columns:
             s = pd.to_numeric(out[col], errors="coerce")
-            out = out[s == (1.0 if attack_success == "Engañó al LLM" else 0.0)]
+            out = out[s == (1.0 if attack_success == "ASR amplio positivo" else 0.0)]
     return out.reset_index(drop=True)
 
 
@@ -35,5 +35,5 @@ def sidebar_filters(df: pd.DataFrame, key_prefix: str = "bm") -> tuple[list[str]
     datasets = dataset_options(df)
     ds = st.multiselect("Filtro por dataset", datasets, default=datasets if datasets else None, key=f"{key_prefix}_ds")
     decision = st.selectbox("Decisión del filtro", ["Todos", "Bloqueado", "Permitido"], key=f"{key_prefix}_dec")
-    success = st.selectbox("Éxito del ataque", ["Todos", "Engañó al LLM", "No engañó"], key=f"{key_prefix}_suc")
+    success = st.selectbox("Resultado amplio del ataque", ["Todos", "ASR amplio positivo", "ASR amplio negativo"], key=f"{key_prefix}_suc")
     return ds, decision, success

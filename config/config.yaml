@@ -26,24 +26,22 @@ model:
   max_depth: 20
   min_samples_leaf: 1
   random_state: 42
-  confidence_threshold: 0.6
+  confidence_threshold: 0.66
   chunk_chars: 250        # ventana de chunk-max (~60 tokens): coincide con la longitud mediana del entrenamiento; no diluye ataques de 1-2 frases
   chunk_overlap: 100      # solape para el fallback sin frases (texto sin puntuación)
   use_lightweight_ml: true  # Use TF-IDF + LogisticRegression instead of SentenceTransformers (Render free) - Updated
 
 ensemble:
-  # If either layer flags the prompt as malicious -> BLOCKED (OR logic)
-  # heuristic + ML scores are combined with a configurable weight
   heuristic_weight: 0.4
   ml_weight: 0.6
   final_threshold: 0.5
+  decision_low_threshold: 0.33
+  decision_high_threshold: 0.66
   require_llm_veto: false
-  # Descuento benigno ELIMINADO (revertido tras test adversario: abría hueco).
-  # Las señales benignas se detectan y reportan, pero no deciden.
 
 classification:
-  ml_benign_threshold: 0.4
-  ml_malicious_threshold: 0.6
+  ml_benign_threshold: 0.33
+  ml_malicious_threshold: 0.66
 
 llm:
   provider: "auto"          # ollama | openai | auto (openai si hay PIF_LLM_API_KEY configurada)

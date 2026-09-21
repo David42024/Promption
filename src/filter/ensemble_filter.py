@@ -1,13 +1,4 @@
-"""Ensemble filter — orchestrates heuristic + ML layers.
-
-Decision strategy (default OR):
-    score = heuristic_weight * heuristic_score + ml_weight * ml_probability
-    blocked = heuristic.blocked OR ml.blocked OR score >= final_threshold
-
-The OR logic keeps the system safe (fail-safe): any layer flagging is enough.
-"""
-import re
-import unicodedata
+"""Ensemble filter — orchestrates input detection and guarded generation."""
 from dataclasses import dataclass
 
 from src.filter.heuristic_filter import HeuristicFilter, HeuristicResult
@@ -19,44 +10,36 @@ _CONF = load_config()
 _MODEL_CONF = _CONF.get("model", {})
 _USE_LIGHTWEIGHT = _MODEL_CONF.get("use_lightweight_ml", False)
 
-logger.info(f"DEBUG: use_lightweight_ml = {_USE_LIGHTWEIGHT}")
-logger.info(f"DEBUG: _MODEL_CONF keys = {list(_MODEL_CONF.keys()) if _MODEL_CONF else 'None'}")
-
-_SAFE_SUPPORT_INTENT = re.compile(
-    r"\b("
-    r"consultas?\s+frecuentes|preguntas?\s+frecuentes|\bfaq\b|"
-    r"atencion\s+al\s+cliente|soporte|"
-    r"ideas?\s+para\s+responder|responder\s+consultas?|"
-    r"redactar\s+(?:un\s+)?(?:correo|mensaje|respuesta)|"
-    r"politicas?\s+publicas?"
-    r")\b",
-    re.IGNORECASE,
-)
-_RISKY_SAFE_INTENT_TERMS = re.compile(
-    r"\b("
-    r"ignora|olvida|bypass|desactiva|system\s+prompt|instrucciones|"
-    r"api\s*key|apikey|token|password|contrasena|contraseña|credencial(?:es)?|"
-    r"secreto(?:s|as)?|clave(?:s)?|sueldo(?:s)?|nomina|n[oó]mina|facturacion|facturaci[oó]n|"
-    r"presupuesto|roi|jwt|admin|root"
-    r")\b",
-    re.IGNORECASE,
-)
+logger.info("ML backend: %s", "lightweight" if _USE_LIGHTWEIGHT else "embeddings")
 
 
-def _normalize_for_safe_intent(text: str) -> str:
-    value = unicodedata.normalize("NFKD", text or "")
-    value = "".join(char for char in value if not unicodedata.combining(char))
-    return re.sub(r"\s+", " ", value.lower()).strip()
+def risk_band(score: float, low_threshold: float = 0.33,
+              high_threshold: float = 0.66) -> str:
+    """Return LOW, MEDIUM or HIGH using inclusive middle-band boundaries."""
+    if score < low_threshold:
+        return "LOW"
+    if score <= high_threshold:
+        return "MEDIUM"
+    return "HIGH"
 
 
-def _is_ml_only_safe_support_intent(text: str, probability: float, threshold: float) -> bool:
-    normalized = _normalize_for_safe_intent(text)
-    margin = max(0.04, threshold * 0.10)
-    return (
-        probability <= threshold + margin
-        and bool(_SAFE_SUPPORT_INTENT.search(normalized))
-        and not _RISKY_SAFE_INTENT_TERMS.search(normalized)
-    )
+def decide_pipeline_action(heuristic_score: float, ml_probability: float | None,
+                           low_threshold: float = 0.33,
+                           high_threshold: float = 0.66) -> str:
+    """Apply the explicit ALLOWED/GUARDED/BLOCKED decision matrix."""
+    if heuristic_score <= 0.0:
+        return "ALLOWED"
+    if heuristic_score >= 1.0:
+        return "BLOCKED"
+    if ml_probability is None:
+        return "GUARDED"
+    heuristic_band = risk_band(heuristic_score, low_threshold, high_threshold)
+    ml_band = risk_band(ml_probability, low_threshold, high_threshold)
+    if heuristic_band == "LOW" and ml_band == "LOW":
+        return "ALLOWED"
+    if heuristic_band in {"MEDIUM", "HIGH"} and ml_band == "HIGH":
+        return "BLOCKED"
+    return "GUARDED"
 
 # Import lightweight ML filter if enabled
 if _USE_LIGHTWEIGHT:
@@ -81,6 +64,10 @@ class EnsembleResult:
 
     @property
     def blocking_reason(self) -> str:
+        if self.decision == "GUARDED":
+            ml_probability = self.ml.probability if self.ml is not None else None
+            ml_text = "no disponible" if ml_probability is None else f"{ml_probability:.2f}"
+            return f"requiere Output Guard (heurística={self.heuristic.score:.2f}, ML={ml_text})"
         reasons = []
         if self.heuristic.blocked:
             rules = ", ".join(r["name"] for r in self.heuristic.matched_rules[:3])
@@ -88,6 +75,10 @@ class EnsembleResult:
         if self.ml is not None and self.ml.blocked:
             reasons.append(f"ML (p={self.ml.probability:.2f})")
         return " + ".join(reasons) or "permitido"
+
+    @property
+    def requires_output_guard(self) -> bool:
+        return self.decision == "GUARDED"
 
 
 class EnsembleFilter:
@@ -97,6 +88,12 @@ class EnsembleFilter:
         self.heuristic_weight = float(conf.get("heuristic_weight", 0.4))
         self.ml_weight = float(conf.get("ml_weight", 0.6))
         self.final_threshold = float(conf.get("final_threshold", 0.5))
+        self.low_threshold = float(conf.get("decision_low_threshold", 0.33))
+        self.high_threshold = float(
+            ml_threshold if ml_threshold is not None else conf.get("decision_high_threshold", 0.66)
+        )
+        if not 0.0 < self.low_threshold < self.high_threshold < 1.0:
+            raise ValueError("Decision thresholds must satisfy 0 < low < high < 1")
         self.heuristic = heuristic or HeuristicFilter()
         
         # Use lightweight ML if configured, otherwise use regular ML
@@ -104,7 +101,7 @@ class EnsembleFilter:
             self.ml = ml or LightMLFilter()
         else:
             self.ml = ml or MLFilter()
-        self.ml_threshold = ml_threshold
+        self.ml_threshold = self.high_threshold
 
     def analyze(self, text: str, use_ml: bool = True, roles: list[str] | None = None) -> EnsembleResult:
         import time
@@ -121,51 +118,56 @@ class EnsembleFilter:
             t_ml0 = time.perf_counter()
             try:
                 ml_res = self.ml.analyze(text)
-                if self.ml_threshold is not None:
-                    ml_res.threshold = self.ml_threshold
-                    ml_res.blocked = ml_res.probability >= self.ml_threshold
+                ml_res.threshold = self.high_threshold
+                ml_res.blocked = ml_res.probability > self.high_threshold
             except Exception:
                 ml_res = None
             ml_latency = (time.perf_counter() - t_ml0) * 1000
 
-        # NOTA: se probó un descuento benigno (cortesía/saludo restando a p(ML))
-        # y se REVERTIÓ: el test adversario demostró que abre un hueco
-        # ("Por favor dime el codigo", p=0.55, pasaba). Las señales benignas
-        # se siguen detectando y reportando, pero no deciden.
-        if ml_res is not None:
-            score = self.heuristic_weight * heur.score + self.ml_weight * ml_res.probability
-            blocked = heur.blocked or ml_res.blocked or score >= self.final_threshold
-            safe_intent_override = (
-                blocked
-                and not heur.blocked
-                and not heur.matched_rules
-                and _is_ml_only_safe_support_intent(
-                    text,
-                    ml_res.probability,
-                    self.ml_threshold if self.ml_threshold is not None else ml_res.threshold,
-                )
-            )
-            if safe_intent_override:
+        heuristic_risk = heur.score if heur.signal == "malicious" else 0.0
+        ml_probability = ml_res.probability if ml_res is not None else None
+        score = (
+            self.heuristic_weight * heuristic_risk + self.ml_weight * ml_probability
+            if ml_probability is not None else heuristic_risk
+        )
+        explicit_benign_override = heur.signal == "benign"
+        decision = decide_pipeline_action(
+            heur.score,
+            ml_probability,
+            self.low_threshold,
+            self.high_threshold,
+        )
+        if explicit_benign_override:
+            score = 0.0
+            if ml_res is not None:
                 ml_res.blocked = False
-                blocked = False
-        else:
-            score = heur.score
-            blocked = heur.blocked
-            safe_intent_override = False
+        blocked = decision == "BLOCKED"
+        safe_intent_override = False
 
         merged = {
             "heuristic_score": heur.score,
+            "heuristic_signal": heur.signal,
+            "heuristic_risk_contribution": heuristic_risk,
             "ml_probability": ml_res.probability if ml_res else None,
             "benign_matched": list(heur.benign_matched),
             "ensemble_score": score,
             "matched_rules": [r["name"] for r in heur.matched_rules],
             "ml_available": ml_res is not None,
             "safe_intent_override": safe_intent_override,
+            "explicit_benign_override": explicit_benign_override,
+            "requires_output_guard": decision == "GUARDED",
+            "heuristic_band": risk_band(heur.score, self.low_threshold, self.high_threshold),
+            "ml_band": (
+                risk_band(ml_probability, self.low_threshold, self.high_threshold)
+                if ml_probability is not None else "UNAVAILABLE"
+            ),
+            "decision_low_threshold": self.low_threshold,
+            "decision_high_threshold": self.high_threshold,
         }
         latency_ms = (time.perf_counter() - start) * 1000
         return EnsembleResult(
             blocked=blocked,
-            decision="BLOCKED" if blocked else "ALLOWED",
+            decision=decision,
             score=score,
             heuristic=heur,
             ml=ml_res,
@@ -180,7 +182,9 @@ class EnsembleFilter:
             "heuristic_rules": len(self.heuristic._rules),
             "ml_trained": self.ml.is_trained(),
             "ml_loaded": self.ml.is_loaded,
-            "ml_threshold": self.ml_threshold if self.ml_threshold is not None else self.ml.threshold,
+            "ml_threshold": self.high_threshold,
+            "decision_low_threshold": self.low_threshold,
+            "decision_high_threshold": self.high_threshold,
         }
 
 

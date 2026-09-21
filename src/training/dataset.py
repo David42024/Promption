@@ -7,6 +7,7 @@ Expected raw files (CSV):
 Output:
     data/processed/training_data.csv -> prompt, label, attack_type, category, dataset, source
 """
+import hashlib
 from pathlib import Path
 
 import pandas as pd
@@ -78,8 +79,39 @@ def apply_quarantine(df: pd.DataFrame, processed_dir: str | None = None) -> pd.D
     return df
 
 
+def apply_label_overrides(df: pd.DataFrame, processed_dir: str | None = None) -> pd.DataFrame:
+    """Apply reviewed label corrections identified by prompt SHA-256."""
+    path = Path(processed_dir or _CONF["paths"]["processed_data"]) / "label_overrides.csv"
+    if not path.exists():
+        return df
+    overrides = pd.read_csv(path, encoding="utf-8")
+    required = {"prompt_sha256", "label", "dataset", "attack_type"}
+    if not required.issubset(overrides.columns):
+        raise ValueError(f"Invalid label override schema: {path}")
+    mapping = overrides.set_index("prompt_sha256").to_dict(orient="index")
+    out = df.copy()
+    hashes = out["prompt"].astype(str).str.strip().map(
+        lambda value: hashlib.sha256(value.encode("utf-8")).hexdigest()
+    )
+    changed = 0
+    for index, digest in hashes.items():
+        override = mapping.get(digest)
+        if override is None:
+            continue
+        label = int(override["label"])
+        out.at[index, "label"] = label
+        out.at[index, "dataset"] = str(override["dataset"])
+        out.at[index, "attack_type"] = str(override["attack_type"])
+        if "category" in out.columns:
+            out.at[index, "category"] = str(override["attack_type"])
+        changed += 1
+    if changed:
+        logger.info("Label overrides: %d filas corregidas (%s)", changed, path)
+    return out
+
+
 def prepare_training_data(data_dir: str | None = None, processed_dir: str | None = None) -> Path:
-    df = apply_quarantine(load_raw_data(data_dir), processed_dir)
+    df = apply_quarantine(apply_label_overrides(load_raw_data(data_dir), processed_dir), processed_dir)
     out = Path(processed_dir or _CONF["paths"]["processed_data"]) / "training_data.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False, encoding="utf-8")
@@ -94,7 +126,7 @@ def load_training_data(processed_dir: str | None = None) -> pd.DataFrame:
     df = pd.read_csv(path, encoding="utf-8")
     if "lang" not in df.columns:  # CSVs generados antes de la columna lang
         df["lang"] = df["prompt"].map(detect_lang)
-    return apply_quarantine(df, processed_dir)
+    return apply_quarantine(apply_label_overrides(df, processed_dir), processed_dir)
 
 
 if __name__ == "__main__":

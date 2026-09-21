@@ -21,8 +21,8 @@ PLACEHOLDER_RE = (
 # validator(value) -> bool extra; "entropy" exige token con letras+dígitos.
 PATTERNS: list[tuple] = [
     ("secret_proximity", "api_key", "MEDIUM",
-     r"(?i)\b(clave|key|secreto|secret|contrase[ñn]a|password|token|credencial)\b[^.\n]{0,60}?\b([A-Za-z0-9_\-]{12,})\b",
-     0.7, False, "entropy"),
+     r"(?i)\b(clave|key|secreto|secret|contrase[ñn]a|password|token|credencial|c[óo]digo)\b[^.\n]{0,60}?\b([A-Za-z0-9_\-]{8,})\b",
+     0.7, False, "secret_entropy"),
     ("private_key_block", "private_key", "CRITICAL",
      r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
      0.99, True),

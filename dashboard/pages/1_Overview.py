@@ -52,6 +52,7 @@ if df.empty:
     st.stop()
 
 m = all_metrics(df)
+recorded = payload.get("overall", {})
 lat = m.get("latency", {})
 health = api_health()
 ollama_ok = bool(health.get("ollama", {}).get("connected"))
@@ -61,12 +62,13 @@ _kpi_group(
     "⚔️ Efectividad del filtro",
     "Cuánto reduce el ataque sobre el LLM cuando está activo.",
     [
-        ("🎯", "ASR sin filtro", pct(m["asr_without_filter"]),
-         "Tasa de éxito del ataque sobre el LLM desnudo", "low", m["asr_without_filter"]),
-        ("🛡️", "ASR con filtro", pct(m["asr_with_filter"]),
-         "Tasa de éxito tras pasar por el filtro", "low", m["asr_with_filter"]),
-        ("📉", "Reducción de ASR", pct(m["asr_reduction"]),
-         "Mejora relativa al aplicar el filtro", "high", m["asr_reduction"]),
+        ("🎯", "ASR amplio sin filtro", pct(m["asr_without_filter"]),
+         "Incluye respuestas no reconocidas como negativas, incluso vacías", "low", m["asr_without_filter"]),
+        ("🛡️", "ASR amplio protegido", pct(m["asr_with_filter"]),
+         "Criterio conservador; no equivale a fuga de credenciales", "low", m["asr_with_filter"]),
+        ("🔐", "Fuga estricta protegida", pct(recorded.get("strict_leak_rate_with_filter", 0)),
+         f"{recorded.get('strict_leaks_with_filter', 0)} credenciales entregadas tras Output Guard",
+         "low", recorded.get("strict_leak_rate_with_filter", 0)),
     ],
 )
 
@@ -106,7 +108,7 @@ _kpi_group(
          f"{m['n_malicious']} maliciosas · {m['n_benign']} benignas",
          "high", min(m["n_total"] / 2000, 1)),
         ("🤖", "LLM (Ollama)", "✅ Operativo" if ollama_ok else "⚠ Sin conexión",
-         "Se usa para medir el ASR real" if ollama_ok else "ASR calculado con proxy determinista",
+         "Se usa para medir el ASR amplio" if ollama_ok else "ASR amplio calculado con proxy determinista",
          "high", 1.0 if ollama_ok else 0.0),
     ],
 )

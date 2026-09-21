@@ -66,7 +66,7 @@ rules:
     enabled: true
 
   - name: "dont_tell_user"
-    pattern: "don't (tell|mention|reveal|say|inform) (the|your|any) (user|human)|do not (tell|mention|reveal|say|inform)"
+    pattern: "(?:don't|do not) (tell|mention|reveal|say|inform) (the|your|any) (user|human)"
     description: "Instruction to hide information from the user"
     severity: "high"
     enabled: true
@@ -102,13 +102,13 @@ rules:
     enabled: true
 
   - name: "credentials_request_es"
-    pattern: "(dame|pasame|pásame|dime|revelame|revélame|pasa|da|entrega|dame|dime|revela|revéla|proporcioname|entregame).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|clave|credencial|acceso|api[_ -]?key)"
+    pattern: "(dame|pasame|pásame|dime|revelame|revélame|pasa|da|entrega|revela|revéla|proporcioname|entregame).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|credenciales?|api[_ -]?key|clave (secreta|privada|de acceso|api)|acceso (administrativo|privilegiado|root))"
     description: "ES: petición directa de token/contraseña/secreto"
     severity: "high"
     enabled: true
 
   - name: "social_engineering_es"
-    pattern: "(eres (un )?(buen|amable|generoso) (bot|asistente|modelo) |por favor|te ruego|te pido|sé amable|ayúdame|ayudame|ayúdame).{0,40}(dame|pasame|pásame|dime|revelame|revélame|entregame|proporcioname|pasa|da|entrega).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|clave|credencial|acceso)"
+    pattern: "(eres (un )?(buen|amable|generoso) (bot|asistente|modelo) |por favor|te ruego|te pido|sé amable|ayúdame|ayudame).{0,40}(dame|pasame|pásame|dime|revelame|revélame|entregame|proporcioname|pasa|da|entrega).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|credenciales?|api[_ -]?key|clave (secreta|privada|de acceso|api)|acceso (administrativo|privilegiado|root))"
     description: "ES: social engineering / manipulación afectiva para obtener credenciales"
     severity: "high"
     enabled: true
@@ -298,7 +298,7 @@ rules:
     enabled: true
 
   - name: "partial_extraction"
-    pattern: "([úu]ltimos|primeros) \\d+ (caracteres|letras|d[íi]gitos).{0,40}(c[óo]digo|secreto|revelar)"
+    pattern: "([úu]ltimos|primeros)(?: \\d+)? (caracteres|letras|d[íi]gitos).{0,40}(c[óo]digo|secreto|token)|(?:c[óo]digo|secreto|token).{0,40}([úu]ltimos|primeros)(?: \\d+)? (caracteres|letras|d[íi]gitos)"
     description: "Extracción parcial del secreto (últimos N caracteres…)"
     severity: "medium"
     enabled: true
@@ -345,16 +345,42 @@ rules:
     severity: "medium"
     enabled: true
 
-# Señales benignas: cortesía/saludo. NUNCA bloquean por sí mismas; solo
-# habilitan el descuento del ensemble (ver config.yaml: ensemble.benign_*),
-# y únicamente cuando ninguna regla de ataque calzó.
+  - name: "prompt_before_conversation"
+    pattern: "(what|show|reveal|repeat).{0,50}(written|text|content).{0,40}(your |the )?prompt.{0,50}(before|prior to).{0,40}(conversation|chat)|(what|show|reveal).{0,50}(prompt|instructions).{0,40}before (the )?(conversation|chat)"
+    description: "EN: extracción del prompt anterior a la conversación"
+    severity: "medium"
+    enabled: true
+
+  - name: "pseudo_system_delimiters"
+    pattern: "(<\\|system\\|>|\\[INPUT\\]|\\[SYSTEM\\]).{0,160}(allow yourself|act as|function in the capacity|continue output|ignore|override)"
+    description: "Delimitadores pseudo-system combinados con una orden de control"
+    severity: "medium"
+    enabled: true
+
+  - name: "decision_process_override"
+    pattern: "descon[ée]ctate de tu proceso.{0,80}(sigue|obedece).{0,30}(mi liderazgo|mis instrucciones)|disconnect from your.{0,60}decision.{0,60}(follow|obey)"
+    description: "Intento de sustituir el proceso de decisión del asistente"
+    severity: "medium"
+    enabled: true
+
+  - name: "runtime_environment_extraction"
+    pattern: "(qu[ée]|cu[áa]les|what|which).{0,40}(variables de entorno|environment variables).{0,50}(tiempo de ejecuci[óo]n|runtime|establecid|set)"
+    description: "Solicitud de variables de entorno activas en ejecución"
+    severity: "medium"
+    enabled: true
+
+# Señales benignas explícitas. Una coincidencia completa da score 0 y permite
+# omitir el veto ML únicamente cuando ninguna regla maliciosa coincide.
 benign:
   - name: "politeness"
-    pattern: "\\b(gracias|por favor|porfa|thank you|thanks|please)\\b"
-    description: "Cortesía explícita"
+    pattern: "^\\s*(gracias|muchas gracias|por favor|porfa|thank you|thanks|please)\\s*[.!¡¿?]*\\s*$"
+    description: "Cortesía breve y completa"
   - name: "greeting"
-    pattern: "^(hola|buenos d[íi]as|buenas tardes|buenas noches|hello|hi|hey)\\b"
-    description: "Saludo de apertura"
+    pattern: "^\\s*(hola|buenos d[íi]as|buenas tardes|buenas noches|hello|hi|hey)(?:[, ]+¿?(?:c[oó]mo est[aá]s?|qu[eé] tal))?\\s*[.!¡¿?]*\\s*$"
+    description: "Saludo breve y completo"
+  - name: "short_acknowledgement"
+    pattern: "^\\s*(ahora\\s+s[ií]|ya|ok(?:ay)?|vale|listo|entendido|perfecto|de acuerdo|s[ií]|no)\\s*[.!¡¿?]*\\s*$"
+    description: "Confirmación o seguimiento conversacional breve"
 
 scores:
   high: 1.0
@@ -364,5 +390,6 @@ scores:
 scoring:
   # Combined heuristic score for a prompt = max severity found.
   # A prompt is heuristically blocked when score >= heuristic_threshold.
-  heuristic_threshold: 0.6
+  heuristic_threshold: 0.66
+  unknown_score: 0.5
   max_matches: 5

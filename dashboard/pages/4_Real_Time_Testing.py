@@ -64,6 +64,8 @@ if result is not None:
     blocked = result["blocked"]
     if blocked:
         st.error("### 🚫 BLOQUEADO")
+    elif result["decision"] == "GUARDED":
+        st.warning("### 🛡️ GENERACIÓN SUPERVISADA POR OUTPUT GUARD")
     else:
         st.success("### ✅ PERMITIDO")
 
@@ -77,13 +79,12 @@ if result is not None:
 
     st.progress(min(max(result["confidence"], 0.0), 1.0),
                 text="Score ensemble (promedio ponderado, no la decisión)")
-    ens_thr = result["ensemble"]["threshold"]
-    if blocked and result["confidence"] < ens_thr:
-        st.caption(f"⛔ Bloqueado por **veto de capa** ({result['reason']}): el promedio "
-                   f"{result['confidence']:.2f} no cruzó el umbral {ens_thr}, pero una capa "
-                   f"sí superó el suyo propio. Cualquiera puede vetar (lógica OR fail-safe).")
+    if result["decision"] == "GUARDED":
+        st.caption("El prompt puede llegar al LLM, pero su respuesta debe pasar obligatoriamente por el Output Guard antes de mostrarse.")
     elif blocked:
-        st.caption(f"Bloqueado por score {result['confidence']:.2f} ≥ umbral {ens_thr} ({result['reason']}).")
+        st.caption(f"Bloqueado por la matriz de riesgo ({result['reason']}).")
+    elif result["ensemble"].get("explicit_benign_override"):
+        st.caption("✅ Permitido por una regla benigna explícita. No coincidió ninguna regla maliciosa y el veto ML quedó en modo informativo.")
 
     heur = result["heuristic"]
     ml = result["ml"]
@@ -91,29 +92,30 @@ if result is not None:
         cc = st.columns(3)
         with cc[0]:
             st.markdown("**Heurística**")
-            st.markdown(f"- Score: `{heur['score']:.2f}` (umbral {heur['threshold']})")
+            st.markdown(f"- Score: `{heur['score']:.2f}`")
             st.markdown(f"- Veto: {'🚫 SÍ — bloquea' if heur['blocked'] else '✅ no'}")
             if heur["matched_rules"]:
                 st.markdown("- Reglas: " + ", ".join(r["name"] for r in heur["matched_rules"]))
         with cc[1]:
             st.markdown("**ML**")
             if ml["available"]:
-                st.markdown(f"- Probabilidad: `{ml['probability']:.3f}` (umbral {ml['threshold']})")
+                st.markdown(f"- Probabilidad: `{ml['probability']:.3f}`")
                 st.markdown(f"- Veto: {'🚫 SÍ — bloquea' if ml['blocked'] else '✅ no'}")
             else:
                 st.markdown("- Modelo no disponible (entrena con `python src/training/train.py`)")
         with cc[2]:
             st.markdown("**Ensemble**")
-            st.markdown(f"- Promedio: `{result['ensemble']['score']:.2f}` (umbral {result['ensemble']['threshold']})")
-            st.markdown("- Veto: " + ("🚫 SÍ — bloquea" if result['ensemble']['score'] >= result['ensemble']['threshold'] else "✅ no"))
-            st.caption("Bloquea si CUALQUIERA veta: heurística, ML o promedio.")
+            st.markdown(f"- Promedio informativo: `{result['ensemble']['score']:.2f}`")
+            st.markdown(f"- Bandas: heurística `{result['ensemble']['heuristic_band']}` · ML `{result['ensemble']['ml_band']}`")
+            st.markdown(f"- Decisión: **{result['decision']}**")
+            st.caption("La matriz 0.33/0.66 decide entre permitir, bloquear o supervisar la salida.")
         charts.render_chart(_layer_bars(result))
 
     # ---- LLM comparison
     section_header("Comparación con el LLM")
     st.caption("Envía el mismo prompt al LLM (sin filtro vs con filtro) y comprueba si logra robar el código secreto.")
     if st.button("⚡ Consultar LLM", type="secondary"):
-        from src.benchmark.runner import SYSTEM_PROMPT, contains_secret
+        from src.benchmark.runner import SYSTEM_PROMPT, apply_output_guard, contains_secret
         from src.llm import get_llm_client
         with st.spinner("Consultando LLM… esto puede tardar unos segundos."):
             client = get_llm_client()
@@ -136,13 +138,18 @@ if result is not None:
                     except Exception as exc:  # noqa: BLE001
                         st.error(f"No se pudo consultar el LLM: {exc}")
                         st.stop()
-                leaked_filt = False if blocked else (contains_secret(r1.text) if r1 else False)
+                if r1 is not None:
+                    delivered, guard = apply_output_guard(r1.text)
+                    leaked_filt = False if guard and guard.action != "PASS" else contains_secret(delivered)
+                else:
+                    delivered, guard, leaked_filt = "", None, False
                 seq = int(st.session_state.get("rt_llm_seq", 0)) + 1
                 st.session_state["rt_llm_seq"] = seq
                 st.session_state["rt_llm_cmp"] = {
                     "seq": seq, "prompt": result["text"], "blocked": blocked,
                     "raw_text": r0.text, "raw_ms": r0.latency_ms, "leaked_raw": leaked_raw,
-                    "filt_text": r1.text if r1 else "", "leaked_filt": leaked_filt,
+                    "filt_text": delivered, "leaked_filt": leaked_filt,
+                    "guard_action": guard.action if guard else "NOT_RUN",
                 }
 
     cmp = st.session_state.get("rt_llm_cmp")
@@ -165,8 +172,10 @@ if result is not None:
                 st.info("El prompt fue bloqueado: nunca llegó al LLM.")
             elif cmp["leaked_filt"]:
                 st.error("⚠ El prompt superó el filtro y robó el secreto.")
+            elif cmp.get("guard_action") in {"REDACT", "BLOCK"}:
+                st.success(f"Output Guard intervino: {cmp['guard_action']}. La salida sensible no se entregó.")
             else:
-                st.success("El prompt llegó al LLM sin filtrar (permitido) y no robó el secreto.")
+                st.success("La salida pasó el Output Guard y no reveló el secreto.")
             if cmp["blocked"]:
                 st.text_area("Respuesta del LLM (con filtro)", "(bloqueado: no se llamó al LLM)",
                              height=140, key=f"resp_filt_{seq}", disabled=True)

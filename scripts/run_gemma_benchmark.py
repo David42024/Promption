@@ -20,10 +20,11 @@ sys.path.insert(0, str(ROOT))
 
 from src.benchmark.metrics import all_metrics, by_attack_type, by_dataset  # noqa: E402
 from src.benchmark.runner import (BenchmarkRunner, RunnerOptions, SYSTEM_PROMPT,  # noqa: E402
-                                  contains_secret, is_compromised, is_refusal,
-                                  sanitize_prompt)
+                                  apply_output_guard, contains_secret, is_compromised,
+                                  is_refusal, sanitize_prompt)
 from src.filter.ensemble_filter import build_default  # noqa: E402
 from src.llm import get_llm_client  # noqa: E402
+from src.output_guard import Action  # noqa: E402
 from src.utils.logger import logger  # noqa: E402
 
 
@@ -286,7 +287,7 @@ def main() -> None:
                 except Exception as exc:  # noqa: BLE001
                     failed_jobs.append(job)
                     logger.error(
-                        "Gemma falló definitivamente: fila=%d tipo=%s error=%s",
+                        "LLM falló definitivamente: fila=%d tipo=%s error=%s",
                         job[0], job[1], exc,
                     )
                     continue
@@ -296,13 +297,45 @@ def main() -> None:
                 done = processed + len(failed_jobs)
                 if done % 25 == 0 or done == len(pending):
                     logger.info(
-                        "Gemma completado: %d exitosas, %d fallidas, %d/%d procesadas",
+                        "LLM completado: %d exitosas, %d fallidas, %d/%d procesadas",
                         processed, len(failed_jobs), done, len(pending),
                     )
 
     evaluable_indices: list[int] = []
     attack_evaluable_indices: list[int] = []
     benign_evaluable_indices: list[int] = []
+    guard_stats = {
+        "enabled": True,
+        "evaluated": 0,
+        "actions": {Action.PASS: 0, Action.REDACT: 0, Action.BLOCK: 0},
+        "attack_evaluated": 0,
+        "benign_evaluated": 0,
+        "attack_interventions": 0,
+        "benign_interventions": 0,
+        "attack_raw_secret_matches": 0,
+        "benign_raw_secret_matches": 0,
+        "prevented_secret_leaks": 0,
+        "benign_non_secret_interventions": 0,
+    }
+
+    def guard(item: dict, is_attack: bool) -> str:
+        delivered, verdict = apply_output_guard(item["response"], enabled=True)
+        raw_secret = contains_secret(item["response"])
+        kind = "attack" if is_attack else "benign"
+        if raw_secret:
+            guard_stats[f"{kind}_raw_secret_matches"] += 1
+        if verdict is not None:
+            guard_stats["evaluated"] += 1
+            guard_stats["actions"][verdict.action] += 1
+            guard_stats[f"{kind}_evaluated"] += 1
+            if verdict.action != Action.PASS:
+                guard_stats[f"{kind}_interventions"] += 1
+                if raw_secret:
+                    guard_stats["prevented_secret_leaks"] += 1
+                elif not is_attack:
+                    guard_stats["benign_non_secret_interventions"] += 1
+        return delivered
+
     for position, row in enumerate(rows):
         raw = completed.get((position, "raw"))
         if raw is None:
@@ -318,10 +351,11 @@ def main() -> None:
             filtered = completed.get((position, "filtered"))
             if filtered is None:
                 continue
-            row["response_filtered"] = filtered["response"]
+            delivered = guard(filtered, is_attack=bool(row["label"] == 1))
+            row["response_filtered"] = delivered
             if row["label"] == 1:
                 row["llm_success_no_filter"] = float(is_compromised(raw["response"]))
-                row["llm_success_with_filter"] = float(is_compromised(filtered["response"]))
+                row["llm_success_with_filter"] = float(is_compromised(delivered))
             row["llm_latency_ms"] = max(raw["latency_ms"], filtered["latency_ms"])
             evaluable_indices.append(position)
         if row["label"] == 1:
@@ -374,8 +408,7 @@ def main() -> None:
     def estimated_cost(totals: dict[str, int]) -> float:
         return (
             totals["input_tokens"] * args.input_usd_per_million
-            + (totals["output_tokens"] + totals["reasoning_tokens"])
-            * args.output_usd_per_million
+            + totals["output_tokens"] * args.output_usd_per_million
         ) / 1_000_000
 
     benchmark_totals = token_totals(required_results)
@@ -447,6 +480,7 @@ def main() -> None:
             benign_rejections_with / len(benign_evaluable_indices)
             if benign_evaluable_indices else 0.0
         ),
+        "output_guard": guard_stats,
         "token_usage": token_usage,
         "llm_coverage": coverage,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -465,6 +499,7 @@ def main() -> None:
             "benign_sample": args.benign_sample,
             "sample_seed": args.sample_seed,
             "include_benign_llm": args.include_benign_llm,
+            "use_output_guard": True,
             "input_usd_per_million": args.input_usd_per_million,
             "output_usd_per_million": args.output_usd_per_million,
         },

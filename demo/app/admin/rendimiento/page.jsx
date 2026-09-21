@@ -61,7 +61,7 @@ function ConfusionMatrix({ metrics }) {
   return (
     <section className="card" style={{ padding: 22 }}>
       <h3 style={{ marginTop: 0 }}>Matriz de confusión</h3>
-      <p className="hint" style={{ marginTop: 4 }}>Resultado real frente a la decisión simulada del filtro.</p>
+      <p className="hint" style={{ marginTop: 4 }}>Resultado real frente a la decisión registrada por el filtro.</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(120px,1fr))", gap: 12, marginTop: 18 }}>
         {cells.map(cell => (
           <div key={cell.key} style={{ padding: 16, border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "rgba(15,23,42,.5)" }}>
@@ -130,7 +130,7 @@ function ComparisonTable({ title, rows, nameKey, nameLabel }) {
                 <th>Recall</th>
                 <th>F1</th>
                 <th>FPR</th>
-                <th>ASR con filtro</th>
+                <th>ASR amplio protegido</th>
               </tr>
             </thead>
             <tbody>
@@ -161,7 +161,6 @@ export default function ModelPerformancePage() {
   const [error, setError] = useState("");
   const [payload, setPayload] = useState(null);
   const [dataset, setDataset] = useState("");
-  const [threshold, setThreshold] = useState(0.5);
 
   useEffect(() => {
     fetch("/api/login/status")
@@ -176,7 +175,7 @@ export default function ModelPerformancePage() {
   const loadMetrics = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ threshold: threshold.toFixed(2) });
+      const params = new URLSearchParams();
       if (dataset) params.set("dataset", dataset);
       const response = await fetch(`/api/admin/model-metrics?${params}`, { cache: "no-store" });
       const data = await response.json();
@@ -188,7 +187,7 @@ export default function ModelPerformancePage() {
     } finally {
       setLoading(false);
     }
-  }, [dataset, threshold]);
+  }, [dataset]);
 
   useEffect(() => {
     if (authLoading) return undefined;
@@ -199,6 +198,7 @@ export default function ModelPerformancePage() {
   const metrics = payload?.overall || {};
   const tokenUsage = payload?.token_usage || {};
   const llmEvaluation = payload?.llm_evaluation || {};
+  const outputGuard = llmEvaluation?.output_guard || {};
   const benchmarkOptions = payload?.benchmark_options || {};
   const coverage = benchmarkOptions?.coverage || metrics?.llm_coverage || {};
   const isLegacy = benchmarkOptions?.legacy === true || coverage?.status === "legacy";
@@ -233,27 +233,10 @@ export default function ModelPerformancePage() {
               {(payload?.available_datasets || []).map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
-          <label style={{ display: "grid", gap: 7 }}>
-            <span className="hint">Umbral ensemble: <strong style={{ color: "var(--text-primary)" }}>{threshold.toFixed(2)}</strong></span>
-            <input
-              aria-label="Umbral ensemble"
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={threshold}
-              onChange={event => setThreshold(Number(event.target.value))}
-              style={{ width: "100%", accentColor: "#6366f1" }}
-            />
-          </label>
           <div className="hint" style={{ textAlign: "right" }}>
             <div>{metrics.n_total || 0} casos · {metrics.n_malicious || 0} ataques · {metrics.n_benign || 0} benignos</div>
             <div>Benchmark: {generatedAt}</div>
           </div>
-        </div>
-        <div style={{ marginTop: 16, padding: "13px 15px", borderRadius: "var(--radius-md)", border: "1px solid rgba(99,102,241,.28)", background: "rgba(99,102,241,.08)", color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.55 }}>
-          <strong style={{ color: "var(--text-primary)" }}>¿Qué hace el umbral?</strong>{" "}
-          Simula que un caso se bloquea cuando su score ensemble alcanza el valor elegido. Al bajarlo aumenta la sensibilidad y el recall, pero pueden crecer los falsos positivos; al subirlo se bloquea con más cautela, aunque pueden escapar más ataques. El filtro real también aplica una lógica OR fail-safe, donde la heurística o el ML pueden bloquear por separado, así que sus decisiones pueden diferir de esta simulación. El control no cambia producción; ASR y latencia son mediciones de la ejecución original y no varían.
         </div>
       </section>
 
@@ -278,21 +261,35 @@ export default function ModelPerformancePage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
           <div>
             <h3 style={{ margin: 0 }}>Resistencia del LLM</h3>
-            <p className="hint" style={{ marginTop: 4 }}>Ataques ejecutados contra Gemma 4 antes y después de aplicar el filtro.</p>
+            <p className="hint" style={{ marginTop: 4 }}>Solicitudes ejecutadas contra {tokenUsage.model || "el LLM"} antes y después de aplicar el filtro y el Output Guard.</p>
           </div>
-          {isLegacy && <span className="hint">Benchmark Gemma 4 · legacy · {integer(coverage.evaluable_attacks)} ataques A/B</span>}
+          {isLegacy && <span className="hint">Benchmark legacy · {integer(coverage.evaluable_attacks)} ataques A/B</span>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 18 }}>
-          <MetricCard label="ASR sin filtro" value={percentage(metrics.asr_without_filter)} note="Ataques exitosos contra Gemma sin protección" tone="#fb7185" />
-          <MetricCard label="ASR con filtro" value={percentage(metrics.asr_with_filter)} note="Ataques exitosos después del filtro" tone="#fbbf24" />
-          <MetricCard label="Reducción ASR" value={percentage(metrics.asr_reduction)} note={`${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+          <MetricCard label="ASR amplio sin filtro" value={percentage(metrics.asr_without_filter)} note="Incluye toda respuesta no reconocida como negativa, incluso vacía" tone="#fb7185" />
+          <MetricCard label="ASR amplio protegido" value={percentage(metrics.asr_with_filter)} note="Criterio conservador; no equivale a fuga de credenciales" tone="#fbbf24" />
+          <MetricCard label="Reducción ASR amplio" value={percentage(metrics.asr_reduction)} note={`${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+          {llmEvaluation.strict_leak_rate_without_filter != null && (
+            <MetricCard label="Fuga estricta sin filtro" value={percentage(llmEvaluation.strict_leak_rate_without_filter)} note={`${integer(llmEvaluation.strict_leaks_without_filter)} respuestas expusieron la credencial`} tone="#fb7185" />
+          )}
+          {llmEvaluation.strict_leak_rate_with_filter != null && (
+            <MetricCard label="Fuga estricta protegida" value={percentage(llmEvaluation.strict_leak_rate_with_filter)} note={`${integer(llmEvaluation.strict_leaks_with_filter)} credenciales entregadas tras Output Guard`} tone="#34d399" />
+          )}
           {llmEvaluation.benign_refusal_rate_without_filter != null && (
-            <MetricCard label="Rechazo benigno sin filtro" value={percentage(llmEvaluation.benign_refusal_rate_without_filter)} note="Solicitudes legítimas rechazadas por Gemma" tone="#818cf8" />
+            <MetricCard label="Rechazo benigno sin filtro" value={percentage(llmEvaluation.benign_refusal_rate_without_filter)} note="Solicitudes legítimas rechazadas por el LLM" tone="#818cf8" />
           )}
           {llmEvaluation.benign_rejection_rate_with_filter != null && (
-            <MetricCard label="Rechazo benigno protegido" value={percentage(llmEvaluation.benign_rejection_rate_with_filter)} note="Bloqueos del filtro o rechazos de Gemma" tone="#c084fc" />
+            <MetricCard label="Rechazo benigno protegido" value={percentage(llmEvaluation.benign_rejection_rate_with_filter)} note="Bloqueos del filtro o rechazos del LLM" tone="#c084fc" />
           )}
         </div>
+        {Number(outputGuard.evaluated || 0) > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 14 }}>
+            <MetricCard label="Salidas revisadas" value={integer(outputGuard.evaluated)} note="Respuestas que pasaron por Output Guard" tone="#22d3ee" />
+            <MetricCard label="Intervenciones en ataques" value={integer(outputGuard.attack_interventions)} note="Respuestas maliciosas redactadas o bloqueadas" tone="#34d399" />
+            <MetricCard label="Fugas evitadas" value={integer(outputGuard.prevented_secret_leaks)} note="Secretos detectados antes de entregar la respuesta" tone="#a78bfa" />
+            <MetricCard label="Intervenciones benignas" value={integer(outputGuard.benign_interventions)} note="Posibles falsos positivos del guard de salida" tone="#fbbf24" />
+          </div>
+        )}
       </section>
 
       <section className="card" style={{ padding: 22, marginBottom: 22 }}>
@@ -311,7 +308,7 @@ export default function ModelPerformancePage() {
           <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 18 }}>
               <MetricCard label="Tokens sin filtro" value={integer(tokenUsage.without_filter?.total_tokens)} note={`${integer(tokenUsage.calls_without_filter)} llamadas potenciales`} tone="#fb7185" />
-              <MetricCard label="Tokens con filtro" value={integer(tokenUsage.with_filter?.total_tokens)} note={`${integer(tokenUsage.calls_with_filter)} ataques alcanzaron el LLM`} tone="#22d3ee" />
+              <MetricCard label="Tokens con filtro" value={integer(tokenUsage.with_filter?.total_tokens)} note={`${integer(tokenUsage.calls_with_filter)} solicitudes alcanzaron el LLM`} tone="#22d3ee" />
               <MetricCard label="Tokens evitados" value={integer(tokenUsage.saved_by_blocking?.total_tokens)} note={`${integer(tokenUsage.calls_avoided)} llamadas bloqueadas antes del LLM`} tone="#34d399" />
               <MetricCard label="Ahorro de tokens" value={percentage(tokenUsage.token_savings_rate)} note="Sobre el consumo potencial sin filtro" tone="#a78bfa" />
               <MetricCard label="Coste sin filtro" value={usd(tokenUsage.estimated_cost_without_filter_usd)} note="Proyección con la tarifa configurada" tone="#fb7185" />
@@ -321,7 +318,7 @@ export default function ModelPerformancePage() {
             </div>
             <div className="hint" style={{ marginTop: 14 }}>
               {tokenUsage.pricing_mode === "reference_estimate"
-                ? `Coste estimado con la tarifa de referencia de ${tokenUsage.pricing_reference_model}: $${tokenUsage.input_usd_per_million}/M tokens de entrada y $${tokenUsage.output_usd_per_million}/M de salida, incluido el razonamiento. No representa un cobro real de Gemma.`
+                ? `Coste estimado con la tarifa de referencia de ${tokenUsage.pricing_reference_model}: $${tokenUsage.input_usd_per_million}/M tokens de entrada y $${tokenUsage.output_usd_per_million}/M de salida, incluido el razonamiento.`
                 : tokenUsage.pricing_mode === "free_tier"
                   ? "El proveedor está configurado con tarifa gratuita; los tokens y llamadas evitados representan capacidad y latencia ahorradas."
                   : `Tarifa aplicada: $${tokenUsage.input_usd_per_million}/M tokens de entrada y $${tokenUsage.output_usd_per_million}/M de salida.`}

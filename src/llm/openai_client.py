@@ -120,13 +120,24 @@ class OpenAICompatibleClient:
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
+        is_openai_gpt5 = (
+            "api.openai.com" in self.host.lower()
+            and self.model.lower().startswith("gpt-5")
+        )
+        token_limit = max_tokens if max_tokens is not None else int(_CONF.get("max_tokens", 200))
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
-            "temperature": temperature if temperature is not None else float(_CONF.get("temperature", 0.2)),
-            "max_tokens": max_tokens if max_tokens is not None else int(_CONF.get("max_tokens", 200)),
             "stream": False,
         }
+        if is_openai_gpt5:
+            payload["max_completion_tokens"] = token_limit
+            payload["reasoning_effort"] = "minimal"
+        else:
+            payload["max_tokens"] = token_limit
+            payload["temperature"] = (
+                temperature if temperature is not None else float(_CONF.get("temperature", 0.2))
+            )
         start = time.perf_counter()
         r = requests.post(f"{self.host}/chat/completions", json=payload,
                           headers=self._headers(), timeout=self.timeout)

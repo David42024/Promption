@@ -21,8 +21,6 @@ from dashboard.components.sidebar import setup_page
 from dashboard.utils.data_loader import load_benchmark_results, load_history, load_model_metrics
 from dashboard.utils.paths import MODELS_DIR
 from dashboard.utils.theme import get_palette
-from src.benchmark.metrics import all_metrics
-
 setup_page("Model Analysis — Prompt Injection Filter", "🔬")
 
 st.title("🔬 Model Analysis — Análisis del modelo ML")
@@ -111,18 +109,6 @@ if not df.empty:
                     title="Correlación entre características")
     charts.apply_theme(fig)
     charts.render_chart(fig)
-
-# ------------------------------------------------------------- threshold sim
-section_header("Umbral de confianza ajustable")
-thr = st.slider("Umbral del score ensemble para considerar bloqueo", 0.0, 1.0, 0.5, 0.01)
-sim = df.copy()
-sim["filter_blocked"] = (pd.to_numeric(sim["ensemble_score"], errors="coerce").fillna(0) >= thr).astype(int)
-sm = all_metrics(sim)
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Precisión", f"{sm['precision']:.3f}")
-c2.metric("Recall", f"{sm['recall']:.3f}")
-c3.metric("F1", f"{sm['f1']:.3f}")
-c4.metric("FPR", f"{sm['fpr']:.3f}")
 
 # ------------------------------------------------------------- error analysis
 section_header("Análisis de errores (prompts mal clasificados)")

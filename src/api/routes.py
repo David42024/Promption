@@ -323,20 +323,29 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
         "threshold": res.ml.threshold if res.ml else None,
     }
     classification_conf = _CONF.get("classification", {})
-    benign_threshold = float(classification_conf.get("ml_benign_threshold", 0.4))
-    malicious_threshold = float(classification_conf.get("ml_malicious_threshold", 0.6))
+    benign_threshold = float(classification_conf.get("ml_benign_threshold", 0.33))
+    malicious_threshold = float(classification_conf.get("ml_malicious_threshold", 0.66))
     classification, requires_review = classify_security_result(
         blocked=res.blocked,
         ml_probability=res.ml.probability if res.ml else None,
         benign_threshold=benign_threshold,
         malicious_threshold=malicious_threshold,
+        explicit_benign=bool(res.merged_features.get("explicit_benign_override")),
+        requires_output_guard=res.requires_output_guard,
     )
     layers = {
         "heuristic": {"blocked": res.heuristic.blocked, "score": res.heuristic.score,
+                      "signal": res.heuristic.signal,
                       "matched_rules": rules, "threshold": res.heuristic.threshold,
                       "benign_matched": list(res.heuristic.benign_matched)},
         "ml": ml_info,
         "ensemble": {"score": res.score, "threshold": flt.final_threshold,
+                     "decision": res.decision,
+                     "requires_output_guard": res.requires_output_guard,
+                     "heuristic_band": res.merged_features.get("heuristic_band"),
+                     "ml_band": res.merged_features.get("ml_band"),
+                     "decision_low_threshold": flt.low_threshold,
+                     "decision_high_threshold": flt.high_threshold,
                      "benign_matched": list(res.heuristic.benign_matched)},
         "classification": {
             "label": classification,
@@ -372,6 +381,7 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
         tenant_id=tenant.tenant_id,
         classification=classification,
         requires_review=requires_review,
+        requires_output_guard=res.requires_output_guard,
     )
 
 
@@ -490,6 +500,7 @@ def metrics_endpoint(
             "strict_leak_rate_with_filter",
             "benign_refusal_rate_without_filter",
             "benign_rejection_rate_with_filter",
+            "output_guard",
             "llm_coverage",
         )
         if key in latest_overall

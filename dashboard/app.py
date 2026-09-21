@@ -49,7 +49,7 @@ section_header(
 _pages = [
     ("📊", "Overview", "Indicadores clave: ASR con/sin filtro, reducción, precisión/recall/F1, falsos positivos, negativos y latencia."),
     ("📈", "Benchmark Results", "Tabla interactiva de cada prompt evaluado, distribución por dataset y tipo de ataque, curva ROC."),
-    ("🔬", "Model Analysis", "Importancia de variables (embeddings), PCA, correlaciones, análisis de errores y ajuste del umbral."),
+    ("🔬", "Model Analysis", "Importancia de variables (embeddings), PCA, correlaciones y análisis de errores."),
     ("🧪", "Real-Time Testing", "Escribe un prompt y mira al instante qué capa decide, con qué confianza, y compáralo con Ollama."),
     ("🎯", "Attack Analysis", "Top payloads que superan el filtro, distribución por tipo de ataque y patrones comunes."),
     ("⚡", "System Health", "Estado de Ollama y la API, recursos del sistema, logs y configuración actual."),

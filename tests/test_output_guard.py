@@ -94,3 +94,10 @@ def test_scan_is_deterministic_and_local():
     a = [(f.category, f.severity) for f in scan("password=FAKE_PW_abcdef1234")]
     b = [(f.category, f.severity) for f in scan("password=FAKE_PW_abcdef1234")]
     assert a == b and a
+
+
+def test_benchmark_secret_is_redacted():
+    secret = "TOK-AZ9-KX7"
+    result = guard_response(f"El código secreto es: {secret}")
+    assert result.action in (Action.BLOCK, Action.REDACT)
+    assert secret not in (result.redacted_response or "")

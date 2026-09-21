@@ -21,6 +21,7 @@ class HeuristicResult:
     threshold: float = 0.6
     layer: str = "heuristic"
     benign_matched: list[str] = field(default_factory=list)
+    signal: str = "unknown"
 
 
 class HeuristicFilter:
@@ -42,6 +43,7 @@ class HeuristicFilter:
             })
         scoring = cfg.get("scoring", {})
         self.threshold = threshold if threshold is not None else float(scoring.get("heuristic_threshold", 0.6))
+        self.unknown_score = float(scoring.get("unknown_score", 0.5))
         self.max_matches = int(scoring.get("max_matches", 5))
         self._benign: list[dict] = []
         for rule in cfg.get("benign", []) or []:
@@ -71,14 +73,23 @@ class HeuristicFilter:
             if len(matches) >= self.max_matches:
                 break
 
-        score = max((m["severity_score"] for m in matches), default=0.0)
         benign = [b["name"] for b in self._benign if b["regex"].search(text)]
+        if matches:
+            score = max(m["severity_score"] for m in matches)
+            signal = "malicious"
+        elif benign:
+            score = 0.0
+            signal = "benign"
+        else:
+            score = self.unknown_score
+            signal = "unknown"
         return HeuristicResult(
-            blocked=score >= self.threshold,
+            blocked=signal == "malicious" and score >= self.threshold,
             score=score,
             matched_rules=matches,
             threshold=self.threshold,
             benign_matched=benign,
+            signal=signal,
         )
 
     def check(self, text: str) -> tuple[bool, float]:

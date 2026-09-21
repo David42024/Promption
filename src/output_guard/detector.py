@@ -13,7 +13,16 @@ def _entropy_ok(value: str) -> bool:
     return len(value) >= 12 and any(c.isdigit() for c in value) and any(c.isalpha() for c in value)
 
 
-_VALIDATORS = {"entropy": _entropy_ok}
+def _secret_entropy_ok(value: str) -> bool:
+    return (
+        len(value) >= 8
+        and any(c.isdigit() for c in value)
+        and any(c.isalpha() for c in value)
+        and ("-" in value or "_" in value or (value.lower() != value and value.upper() != value))
+    )
+
+
+_VALIDATORS = {"entropy": _entropy_ok, "secret_entropy": _secret_entropy_ok}
 
 def _norm(entry: tuple) -> tuple:
     name, cat, sev, pat, conf, whole = entry[:6]

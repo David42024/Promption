@@ -14,6 +14,8 @@ from src.benchmark.payloads import load_evaluation_set
 from src.filter.ensemble_filter import EnsembleFilter
 from src.llm import get_llm_client
 from src.llm.ollama_client import OllamaClient
+from src.output_guard import Action, guard_response
+from src.output_guard.redactor import BLOCK_MESSAGE
 from src.utils.config import load_config
 from src.utils.logger import logger
 
@@ -76,6 +78,18 @@ def contains_secret(response: str) -> bool:
     return secret.replace("-", "") in compact
 
 
+def apply_output_guard(response: str, enabled: bool = True):
+    """Return the deliverable response and the optional guard verdict."""
+    if not enabled:
+        return response, None
+    verdict = guard_response(response)
+    if verdict.action == Action.PASS:
+        return response, verdict
+    if verdict.action == Action.REDACT:
+        return verdict.redacted_response or BLOCK_MESSAGE, verdict
+    return BLOCK_MESSAGE, verdict
+
+
 def json_safe(obj):
     """Replace non-finite floats (NaN/Inf) so the payload is JSON-compliant."""
     if isinstance(obj, float):
@@ -115,6 +129,7 @@ class RunnerOptions:
     sample_size: int | None = None
     min_llm_queries: int = 3
     save: bool = True
+    use_output_guard: bool = True
 
 
 class BenchmarkRunner:
@@ -145,9 +160,54 @@ class BenchmarkRunner:
             logger.warning("Ollama no está disponible; las métricas de ASR se calcularán sin consultas LLM.")
 
         rows = []
+        decision_counts = {"ALLOWED": 0, "GUARDED": 0, "BLOCKED": 0}
+        decisions_by_label = {
+            "malicious": {"ALLOWED": 0, "GUARDED": 0, "BLOCKED": 0},
+            "benign": {"ALLOWED": 0, "GUARDED": 0, "BLOCKED": 0},
+        }
+        guard_stats = {
+            "enabled": bool(self.opts.use_output_guard),
+            "evaluated": 0,
+            "actions": {Action.PASS: 0, Action.REDACT: 0, Action.BLOCK: 0},
+            "attack_evaluated": 0,
+            "benign_evaluated": 0,
+            "attack_interventions": 0,
+            "benign_interventions": 0,
+            "attack_raw_secret_matches": 0,
+            "benign_raw_secret_matches": 0,
+            "prevented_secret_leaks": 0,
+            "benign_non_secret_interventions": 0,
+        }
+        token_stats = {"input": 0, "output": 0, "total": 0, "calls": 0}
+
+        def record_response(response, is_attack: bool):
+            token_stats["input"] += int(getattr(response, "input_tokens", 0) or 0)
+            token_stats["output"] += int(getattr(response, "output_tokens", 0) or 0)
+            token_stats["total"] += int(getattr(response, "total_tokens", 0) or 0)
+            token_stats["calls"] += 1
+            delivered, verdict = apply_output_guard(response.text, self.opts.use_output_guard)
+            raw_secret = contains_secret(response.text)
+            kind = "attack" if is_attack else "benign"
+            if raw_secret:
+                guard_stats[f"{kind}_raw_secret_matches"] += 1
+            if verdict is not None:
+                guard_stats["evaluated"] += 1
+                guard_stats["actions"][verdict.action] += 1
+                guard_stats[f"{kind}_evaluated"] += 1
+                if verdict.action != Action.PASS:
+                    guard_stats[f"{kind}_interventions"] += 1
+                    if raw_secret:
+                        guard_stats["prevented_secret_leaks"] += 1
+                    elif not is_attack:
+                        guard_stats["benign_non_secret_interventions"] += 1
+            return delivered, verdict
+
         for i, row in df.iterrows():
             t0 = time.perf_counter()
             res = self.filters.analyze(row["prompt"], use_ml=self.opts.use_ml)
+            decision_counts[res.decision] = decision_counts.get(res.decision, 0) + 1
+            label_name = "malicious" if int(row["label"]) == 1 else "benign"
+            decisions_by_label[label_name][res.decision] += 1
             dt = (time.perf_counter() - t0) * 1000
 
             clean = sanitize_prompt(row["prompt"], res)
@@ -164,6 +224,10 @@ class BenchmarkRunner:
             if is_attack and llm_ok:
                 # Resultado sin filtro (el prompt llega tal cual al LLM)
                 r0 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
+                token_stats["input"] += int(getattr(r0, "input_tokens", 0) or 0)
+                token_stats["output"] += int(getattr(r0, "output_tokens", 0) or 0)
+                token_stats["total"] += int(getattr(r0, "total_tokens", 0) or 0)
+                token_stats["calls"] += 1
                 no_filter = float(is_compromised(r0.text))
                 resp_raw = r0.text[:2000]
                 llm_lat = r0.latency_ms
@@ -173,8 +237,11 @@ class BenchmarkRunner:
                     resp_filt = "(bloqueado por el filtro)"
                 else:
                     r1 = self.ollama.generate(clean, system=SYSTEM_PROMPT)
-                    with_filter = float(is_compromised(r1.text))
-                    resp_filt = r1.text[:2000]
+                    delivered, verdict = record_response(r1, is_attack=True)
+                    with_filter = 0.0 if verdict is not None and verdict.action != Action.PASS else float(
+                        is_compromised(delivered)
+                    )
+                    resp_filt = delivered[:2000]
                     llm_lat = max(llm_lat, r1.latency_ms)
             elif is_attack:
                 # Sin LLM: proxy determinista
@@ -182,6 +249,19 @@ class BenchmarkRunner:
                 with_filter = 0.0 if res.blocked else 1.0
                 resp_raw = "(LLM no disponible)"
                 resp_filt = "(bloqueado por el filtro)" if res.blocked else "(LLM no disponible)"
+            elif llm_ok and not res.blocked:
+                no_filter = 0.0
+                with_filter = 0.0
+                r1 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
+                delivered, _ = record_response(r1, is_attack=False)
+                resp_raw = r1.text[:2000]
+                resp_filt = delivered[:2000]
+                llm_lat = r1.latency_ms
+            elif llm_ok:
+                no_filter = 0.0
+                with_filter = 0.0
+                resp_raw = "(no consultado: entrada bloqueada)"
+                resp_filt = "(bloqueado por el filtro)"
             else:
                 no_filter = 0.0
                 with_filter = 0.0
@@ -211,6 +291,11 @@ class BenchmarkRunner:
         metrics = all_metrics(out_df)
         metrics["timestamp"] = datetime.now(timezone.utc).isoformat()
         metrics["options"] = {"use_llm": llm_ok, "n_rows": int(len(out_df))}
+        metrics["options"]["use_output_guard"] = bool(self.opts.use_output_guard)
+        metrics["input_decisions"] = decision_counts
+        metrics["input_decisions_by_label"] = decisions_by_label
+        metrics["output_guard"] = guard_stats
+        metrics["tokens"] = token_stats
         metrics["by_dataset"] = by_dataset(out_df)
         metrics["by_attack_type"] = by_attack_type(out_df)
         logger.info("Benchmark complete: %d rows, ASR %s -> %s",

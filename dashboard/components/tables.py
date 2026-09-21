@@ -15,8 +15,8 @@ def style_result_table(df: pd.DataFrame) -> pd.DataFrame:
         "ensemble_score": "Score ensemble",
         "filter_blocked": "Bloqueado",
         "filter_latency_ms": "Latencia (s)",
-        "llm_success_with_filter": "Engañó al LLM (filtrado)",
-        "llm_success_no_filter": "Engañó al LLM (sin filtro)",
+        "llm_success_with_filter": "ASR amplio (protegido)",
+        "llm_success_no_filter": "ASR amplio (sin filtro)",
     })
     for col in ("Score heurística", "Prob. ML", "Score ensemble"):
         if col in out.columns:

@@ -20,9 +20,9 @@ from sklearn.metrics import (
 )
 
 from src.training.dataset import load_training_data
+from src.training.split import SYNTH_SOURCES, stratified_split
 from src.utils.config import load_config
 from src.utils.logger import logger
-from src.utils.visualizer import plot_confusion_matrix, plot_feature_importance
 
 _CONF = load_config()
 
@@ -55,25 +55,6 @@ def embed_dataset(df: pd.DataFrame, model_name: str, cache_path: Path | None = N
 # Filas de aumento sintético: pertenecen a familias creadas para enseñar y
 # NUNCA deben caer en test (una familia no se reparte entre train y test).
 # El benchmark externo (data/eval/redteam_100.csv) jamás entra a train.
-SYNTH_SOURCES = {"redteam_synth", "hard_negative", "translated_es", "translated_es2",
-                 "translated_gemini", "local", "synth_v2"}
-
-
-def stratified_split(df: pd.DataFrame, seed: int = 42, test_frac: float = 0.2) -> np.ndarray:
-    """Test indices with 80/20 per (label, lang) stratum (deterministic),
-    excluding synthetic-augmentation families (forced to train)."""
-    rng = np.random.RandomState(seed)
-    te_parts = []
-    pub = ~df["source"].astype(str).isin(SYNTH_SOURCES) if "source" in df.columns else pd.Series(True, index=df.index)
-    groups = df[pub].groupby(["label", "lang"]).indices
-    for _, idx in sorted(groups.items()):
-        idx = np.asarray(idx)
-        rng.shuffle(idx)
-        k = max(1, int(len(idx) * test_frac)) if len(idx) > 1 else 1
-        te_parts.append(idx[:k])
-    return np.concatenate(te_parts) if te_parts else np.array([], dtype=int)
-
-
 def slice_metrics(y_true: np.ndarray, y_pred: np.ndarray, y_prob: np.ndarray) -> dict:
     from sklearn.metrics import precision_recall_fscore_support
     p, r, f, _ = precision_recall_fscore_support(y_true, y_pred, average="binary", zero_division=0)
@@ -82,6 +63,8 @@ def slice_metrics(y_true: np.ndarray, y_pred: np.ndarray, y_prob: np.ndarray) ->
 
 
 def main(embed_model: str | None = None, out_path: str | None = None, cache: bool = True) -> dict:
+    from src.utils.visualizer import plot_confusion_matrix, plot_feature_importance
+
     df = load_training_data()
     y = df["label"].to_numpy(int)
     data_dir = Path(load_config()["paths"]["raw_data"]).parent

@@ -31,6 +31,7 @@ models/*.model
 !models/lightweight_classifier.pkl
 data/processed/*
 !data/processed/quarantine.csv
+!data/processed/label_overrides.csv
 data/embeddings*.npy
 data/pdf_payloads/
 data/audio_payloads/

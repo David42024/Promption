@@ -45,6 +45,7 @@ class FilterResponse(BaseModel):
     tenant_id: str = "default"
     classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
     requires_review: bool = True
+    requires_output_guard: bool = False
 
 
 class BenchmarkRequest(BaseModel):

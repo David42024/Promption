@@ -4,11 +4,11 @@ Evaluation set = all malicious prompts (labelled 1) + all benign prompts (labell
 The ``dataset`` column identifies the source collection: OWASP, BIANCA, Jailbreak,
 GitHub, Custom (attacks) or Benigno (legit).
 """
-from src.training.dataset import load_raw_data
+from src.training.dataset import apply_label_overrides, apply_quarantine, load_raw_data
 
 
 def load_evaluation_set(data_dir: str | None = None):
-    df = load_raw_data(data_dir)
+    df = apply_quarantine(apply_label_overrides(load_raw_data(data_dir)))
     df = df[["prompt", "label", "dataset", "attack_type", "source"]].reset_index(drop=True)
     return df
 

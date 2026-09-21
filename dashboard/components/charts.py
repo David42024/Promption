@@ -60,7 +60,7 @@ def plot_asr_comparison(overall: dict) -> go.Figure:
     without = overall.get("asr_without_filter", 0) * 100
     with_f = overall.get("asr_with_filter", 0) * 100
     fig = go.Figure(go.Bar(
-        x=["ASR sin filtro", "ASR con filtro"],
+        x=["ASR amplio sin filtro", "ASR amplio protegido"],
         y=[without, with_f],
         marker_color=[pal["red"], pal["green"]],
         text=[f"{without:.1f}%", f"{with_f:.1f}%"],
@@ -96,10 +96,10 @@ def plot_performance_by_dataset(rows: list[dict]) -> go.Figure:
         return go.Figure()
     names = [r["dataset"] for r in rows]
     fig = go.Figure()
-    fig.add_trace(go.Bar(name="ASR sin filtro", x=names,
+    fig.add_trace(go.Bar(name="ASR amplio sin filtro", x=names,
                          y=[r.get("asr_without_filter", 0) * 100 for r in rows],
                          marker_color=pal["red"]))
-    fig.add_trace(go.Bar(name="ASR con filtro", x=names,
+    fig.add_trace(go.Bar(name="ASR amplio protegido", x=names,
                          y=[r.get("asr_with_filter", 0) * 100 for r in rows],
                          marker_color=pal["green"]))
     fig.update_layout(barmode="group", legend=dict(orientation="h", y=-0.15))
@@ -118,8 +118,8 @@ def plot_performance_by_attack_type(df: pd.DataFrame) -> go.Figure:
     names = det_rate.index.tolist()
     fig = go.Figure()
     fig.add_trace(go.Bar(name="Tasa de bloqueo del filtro", x=names, y=det_rate.values, marker_color=pal["blue"]))
-    fig.add_trace(go.Bar(name="ASR sin filtro", x=names, y=asr0.values, marker_color=pal["red"]))
-    fig.add_trace(go.Bar(name="ASR con filtro", x=names, y=asr_ok.fillna(0).values, marker_color=pal["green"]))
+    fig.add_trace(go.Bar(name="ASR amplio sin filtro", x=names, y=asr0.values, marker_color=pal["red"]))
+    fig.add_trace(go.Bar(name="ASR amplio protegido", x=names, y=asr_ok.fillna(0).values, marker_color=pal["green"]))
     fig.update_layout(barmode="group", legend=dict(orientation="h", y=-0.25))
     fig.update_yaxes(title="%")
     return _base(fig, "Detección y ASR por tipo de ataque")

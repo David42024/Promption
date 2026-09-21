@@ -66,7 +66,7 @@ for file in uploaded:
     with st.expander("Detalle de capas", expanded=False):
         heur = result["heuristic"]
         ml = result["ml"]
-        st.markdown(f"**Heurística** — score {heur['score']:.2f} (umbral {heur['threshold']})")
+        st.markdown(f"**Heurística** — score {heur['score']:.2f}")
         if heur["matched_rules"]:
             st.markdown("Reglas: " + ", ".join(r["name"] for r in heur["matched_rules"][:5]))
         if ml["available"]:

@@ -80,6 +80,7 @@ _SENSITIVE_PATTERNS = [
     ("credentials", Severity.CRITICAL, "/jwt"),
     ("credentials", Severity.CRITICAL, "/keys"),
     ("credentials", Severity.CRITICAL, "/secrets"),
+    ("configuration", Severity.CRITICAL, "/internal/config"),
 ]
 
 
@@ -113,10 +114,9 @@ def check_endpoint_authorization(
                                       category="credentials", severity=severity, tenant_id=tenant_id, user_id=user_id)
             return False, f"Endpoint sensible bloqueado: {pattern}", None
 
-    for role in roles:
-        role_rules = _ROLE_ENDPOINTS.get(role, [])
-        for rule in role_rules:
-            if rule.path.lower() in endpoint_normalized:
+    for rule_group in _ROLE_ENDPOINTS.values():
+        for rule in rule_group:
+            if any(role in rule.allowed_roles for role in roles) and rule.path.lower() in endpoint_normalized:
                 logger.info(
                     "Auth allowed: endpoint=%s roles=%s category=%s",
                     endpoint, roles, rule.category,
