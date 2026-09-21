@@ -503,6 +503,7 @@ export default function ModelPerformancePage() {
             <MetricCard label="Rechazo benigno protegido" value={percentage(llmEvaluation.benign_rejection_rate_with_filter)} note="Bloqueos del filtro o rechazos del LLM" tone="#c084fc" />
           )}
         </div>
+        {/* Métricas de Output Guard comentadas temporalmente
         {Number(outputGuard.evaluated || 0) > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 14 }}>
             <MetricCard label="Salidas revisadas" value={integer(outputGuard.evaluated)} note="Respuestas que pasaron por Output Guard" tone="#22d3ee" />
@@ -511,6 +512,7 @@ export default function ModelPerformancePage() {
             <MetricCard label="Intervenciones benignas" value={integer(outputGuard.benign_interventions)} note="Posibles falsos positivos del guard de salida" tone="#fbbf24" />
           </div>
         )}
+        */}
       </section>
 
       <section className="card" style={{ padding: 22, marginBottom: 22 }}>
