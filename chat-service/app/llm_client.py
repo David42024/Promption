@@ -18,6 +18,7 @@ class LLMClient:
     """Client for LLM integration with provider fallback"""
     
     def __init__(self):
+        self.openai_api_key = settings.openai_api_key
         self.gemini_api_key = settings.gemini_api_key
         self.groq_api_key = settings.groq_api_key
         self.openrouter_api_key = settings.openrouter_api_key
@@ -33,6 +34,7 @@ class LLMClient:
     def _get_available_models(self) -> List[Dict[str, Any]]:
         """Get available models with API keys"""
         models_by_provider = {
+            "openai": self._get_openai_models(),
             "gemini": self._get_gemini_models(),
             "groq": self._get_groq_models(),
             "openrouter": self._get_openrouter_models(),
@@ -57,6 +59,23 @@ class LLMClient:
             models.extend(models_by_provider.get(provider, [])[1:])
 
         return models
+
+    def _get_openai_models(self) -> List[Dict[str, Any]]:
+        if not self.openai_api_key:
+            return []
+        return [
+            {
+                "id": "openai-primary",
+                "label": f"OpenAI · {settings.openai_model}",
+                "provider": "openai",
+                "api": "openai_compatible",
+                "model": settings.openai_model,
+                "api_key": self.openai_api_key,
+                "base_url": "https://api.openai.com/v1/chat/completions",
+                "temperature": 0.2,
+                "max_tokens": 600,
+            }
+        ]
 
     def _get_gemini_models(self) -> List[Dict[str, Any]]:
         if not self.gemini_api_key:
@@ -181,7 +200,7 @@ class LLMClient:
         """Generate a response using an ordered fallback within one time budget."""
         if not self.models:
             raise Exception(
-                "No LLM providers configured. Please set GEMINI_API_KEY, GROQ_API_KEY "
+                "No LLM providers configured. Please set OPENAI_API_KEY, GEMINI_API_KEY, GROQ_API_KEY "
                 "or OPENROUTER_API_KEY environment variables."
             )
 
@@ -221,13 +240,27 @@ class LLMClient:
                         if model_config["provider"] == "openrouter":
                             headers["HTTP-Referer"] = "https://promption.shop"
                             headers["X-Title"] = "Promption Shop Demo"
-                        payload = {
-                            "model": model_config["model"],
-                            "messages": messages,
-                            "temperature": resolved_temperature,
-                            "max_tokens": resolved_max_tokens,
-                            "stream": False,
-                        }
+
+                        is_gpt5 = (
+                            model_config["provider"] == "openai"
+                            and model_config["model"].lower().startswith("gpt-5")
+                        )
+                        if is_gpt5:
+                            payload = {
+                                "model": model_config["model"],
+                                "messages": messages,
+                                "max_completion_tokens": resolved_max_tokens,
+                                "reasoning_effort": "minimal",
+                                "stream": False,
+                            }
+                        else:
+                            payload = {
+                                "model": model_config["model"],
+                                "messages": messages,
+                                "temperature": resolved_temperature,
+                                "max_tokens": resolved_max_tokens,
+                                "stream": False,
+                            }
 
                     request_timeout = min(self.provider_timeout, remaining)
                     try:

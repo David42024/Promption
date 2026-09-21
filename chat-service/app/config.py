@@ -14,12 +14,14 @@ class Settings(BaseSettings):
     tenant_id: Optional[str] = None
     
     # LLM Configuration
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-5-nano"
     gemini_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
     openrouter_api_key: Optional[str] = None
-    default_model: str = "llama-3.1-70b-versatile"
+    default_model: str = "gpt-5-nano"
     gemini_model: str = "gemini-3.1-flash"
-    llm_provider_order: str = "gemini,groq,openrouter"
+    llm_provider_order: str = "openai,gemini,groq,openrouter"
     llm_provider_timeout_seconds: float = 8.0
     llm_total_timeout_seconds: float = 24.0
     llm_max_attempts: int = 1
