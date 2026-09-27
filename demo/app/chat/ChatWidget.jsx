@@ -1,8 +1,10 @@
 "use client";
 import { useChat } from "./ChatContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import PermissionsConfig from "./PermissionsConfig";
+import ChatActions from "./ChatActions";
+import { sendChat } from "./chatStream";
 
 const SendIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -79,9 +81,11 @@ function formatBotMessage(text) {
 }
 
 export default function ChatWidget() {
-  const { msgs, setMsgs, isOpen, setIsOpen } = useChat();
+  const { msgs, setMsgs, isOpen, setIsOpen, historyLoaded, newConversation } = useChat();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
+  const requestController = useRef(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [showConfig, setShowConfig] = useState(false);
 
@@ -103,21 +107,19 @@ export default function ChatWidget() {
     checkAuth();
   }, []);
 
-  async function send(e) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || busy) return;
+  async function send(e, override) {
+    e?.preventDefault();
+    const text = (override ?? input).trim();
+    if (!text || busy || requestController.current || !historyLoaded) return;
     setInput("");
     setMsgs((m) => [...m, { from: "user", text }]);
     setBusy(true);
+    setProgress("Revisando solicitud…");
+    const controller = new AbortController();
+    requestController.current = controller;
     try {
-      const r = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const data = await r.json();
-      if (!r.ok) {
+      const { ok, data } = await sendChat(text, setProgress, controller.signal);
+      if (!ok) {
         setMsgs((m) => [
           ...m,
           {
@@ -183,6 +185,7 @@ export default function ChatWidget() {
           ...m,
           {
             from: "bot",
+            actions: data.actions || [],
             text:
               formattedReply +
               filterIndicator +
@@ -193,11 +196,21 @@ export default function ChatWidget() {
           },
         ]);
       }
-    } catch {
-      setMsgs((m) => [...m, { from: "blocked", text: "⚠️ Error de red. Comprueba tu conexión e inténtalo de nuevo." }]);
+    } catch (error) {
+      setMsgs((m) => [...m, { from: "blocked", text: error?.name === "AbortError"
+        ? "Ejecución detenida." : "⚠️ Error de red. Comprueba tu conexión e inténtalo de nuevo." }]);
     } finally {
+      requestController.current = null;
       setBusy(false);
+      setProgress("");
     }
+  }
+
+  async function stop() {
+    if (!requestController.current) return;
+    setProgress("Deteniendo ejecución…");
+    await fetch("/api/chat", { method: "PATCH" }).catch(() => {});
+    requestController.current?.abort();
   }
 
   if (!isOpen) {
@@ -280,6 +293,7 @@ export default function ChatWidget() {
           </div>
         </div>
         <div className="chat-actions">
+          <button className="icon-btn" onClick={() => newConversation().catch(() => {})} disabled={busy || !historyLoaded} title="Nueva conversación" aria-label="Nueva conversación">＋</button>
           <button
             className="icon-btn"
             onClick={() => setShowConfig(true)}
@@ -382,6 +396,8 @@ export default function ChatWidget() {
               }`}
             >
               {m.text}
+              {m.actions?.length > 0 && <ChatActions actions={m.actions}
+                onAnswer={(question, value) => send(null, `Respuesta a la pregunta "${question}": ${value}`)} />}
             </div>
             {m.from === "user" && (
               <div className="avatar sm" style={{ width: 26, height: 26, fontSize: 12 }}>
@@ -395,7 +411,8 @@ export default function ChatWidget() {
             <div className="avatar sm" style={{ width: 26, height: 26, fontSize: 12 }}>
               🤖
             </div>
-            <div className="msg bot typing-indicator">
+            <div className="msg bot typing-indicator" role="status" aria-live="polite">
+              <span className="chat-progress-label">{progress || "Generando respuesta…"}</span>
               <span></span>
               <span></span>
               <span></span>
@@ -418,14 +435,17 @@ export default function ChatWidget() {
         <input
           className="input"
           value={input}
+          disabled={busy || !historyLoaded}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Escribe tu mensaje…"
           style={{ margin: 0, flex: 1, padding: "10px 14px" }}
         />
+        {busy && <button type="button" className="btn" onClick={stop}
+          aria-label="Detener ejecución">Detener</button>}
         <button
           className="btn send-btn"
           type="submit"
-          disabled={busy || !input.trim()}
+          disabled={busy || !historyLoaded || !input.trim()}
           title="Enviar"
           style={{ width: 44, height: 44, padding: 0, borderRadius: "var(--radius-md)" }}
         >

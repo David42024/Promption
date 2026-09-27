@@ -1,0 +1,105 @@
+import { timingSafeEqual } from "node:crypto";
+import { createOpenAI } from "@ai-sdk/openai";
+import { generateText, jsonSchema, tool, wrapLanguageModel } from "ai";
+import { promptionMiddleware } from "../../../../lib/ai/promptionMiddleware.js";
+
+export const maxDuration = 300;
+export const runtime = "nodejs";
+
+function trusted(request) {
+  const expected = process.env.CHAT_SERVICE_TOKEN;
+  const received = request.headers.get("x-chat-service-token") || "";
+  if (!expected || expected.length !== received.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(received));
+}
+
+function transcript(messages) {
+  const names = new Map();
+  return messages.map(message => {
+    if (message.role === "user") {
+      return { role: "user", content: String(message.content || "") };
+    }
+    if (message.role === "assistant") {
+      const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+      const parts = [];
+      if (message.content) parts.push({ type: "text", text: String(message.content) });
+      for (const call of calls) {
+        const toolName = call.function?.name;
+        const toolCallId = call.id;
+        names.set(toolCallId, toolName);
+        parts.push({ type: "tool-call", toolCallId, toolName,
+          input: JSON.parse(call.function?.arguments || "{}") });
+      }
+      return { role: "assistant", content: parts.length ? parts : "" };
+    }
+    if (message.role === "tool") {
+      const toolCallId = message.tool_call_id;
+      const toolName = names.get(toolCallId);
+      if (!toolName) throw new Error("Resultado de herramienta sin llamada asociada");
+      let value;
+      try { value = JSON.parse(message.content || "{}"); }
+      catch { value = { text: String(message.content || "") }; }
+      return { role: "tool", content: [{ type: "tool-result", toolCallId, toolName,
+        output: { type: "json", value } }] };
+    }
+    throw new Error("Rol de mensaje no admitido");
+  });
+}
+
+export async function POST(request) {
+  if (!trusted(request)) return Response.json({ error: "No autorizado" }, { status: 401 });
+  if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL || !process.env.OPENAI_TOOL_MODEL) {
+    return Response.json({ error: "Configuración de OpenAI incompleta en Next.js" }, { status: 503 });
+  }
+  let body;
+  try { body = await request.json(); }
+  catch { return Response.json({ error: "JSON inválido" }, { status: 400 }); }
+  if (![process.env.OPENAI_MODEL, process.env.OPENAI_TOOL_MODEL].includes(body.model)
+      || !Array.isArray(body.messages) || body.messages.length > 40
+      || typeof body.original_text !== "string" || !body.original_text.trim()
+      || typeof body.user_id !== "string" || !Array.isArray(body.roles)
+      || body.roles.some(role => !["guest", "customer", "ventas", "admin"].includes(role))
+      || !Array.isArray(body.tools) || body.tools.length > 25) {
+    return Response.json({ error: "Solicitud de modelo inválida" }, { status: 400 });
+  }
+  try {
+    const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const identity = { userId: body.user_id, roles: body.roles };
+    const model = wrapLanguageModel({
+      model: provider(body.model),
+      middleware: promptionMiddleware(identity, body.original_text, request.signal),
+    });
+    const tools = Object.fromEntries(body.tools.map(spec => [
+      spec.function.name,
+      tool({ description: spec.function.description,
+        inputSchema: jsonSchema(spec.function.parameters) }),
+    ]));
+    const system = body.messages
+      .filter(message => message.role === "system")
+      .map(message => String(message.content || ""))
+      .join("\n\n");
+    const result = await generateText({
+      model,
+      system,
+      messages: transcript(body.messages.filter(message => message.role !== "system")),
+      allowSystemInMessages: false,
+      providerOptions: { openai: { parallelToolCalls: false, maxToolCalls: 1 } },
+      tools,
+      toolChoice: body.force_tool ? { type: "tool", toolName: body.force_tool } : "auto",
+      maxOutputTokens: Math.min(Math.max(Number(body.max_tokens) || 1200, 100), 6000),
+      abortSignal: request.signal,
+    });
+    return Response.json({
+      text: result.text,
+      calls: result.toolCalls.map(call => ({
+        id: call.toolCallId,
+        name: call.toolName,
+        arguments: JSON.stringify(call.input),
+      })),
+      model: body.model,
+    });
+  } catch (error) {
+    const status = error.status === 403 ? 403 : 503;
+    return Response.json({ error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta" }, { status });
+  }
+}

@@ -20,6 +20,8 @@ class FilterClient:
 
     @property
     def headers(self) -> Dict[str, str]:
+        if not self.base_url:
+            raise RuntimeError("FILTER_API_URL is not configured")
         if not self.api_key:
             raise RuntimeError("PROMPTION_API_KEY is not configured")
         return {

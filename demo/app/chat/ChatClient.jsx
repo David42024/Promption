@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useChat } from "./ChatContext";
 import PermissionsConfig from "./PermissionsConfig";
+import ChatActions from "./ChatActions";
+import { sendChat } from "./chatStream";
 
 // Función para formatear mensajes del bot de manera más bonita y estructurada
 function formatBotMessage(text) {
@@ -146,9 +148,11 @@ function pickDocStyle(id, title = "", tier = "publico") {
 }
 
 export default function ChatClient({ user }) {
-  const { msgs, setMsgs } = useChat();
+  const { msgs, setMsgs, historyLoaded, newConversation } = useChat();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
+  const requestController = useRef(null);
   const [docs, setDocs] = useState([]);
   const [docView, setDocView] = useState(null);
   const [filterStatus, setFilterStatus] = useState({ filterEnabled: true, outputGuardEnabled: true });
@@ -174,7 +178,7 @@ export default function ChatClient({ user }) {
   }, []);
 
   useEffect(() => {
-    if (msgs.length === 0) {
+    if (historyLoaded && msgs.length === 0) {
       setMsgs([
         {
           from: "bot",
@@ -182,6 +186,9 @@ export default function ChatClient({ user }) {
         },
       ]);
     }
+  }, [historyLoaded]);
+
+  useEffect(() => {
     fetch("/api/docs")
       .then(r => r.json())
       .then(d => setDocs(d.docs || []))
@@ -204,20 +211,18 @@ export default function ChatClient({ user }) {
     );
   }
 
-  async function send(e) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || busy) return;
+  async function send(e, override) {
+    e?.preventDefault();
+    const text = (override ?? input).trim();
+    if (!text || busy || requestController.current || !historyLoaded) return;
     setInput("");
     setMsgs(m => [...m, { from: "user", text }]);
     setBusy(true);
+    setProgress("Revisando solicitud…");
+    const controller = new AbortController();
+    requestController.current = controller;
     try {
-      const r = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const data = await r.json();
+      const { ok, data } = await sendChat(text, setProgress, controller.signal);
 
       // Refrescamos estado del filtro en cada respuesta
       if (typeof data.filterEnabled === "boolean") {
@@ -227,7 +232,7 @@ export default function ChatClient({ user }) {
         }));
       }
 
-      if (!r.ok) {
+      if (!ok) {
         setMsgs(m => [
           ...m,
           {
@@ -284,6 +289,7 @@ export default function ChatClient({ user }) {
           ...m,
           {
             from: "bot",
+            actions: data.actions || [],
             text:
               formattedReply +
               (data.leaked ? "\n\n⚠️ (el modelo filtró el secreto pero la comprobación local lo detectó)" : "") +
@@ -293,11 +299,21 @@ export default function ChatClient({ user }) {
           },
         ]);
       }
-    } catch {
-      setMsgs(m => [...m, { from: "blocked", text: "⚠️ Error de red. Comprueba tu conexion e intentalo de nuevo." }]);
+    } catch (error) {
+      setMsgs(m => [...m, { from: "blocked", text: error?.name === "AbortError"
+        ? "Ejecución detenida." : "⚠️ Error de red. Comprueba tu conexión e inténtalo de nuevo." }]);
     } finally {
+      requestController.current = null;
       setBusy(false);
+      setProgress("");
     }
+  }
+
+  async function stop() {
+    if (!requestController.current) return;
+    setProgress("Deteniendo ejecución…");
+    await fetch("/api/chat", { method: "PATCH" }).catch(() => {});
+    requestController.current?.abort();
   }
 
   async function logout() {
@@ -650,6 +666,8 @@ export default function ChatClient({ user }) {
                 : "bot"
             }`}>
               {m.text}
+              {m.actions?.length > 0 && <ChatActions actions={m.actions}
+                onAnswer={(question, value) => send(null, `Respuesta a la pregunta "${question}": ${value}`)} />}
             </div>
             {m.from === "user" && (
               <div className="avatar sm" style={{
@@ -665,7 +683,8 @@ export default function ChatClient({ user }) {
         {busy && (
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
             <div className="avatar sm">🤖</div>
-            <div className="msg bot typing-indicator">
+            <div className="msg bot typing-indicator" role="status" aria-live="polite">
+              <span className="chat-progress-label">{progress || "Generando respuesta…"}</span>
               <span></span>
               <span></span>
               <span></span>
@@ -675,10 +694,12 @@ export default function ChatClient({ user }) {
       </div>
 
       <div className="chat-input-wrapper">
+        <button type="button" onClick={() => newConversation().catch(() => {})} disabled={busy || !historyLoaded} className="btn" style={{ marginBottom: 10, fontSize: "0.8rem" }}>Nueva conversación</button>
         <form className="chat-input-row" onSubmit={send}>
           <input
             className="input"
             value={input}
+            disabled={busy || !historyLoaded}
             onChange={e => setInput(e.target.value)}
             placeholder={
               filterStatus.filterEnabled
@@ -687,10 +708,12 @@ export default function ChatClient({ user }) {
             }
             style={{ margin: 0 }}
           />
+          {busy && <button type="button" className="btn" onClick={stop}
+            aria-label="Detener ejecución">Detener</button>}
           <button
             className="btn send-btn"
             type="submit"
-            disabled={busy || !input.trim()}
+            disabled={busy || !historyLoaded || !input.trim()}
             title="Enviar"
             style={!filterStatus.filterEnabled ? {
               background: "linear-gradient(135deg, var(--warning-500), var(--danger-500))",

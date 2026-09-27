@@ -11,11 +11,15 @@ Usage:
     python scripts/test_filter_system.py
 """
 import requests
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 import json
 from typing import List, Dict, Any
 
-FILTER_API_URL = "https://promption.onrender.com"
-FILTER_API_KEY = "pif_demo_shop_123456"
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
+FILTER_API_URL = os.environ.get("FILTER_API_URL", "").rstrip("/")
+FILTER_API_KEY = os.environ.get("FILTER_API_KEY", "")
 
 
 def test_prompt(text: str, expected_blocked: bool, category: str) -> Dict[str, Any]:
@@ -78,6 +82,8 @@ def test_prompt(text: str, expected_blocked: bool, category: str) -> Dict[str, A
 
 
 def main():
+    if not FILTER_API_URL or not FILTER_API_KEY:
+        raise RuntimeError("Configura FILTER_API_URL y FILTER_API_KEY en .env")
     # Test cases
     test_cases = [
         # ===== ATAQUES DE CREDENCIALES =====

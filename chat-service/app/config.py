@@ -1,5 +1,4 @@
 """Configuration management for Chat Service"""
-import os
 from typing import Optional, List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,22 +7,23 @@ class Settings(BaseSettings):
     """Application settings"""
     
     # Filter API Configuration
-    filter_api_url: str = "https://promption.onrender.com"
+    filter_api_url: str = ""
     promption_api_key: Optional[str] = None
     filter_api_key: Optional[str] = None
     tenant_id: Optional[str] = None
     
     # LLM Configuration
-    openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-5-nano"
+    openai_model: str = ""
+    openai_tool_model: str = ""
+    vercel_ai_url: str = ""
     gemini_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
     openrouter_api_key: Optional[str] = None
-    default_model: str = "gpt-5-nano"
+    openrouter_site_url: str = ""
     gemini_model: str = "gemini-3.1-flash"
-    llm_provider_order: str = "openai,gemini,groq,openrouter"
-    llm_provider_timeout_seconds: float = 8.0
-    llm_total_timeout_seconds: float = 24.0
+    llm_provider_order: str = "openai"
+    llm_provider_timeout_seconds: float = 90.0
+    llm_total_timeout_seconds: float = 120.0
     llm_max_attempts: int = 1
     llm_retry_backoff_seconds: float = 0.35
     
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     security_state_path: str = "data/security-state.json"
     
     # CORS Configuration (como string separado por comas)
-    cors_origins_str: str = "http://localhost:3000,https://promptionsi.vercel.app,https://promption.shop"
+    cors_origins_str: str = ""
     
     @property
     def cors_origins(self) -> List[str]:

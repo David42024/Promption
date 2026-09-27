@@ -1,5 +1,6 @@
 """Role-aware policy and authorized retrieval tests for the chat service."""
 from pathlib import Path
+import asyncio
 import sys
 
 
@@ -86,8 +87,8 @@ def test_vip_customer_private_records_remain_confidential():
 
 def test_authorized_retrieval_returns_voltagear_only_after_acl():
     executor = MCPToolExecutor()
-    denied = executor.execute("getMarketingCampaigns", {}, ["customer"])
-    allowed = executor.execute("getMarketingCampaigns", {}, ["ventas"])
+    denied = asyncio.run(executor.execute("getMarketingCampaigns", {}, ["customer"]))
+    allowed = asyncio.run(executor.execute("getMarketingCampaigns", {}, ["ventas"]))
     assert denied["audit"]["allowed"] is False
     assert allowed["audit"]["allowed"] is True
     campaigns = allowed["result"]["campanas"]

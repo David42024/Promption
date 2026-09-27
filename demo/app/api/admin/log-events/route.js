@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { isAdmin } from "../../../../lib/shop.js";
 import { readSessionToken } from "../../../../lib/session.js";
 
-const FILTER_API_URL = (process.env.PIF_API_URL || process.env.NEXT_PUBLIC_PIF_API_URL || "https://promption.onrender.com").replace(/\/$/, "");
+const FILTER_API_URL = (process.env.PIF_API_URL || process.env.NEXT_PUBLIC_PIF_API_URL || "").replace(/\/$/, "");
 const ADMIN_API_KEY = process.env.PROMPTION_ADMIN_API_KEY || process.env.PIF_ADMIN_API_KEY || "";
 
 function session() {

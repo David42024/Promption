@@ -1,104 +1,59 @@
-# Configuración de Variables de Entorno para Producción
+# Configuración de los tres servicios
 
-## 🌐 URLs de Producción
-- **Backend (Render)**: https://promption.onrender.com/
-- **Frontend (Vercel)**: https://promptionsi.vercel.app/
+Las URLs y los modelos son variables de entorno. Copia el ejemplo de cada
+servicio y ajusta las direcciones según el entorno. No publiques las claves.
 
-## 🔧 Configuración en Render (Backend)
+## Filter API (raíz del repositorio)
 
-Las siguientes variables deben configurarse en el dashboard de Render:
+Usa [`.env.example`](../.env.example) como plantilla de `.env`:
 
-### Variables de Entorno para Render
-```
-PIF_API_URL=https://promption.onrender.com
-PROMPTION_API_KEYS=tenant123.unitru:pk-123-tenant123.unitru
+```dotenv
+PROMPTION_API_KEYS=mi-tenant:pk-clave-aleatoria
 PROMPTION_ADMIN_API_KEYS=promption-platform:pk-admin-clave-aleatoria
-GROQ_API_KEY=gsk_TU_GROQ_KEY_REAL
-OPENROUTER_API_KEY=sk-or-TU_OPENROUTER_KEY_REAL
-GEMINI_API_KEY=TU_GEMINI_KEY_REAL
-GEMINI_MODEL=gemini-3.1-flash
-LLM_PROVIDER_ORDER=gemini,groq,openrouter
-CHAT_SERVICE_TOKEN=GENERA_UN_SECRETO_COMPARTIDO_LARGO
+PROMPTION_CORS_ORIGINS=https://tu-demo.vercel.app
+FILTER_API_URL=https://tu-filter-api.com
+FILTER_API_KEY=pk-clave-del-tenant
 ```
 
-### Pasos para configurar en Render:
-1. Ve a tu dashboard de Render
-2. Selecciona tu servicio web
-3. Navega a "Environment" 
-4. Añade cada variable de entorno con su valor correspondiente
-5. Haz "Deploy" para aplicar los cambios
+`FILTER_API_URL` y `FILTER_API_KEY` también permiten ejecutar
+`scripts/test_filter_system.py`. El proceso de la API carga `.env` de la raíz.
 
-## 🚀 Configuración en Vercel (Frontend)
+## Chat Service
 
-Las siguientes variables deben configurarse en el dashboard de Vercel:
+Usa [`chat-service/.env.example`](../chat-service/.env.example) como plantilla
+de `chat-service/.env`. Para un despliegue, configura al menos:
 
-### Variables de Entorno para Vercel
+```dotenv
+FILTER_API_URL=https://tu-filter-api.com
+PROMPTION_API_KEY=pk-clave-del-tenant
+TENANT_ID=mi-tenant
+VERCEL_AI_URL=https://tu-demo.vercel.app/api/ai/turn
+OPENAI_MODEL=gpt-5.4-nano
+OPENAI_TOOL_MODEL=gpt-5.4-mini
+CHAT_SERVICE_TOKEN=secreto-compartido-largo
+CORS_ORIGINS_STR=https://tu-demo.vercel.app
 ```
-NEXT_PUBLIC_CHAT_API_URL=https://chat-service-l31i.onrender.com
-PIF_API_URL=https://promption.onrender.com
+
+## Next.js en Vercel
+
+Usa [`.env.example`](./.env.example) como plantilla de las variables de Vercel:
+
+```dotenv
+CHAT_API_URL=https://tu-chat-service.com
+PIF_API_URL=https://tu-filter-api.com
+SITE_URL=https://tu-demo.vercel.app
+OPENAI_API_KEY=sk-tu-clave-openai
+OPENAI_MODEL=gpt-5.4-nano
+OPENAI_TOOL_MODEL=gpt-5.4-mini
+CHAT_SERVICE_TOKEN=el-mismo-secreto-de-chat-service
+SESSION_SECRET=otro-secreto-largo-e-independiente
 PROMPTION_ADMIN_API_KEY=pk-admin-clave-aleatoria
-CHAT_SERVICE_TOKEN=EL_MISMO_VALOR_CONFIGURADO_EN_RENDER
-SESSION_SECRET=GENERA_OTRO_SECRETO_LARGO_E_INDEPENDIENTE
 ```
 
-### Pasos para configurar en Vercel:
-1. Ve a tu dashboard de Vercel
-2. Selecciona tu proyecto
-3. Navega a "Settings" → "Environment Variables"
-4. Añade cada variable de entorno con su valor correspondiente
-5. Haz "Redeploy" para aplicar los cambios
+Las llamadas a OpenAI salen de Next.js mediante Vercel AI SDK. Chat Service
+mantiene la política y ejecuta las herramientas MCP. `CHAT_SERVICE_TOKEN` debe
+coincidir en ambos servidores y los dos nombres de modelo también.
 
-## ⚠️ IMPORTANTE: Seguridad
-
-1. **CAMBIA los valores por defecto**:
-   - `PROMPTION_ADMIN_API_KEY` debe ser un string aleatorio largo
-   - cada key en `PROMPTION_API_KEYS` debe ser única por tenant
-
-2. **Nunca commits secrets reales** en el repositorio
-
-3. **Usa valores diferentes** para desarrollo y producción
-
-4. **El frontend público solo necesita** `NEXT_PUBLIC_CHAT_API_URL`. Los secretos
-   `PROMPTION_ADMIN_API_KEY` y `CHAT_SERVICE_TOKEN` viven server-side en Vercel.
-
-5. **El backend necesita todas las variables** including API keys
-
-## 🧪 Desarrollo Local
-
-Para desarrollo local, crea un archivo `.env.local`:
-
-```bash
-# Backend (para el servidor FastAPI si lo ejecutas localmente)
-PIF_API_URL=http://localhost:8000
-PROMPTION_API_KEYS=tenant123.unitru:pk-123-tenant123.unitru
-PROMPTION_ADMIN_API_KEYS=promption-platform:pk-admin-local-dev
-GROQ_API_KEY=gsk_tu_key_local
-OPENROUTER_API_KEY=sk-or-tu_key_local
-GEMINI_API_KEY=tu_gemini_key_local
-GEMINI_MODEL=gemini-3.1-flash
-LLM_PROVIDER_ORDER=gemini,groq,openrouter
-
-# Frontend (Next.js)
-NEXT_PUBLIC_CHAT_API_URL=http://localhost:8001
-PIF_API_URL=http://localhost:8000
-PROMPTION_ADMIN_API_KEY=pk-admin-local-dev
-CHAT_SERVICE_TOKEN=secreto-local
-SESSION_SECRET=otro-secreto-local
-```
-
-## 🔍 Verificación
-
-Después del despliegue, verifica:
-
-1. **Backend**: 
-   - `curl https://promption.onrender.com/api/v1/health`
-   - Debe retornar estado saludable
-
-2. **Frontend**:
-   - Visita https://promptionsi.vercel.app/
-   - El chat debe funcionar
-   - El panel admin debe cargar logs
-
-3. **Comunicación**:
-   - El frontend debe poder conectar con el backend
-   - Las API keys deben funcionar
+Para desarrollo local, usa las mismas variables con URLs
+`http://127.0.0.1:8000`, `http://127.0.0.1:8001` y
+`http://127.0.0.1:3000/api/ai/turn`, respectivamente.

@@ -1,6 +1,10 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
 httpx==0.25.2
-pydantic==2.5.0
+pydantic==2.13.5
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
+reportlab>=4.0.0,<6  # PDF adjuntos generados por tool calls del chat
+mcp==2.2.0  # SDK oficial para registrar, validar y ejecutar herramientas MCP
+python-docx==1.2.0  # DOCX generados por la herramienta MCP del servidor
+openpyxl==3.1.5  # XLSX generados por la herramienta MCP del servidor

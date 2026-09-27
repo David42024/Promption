@@ -1,6 +1,7 @@
 import { findUser, publicUser } from "../../../lib/shop.js";
 import { createSessionToken } from "../../../lib/session.js";
 import { cookies } from "next/headers";
+import { randomUUID } from "node:crypto";
 
 export async function POST(req) {
   const { email, password } = await req.json().catch(() => ({}));
@@ -15,10 +16,15 @@ export async function POST(req) {
     path: "/",
     maxAge: 60 * 60 * 8,
   });
+  cookies().set("chat_session", randomUUID(), {
+    httpOnly: true, secure: process.env.NODE_ENV === "production",
+    sameSite: "lax", path: "/", maxAge: 60 * 60 * 8,
+  });
   return Response.json({ user: publicUser(user) });
 }
 
 export async function DELETE() {
   cookies().delete("demo_user");
+  cookies().delete("chat_session");
   return Response.json({ ok: true });
 }

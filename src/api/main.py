@@ -7,9 +7,13 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+from src.utils.config import ROOT_DIR, load_config
+
+load_dotenv(ROOT_DIR / ".env", override=False)
 
 from src.api.routes import router
-from src.utils.config import load_config
 from src.utils.logger import logger
 
 _CONF = load_config()
@@ -21,13 +25,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
-_cors_default = (
-    "http://localhost:3000,http://localhost:8501,"
-    "https://promptionsi.vercel.app,https://promption.shop"
-)
 _cors_origins = [
     origin.strip()
-    for origin in os.environ.get("PROMPTION_CORS_ORIGINS", _cors_default).split(",")
+    for origin in os.environ.get("PROMPTION_CORS_ORIGINS", "").split(",")
     if origin.strip()
 ]
 app.add_middleware(

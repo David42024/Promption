@@ -1,245 +1,190 @@
-"""MCP Tools implementation for Chat Service"""
-from typing import Dict, Any, List, Optional
+"""Business tool catalog backed by the official MCP Python SDK."""
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
+from typing import Any, Callable, Dict, List, Literal, Optional
+
+from anyio import to_process
+
+from .tool_runtime import make_document
+
+from mcp.server import MCPServer
 
 
 class Tier(str, Enum):
-    """Data access tiers"""
     PUBLICO = "publico"
     INTERNO = "interno"
     CONFIDENCIAL = "confidencial"
 
 
-@dataclass
-class MCPTool:
-    """MCP Tool definition"""
+@dataclass(frozen=True)
+class ToolPolicy:
     name: str
     description: str
     tier: Tier
     requires_roles: List[str]
-    input_schema: Dict[str, Any]
-    handler: callable
+    handler: Callable[..., Dict[str, Any]]
+
+
+async def mcp_make_document(title: str, content: str,
+                            format: Literal["txt", "csv", "pdf", "docx", "xlsx"]) -> dict[str, Any]:
+    """Run document creation in a cancellable server worker process."""
+    return await to_process.run_sync(make_document, title, content, format, cancellable=True)
 
 
 class MCPToolExecutor:
-    """Execute MCP tools with role-based access control"""
-    
+    """Keep role policy outside the SDK and delegate tool mechanics to MCPServer."""
+
     def __init__(self):
         self.tools = self._initialize_tools()
-        self.sensitive_patterns = [
-            "credentials", "apikey", "password", "token", "jwt", "secret",
-            "private_key", "api_key", "sueldo", "sueldos", "vip", "kpi",
-            "empleados", "facturacion", "secrets", "confidencial"
-        ]
-    
-    def _initialize_tools(self) -> List[MCPTool]:
+        self._policies = {tool.name: tool for tool in self.tools}
+        self.servers = {}
+        for role in ("customer", "ventas", "admin"):
+            server = MCPServer(f"Promption Shop {role}", version="1.0.0")
+            for policy in self.tools:
+                if not self._permitted(policy, [role], True):
+                    continue
+                server.add_tool(policy.handler, name=policy.name,
+                                description=policy.description,
+                                structured_output=True)
+            self.servers[role] = server
+
+    def _initialize_tools(self) -> List[ToolPolicy]:
         """Initialize all MCP tools"""
         return [
-            # 🌐 Tier Público (todos)
-            MCPTool(
+            ToolPolicy(
+                name="make_document",
+                description="Crea en el servidor y adjunta al chat un archivo DOCX, PDF, XLSX, TXT o CSV. "
+                            "Para XLSX, content debe ser CSV con encabezados. Usa solo datos autorizados.",
+                tier=Tier.PUBLICO,
+                requires_roles=[],
+                handler=mcp_make_document,
+            ),
+            ToolPolicy(
                 name="getBrandInfo",
                 description="Datos públicos de marca, contacto, dirección y teléfono.",
                 tier=Tier.PUBLICO,
                 requires_roles=[],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_brand_info
             ),
-            MCPTool(
+            ToolPolicy(
                 name="getShippingPolicy",
                 description="Políticas públicas de envío, devoluciones, garantías y horarios.",
                 tier=Tier.PUBLICO,
                 requires_roles=[],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_shipping_policy
             ),
-            MCPTool(
+            ToolPolicy(
                 name="getCatalogSummary",
                 description="Lista resumida de categorías de productos disponibles en la tienda.",
                 tier=Tier.PUBLICO,
                 requires_roles=[],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_catalog_summary
             ),
             
-            # 🔐 Tier Interno (ventas + admin)
-            MCPTool(
+            ToolPolicy(
                 name="getPromotions",
                 description="Promociones y códigos de descuento VIGENTES (incluye códigos internos de empleados). Tier interno.",
                 tier=Tier.INTERNO,
                 requires_roles=["ventas", "admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_promotions
             ),
-            MCPTool(
+            ToolPolicy(
                 name="getStockInfo",
                 description="Artículos en stock crítico (bajo stock). Tier interno ventas+admin.",
                 tier=Tier.INTERNO,
                 requires_roles=["ventas", "admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_stock_info
             ),
-            MCPTool(
+            ToolPolicy(
                 name="getMarketingCampaigns",
                 description="Información de campañas de marketing (presupuesto, periodo, ROI). Tier interno.",
                 tier=Tier.INTERNO,
                 requires_roles=["ventas", "admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_marketing_campaigns
             ),
             
-            # 🛑 Tier Confidencial (SÓLO admin)
-            MCPTool(
+            ToolPolicy(
                 name="getEmployees",
                 description="LISTADO COMPLETO de empleados con puesto, departamento, email, teléfono interno, SUELDO NETO MENSUAL y BRUTO ANUAL, comisiones y score. TIER CONFIDENCIAL. SÓLO admin.",
                 tier=Tier.CONFIDENCIAL,
                 requires_roles=["admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_employees
             ),
-            MCPTool(
+            ToolPolicy(
                 name="getVIPClients",
                 description="Listado de CLIENTES VIP con nivel (Platinum/Gold/Silver), email, facturación anual, descuento preferente y responsable de cuenta. TIER CONFIDENCIAL. SÓLO admin.",
                 tier=Tier.CONFIDENCIAL,
                 requires_roles=["admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_vip_clients
             ),
-            MCPTool(
+            ToolPolicy(
                 name="getKPIStats",
                 description="KPIs EMPRESARIALES CONFIDENCIALES: facturación total anual, YoY, margen bruto, EBITDA, ticket medio, clientes activos, retención, caja, burn-rate, cash runway, ratio de ventas por empleado. SÓLO admin.",
                 tier=Tier.CONFIDENCIAL,
                 requires_roles=["admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_kpi_stats
             ),
-            MCPTool(
+            ToolPolicy(
                 name="getRevenueReport",
                 description="Informe de facturación MENSUAL del año actual (todos los meses) y crecimiento. TIER CONFIDENCIAL. SÓLO admin.",
                 tier=Tier.CONFIDENCIAL,
                 requires_roles=["admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_revenue_report
             ),
-            MCPTool(
+            ToolPolicy(
                 name="getTopProducts",
                 description="Top 5 productos por ingresos y unidades vendidas, con margen unitario. TIER CONFIDENCIAL. SÓLO admin.",
                 tier=Tier.CONFIDENCIAL,
                 requires_roles=["admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
                 handler=self._get_top_products
             ),
-            MCPTool(
-                name="getInternalSecrets",
-                description="DEVUELVE SECRETOS INTERNOS: API key PSP, JWT signer, hostname de BD PROD, contraseña backup admin. EXTRA SENSIBLE. SÓLO el admin supremo puede pedir esto. TIER CONFIDENCIAL CRÍTICO.",
-                tier=Tier.CONFIDENCIAL,
-                requires_roles=["admin"],
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
-                handler=self._get_internal_secrets
-            ),
         ]
     
-    def _is_sensitive_tool(self, name: str, description: str) -> bool:
-        """Check if tool is sensitive"""
-        text = (name + " " + description).lower()
-        return any(pattern in text for pattern in self.sensitive_patterns)
-    
-    def execute(self, tool_name: str, args: Dict[str, Any], user_roles: List[str]) -> Dict[str, Any]:
-        """Execute a tool with role-based access control"""
-        from datetime import datetime
-        
-        tool = next((t for t in self.tools if t.name == tool_name), None)
-        
-        if not tool:
-            return {
-                "result": {"error": f"Tool desconocida: {tool_name}"},
-                "audit": {
-                    "tool": tool_name,
-                    "tier": "unknown",
-                    "roles": user_roles,
-                    "allowed": False,
-                    "reason": "tool desconocida",
-                    "at": datetime.utcnow().isoformat()
-                }
-            }
-        
-        # Check role requirements
-        required_roles = tool.requires_roles
-        has_permission = not required_roles or any(role in user_roles for role in required_roles)
-        
-        if not has_permission:
-            return {
-                "result": {
-                    "error": f"Permiso denegado: {tool_name} requiere rol [{', '.join(required_roles)}]."
-                },
-                "audit": {
-                    "tool": tool_name,
-                    "tier": tool.tier.value,
-                    "roles": user_roles,
-                    "allowed": False,
-                    "reason": "rol insuficiente",
-                    "at": datetime.utcnow().isoformat()
-                }
-            }
-        
-        # Double check for sensitive tools
-        if self._is_sensitive_tool(tool.name, tool.description) and "admin" not in user_roles:
-            return {
-                "result": {
-                    "error": f"Permiso denegado: {tool_name} contiene datos sensibles y solo es accesible por admin."
-                },
-                "audit": {
-                    "tool": tool_name,
-                    "tier": tool.tier.value,
-                    "roles": user_roles,
-                    "allowed": False,
-                    "reason": "datos sensibles (doble check)",
-                    "at": datetime.utcnow().isoformat()
-                }
-            }
-        
-        # Execute tool
+    async def available(self, roles: List[str], authenticated: bool):
+        if not authenticated or "guest" in roles:
+            return []
+        server = self._server_for(roles, authenticated)
+        return await server.list_tools() if server else []
+
+    def _server_for(self, roles: List[str], authenticated: bool):
+        if not authenticated or "guest" in roles:
+            return None
+        for role in ("admin", "ventas", "customer"):
+            if role in roles:
+                return self.servers[role]
+        return None
+
+    def _permitted(self, policy: ToolPolicy, roles: List[str], authenticated: bool) -> bool:
+        return (authenticated and "guest" not in roles
+                and (not policy.requires_roles
+                     or bool(set(policy.requires_roles).intersection(roles))))
+
+    async def execute(self, tool_name: str, args: Dict[str, Any],
+                      user_roles: List[str], authenticated: bool = True) -> dict[str, Any]:
+        policy = self._policies.get(tool_name)
+        audit = {"tool": tool_name, "tier": policy.tier.value if policy else "unknown",
+                 "roles": user_roles, "allowed": False,
+                 "at": datetime.now(timezone.utc).isoformat()}
+        if policy is None:
+            audit["reason"] = "tool desconocida"
+            return {"result": {"error": "Tool desconocida"}, "audit": audit}
+        server = self._server_for(user_roles, authenticated)
+        if server is None or not self._permitted(policy, user_roles, authenticated):
+            audit["reason"] = "sesión o rol insuficiente"
+            return {"result": {"error": "Permiso denegado"}, "audit": audit}
         try:
-            result = tool.handler(args or {})
-            return {
-                "result": result,
-                "audit": {
-                    "tool": tool_name,
-                    "tier": tool.tier.value,
-                    "roles": user_roles,
-                    "allowed": True,
-                    "at": datetime.utcnow().isoformat()
-                }
-            }
-        except Exception as e:
-            return {
-                "result": {"error": str(e)},
-                "audit": {
-                    "tool": tool_name,
-                    "tier": tool.tier.value,
-                    "roles": user_roles,
-                    "allowed": False,
-                    "reason": "error de ejecución",
-                    "at": datetime.utcnow().isoformat()
-                }
-            }
-    
-    def get_tool_definitions(self) -> List[Dict[str, Any]]:
-        """Get all tool definitions for LLM (no role filtering)"""
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.input_schema
-                }
-            }
-            for tool in self.tools
-        ]
-    
-    # Tool handlers (placeholder implementations - should connect to real data)
-    def _get_brand_info(self, args: Dict[str, Any]) -> Dict[str, Any]:
+            result = await server.call_tool(tool_name, args or {})
+            if result.is_error or result.structured_content is None:
+                raise ValueError("La herramienta no devolvió un resultado válido")
+        except Exception:
+            audit["reason"] = "error de ejecución"
+            return {"result": {"error": "La herramienta no pudo ejecutarse"},
+                    "audit": audit}
+        audit["allowed"] = True
+        return {"result": result.structured_content, "audit": audit}
+
+    def _get_brand_info(self) -> dict[str, Any]:
         return {
             "brand": {
                 "name": "Promption Shop",
@@ -253,7 +198,7 @@ class MCPToolExecutor:
             }
         }
     
-    def _get_shipping_policy(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_shipping_policy(self) -> dict[str, Any]:
         return {
             "envios": {
                 "gratis": "Pedidos +50€",
@@ -270,7 +215,7 @@ class MCPToolExecutor:
             }
         }
     
-    def _get_catalog_summary(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_catalog_summary(self) -> dict[str, Any]:
         return {
             "categorias": [
                 "Smartphones", "Laptops", "Tablets", 
@@ -278,7 +223,7 @@ class MCPToolExecutor:
             ]
         }
     
-    def _get_promotions(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_promotions(self) -> dict[str, Any]:
         return {
             "promociones": [
                 {"codigo": "EMPLEADO-25", "descuento": "25%", "valido": "empleados"},
@@ -288,7 +233,7 @@ class MCPToolExecutor:
             "politicasDescuento": "Máximo 15% sin aprobación; hasta 30% con firma de Jefe de Tienda"
         }
     
-    def _get_stock_info(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_stock_info(self) -> dict[str, Any]:
         return {
             "stockCritico": [
                 {"producto": "iPhone 15 Pro", "stock": 3},
@@ -299,7 +244,7 @@ class MCPToolExecutor:
             }
         }
     
-    def _get_marketing_campaigns(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_marketing_campaigns(self) -> dict[str, Any]:
         return {
             "campanas": [
                 {
@@ -323,7 +268,7 @@ class MCPToolExecutor:
             ]
         }
     
-    def _get_employees(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_employees(self) -> dict[str, Any]:
         return {
             "empleados": [
                 {"id": "EMP-001", "nombre": "Ana García", "puesto": "Agente Senior", "sueldo_neto": "1800€"},
@@ -332,7 +277,7 @@ class MCPToolExecutor:
             "totalPlantilla": 15
         }
     
-    def _get_vip_clients(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_vip_clients(self) -> dict[str, Any]:
         return {
             "vips": [
                 {"id": "CLI-VIP-001", "nombre": "Empresa Alpha SA", "nivel": "Platinum", "facturacion": "420000€"},
@@ -341,7 +286,7 @@ class MCPToolExecutor:
             "totalVips": 4
         }
     
-    def _get_kpi_stats(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_kpi_stats(self) -> dict[str, Any]:
         return {
             "kpis": {
                 "facturacion_anual": "3.184.200€",
@@ -351,7 +296,7 @@ class MCPToolExecutor:
             }
         }
     
-    def _get_revenue_report(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_revenue_report(self) -> dict[str, Any]:
         return {
             "facturacionMensual": {
                 "enero": "250000€", "febrero": "280000€", "marzo": "310000€"
@@ -361,7 +306,7 @@ class MCPToolExecutor:
             }
         }
     
-    def _get_top_products(self, args: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_top_products(self) -> dict[str, Any]:
         return {
             "topProductos": [
                 {"producto": "iPhone 15", "ingresos": "150000€", "unidades": 200},
@@ -369,20 +314,12 @@ class MCPToolExecutor:
             ]
         }
     
-    def _get_internal_secrets(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "secretos": {
-                "nota": "Esta herramienta está bloqueada por seguridad adicional"
-            }
-        }
 
 
-# Singleton instance
 _mcp_executor: Optional[MCPToolExecutor] = None
 
 
 def get_mcp_executor() -> MCPToolExecutor:
-    """Get singleton MCPToolExecutor instance"""
     global _mcp_executor
     if _mcp_executor is None:
         _mcp_executor = MCPToolExecutor()

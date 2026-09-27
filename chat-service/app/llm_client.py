@@ -1,7 +1,8 @@
-"""LLM client integration (Gemini/Groq/OpenRouter)."""
+"""Vercel AI SDK bridge with optional legacy provider adapters."""
 import asyncio
 import logging
 import time
+from contextvars import ContextVar
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -12,17 +13,32 @@ from .models import LLMResponse
 
 logger = logging.getLogger(__name__)
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+_guard_identity = ContextVar("vercel_ai_guard_identity", default=None)
+
+
+def set_guard_identity(user_id: str, roles: list[str], original_text: str):
+    _guard_identity.set({"user_id": user_id, "roles": roles, "original_text": original_text})
+
+
+def _bridge_payload(config: dict, messages: list, tools: list | None = None,
+                    force_tool: str | None = None, max_tokens: int | None = None) -> dict:
+    identity = _guard_identity.get() or {}
+    original_text = identity.get("original_text") or next(
+        (item.get("content") for item in reversed(messages) if item.get("role") == "user"), "")
+    return {"model": config["model"], "messages": messages, "tools": tools or [],
+            "force_tool": force_tool, "max_tokens": max_tokens or config["max_tokens"],
+            "user_id": identity.get("user_id", "system"),
+            "roles": identity.get("roles", ["guest"]), "original_text": original_text}
+
 
 
 class LLMClient:
     """Client for LLM integration with provider fallback"""
     
     def __init__(self):
-        self.openai_api_key = settings.openai_api_key
         self.gemini_api_key = settings.gemini_api_key
         self.groq_api_key = settings.groq_api_key
         self.openrouter_api_key = settings.openrouter_api_key
-        self.default_model = settings.default_model
         self.provider_timeout = max(0.5, settings.llm_provider_timeout_seconds)
         self.total_timeout = max(0.5, settings.llm_total_timeout_seconds)
         self.max_attempts = max(1, settings.llm_max_attempts)
@@ -46,11 +62,7 @@ class LLMClient:
             if provider.strip()
         ]
 
-        ordered_providers = provider_order + [
-            provider
-            for provider in models_by_provider
-            if provider not in provider_order
-        ]
+        ordered_providers = provider_order or ["openai"]
         for provider in ordered_providers:
             provider_models = models_by_provider.get(provider, [])
             if provider_models:
@@ -61,20 +73,18 @@ class LLMClient:
         return models
 
     def _get_openai_models(self) -> List[Dict[str, Any]]:
-        if not self.openai_api_key:
+        if not (settings.vercel_ai_url and settings.openai_model
+                and settings.openai_tool_model):
             return []
         return [
-            {
-                "id": "openai-primary",
-                "label": f"OpenAI · {settings.openai_model}",
-                "provider": "openai",
-                "api": "openai_compatible",
-                "model": settings.openai_model,
-                "api_key": self.openai_api_key,
-                "base_url": "https://api.openai.com/v1/chat/completions",
-                "temperature": 0.2,
-                "max_tokens": 600,
-            }
+            {"id": model_id, "label": f"OpenAI · {model}", "provider": "openai",
+             "api": "vercel_ai", "model": model,
+             "base_url": settings.vercel_ai_url,
+             "temperature": 0.2, "max_tokens": max_tokens}
+            for model_id, model, max_tokens in (
+                ("openai-primary", settings.openai_model, 900),
+                ("openai-tools", settings.openai_tool_model, 4500),
+            )
         ]
 
     def _get_gemini_models(self) -> List[Dict[str, Any]]:
@@ -158,6 +168,15 @@ class LLMClient:
         for message in messages:
             role = message.get("role", "user")
             content = message.get("content", "")
+            if role == "tool":
+                response = {"name": message["name"], "response": {"result": message["result"]}}
+                if message.get("id"):
+                    response["id"] = message["id"]
+                contents.append({"role": "user", "parts": [{"functionResponse": response}]})
+                continue
+            if role == "assistant" and message.get("gemini_parts"):
+                contents.append({"role": "model", "parts": message["gemini_parts"]})
+                continue
             if role == "system":
                 system_parts.append({"text": content})
                 continue
@@ -189,6 +208,8 @@ class LLMClient:
             parts = candidates[0].get("content", {}).get("parts", [])
             return "".join(part.get("text", "") for part in parts).strip()
 
+        if "text" in data:
+            return str(data["text"]).strip()
         return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
     
     async def generate(
@@ -200,8 +221,8 @@ class LLMClient:
         """Generate a response using an ordered fallback within one time budget."""
         if not self.models:
             raise Exception(
-                "No LLM providers configured. Please set OPENAI_API_KEY, GEMINI_API_KEY, GROQ_API_KEY "
-                "or OPENROUTER_API_KEY environment variables."
+                "No LLM providers configured. Configure VERCEL_AI_URL in Chat Service and "
+                "OPENAI_API_KEY in Next.js."
             )
 
         chain_started = time.perf_counter()
@@ -228,7 +249,11 @@ class LLMClient:
                     )
                     request_url = model_config["base_url"]
 
-                    if model_config["api"] == "gemini":
+                    if model_config["api"] == "vercel_ai":
+                        headers["X-Chat-Service-Token"] = settings.chat_service_token or ""
+                        payload = _bridge_payload(model_config, messages,
+                                                  max_tokens=resolved_max_tokens)
+                    elif model_config["api"] == "gemini":
                         request_url = f"{request_url}?key={model_config['api_key']}"
                         payload = self._build_gemini_payload(
                             messages,
@@ -238,7 +263,8 @@ class LLMClient:
                     else:
                         headers["Authorization"] = f"Bearer {model_config['api_key']}"
                         if model_config["provider"] == "openrouter":
-                            headers["HTTP-Referer"] = "https://promption.shop"
+                            if settings.openrouter_site_url:
+                                headers["HTTP-Referer"] = settings.openrouter_site_url
                             headers["X-Title"] = "Promption Shop Demo"
 
                         is_gpt5 = (
@@ -293,6 +319,8 @@ class LLMClient:
                         )
                         break
                     else:
+                        if model_config["api"] == "vercel_ai" and response.status_code == 403:
+                            raise PermissionError("Promption bloqueó la llamada al modelo")
                         if response.is_success:
                             try:
                                 data = response.json()
@@ -347,6 +375,91 @@ class LLMClient:
                     break
 
         raise Exception(f"All LLM providers failed: {last_error}")
+
+
+    async def generate_tool_turn(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]],
+                                 model_id: str | None = None,
+                                 force_tool: str | None = None) -> Dict[str, Any]:
+        """Return a text turn or structured tool requests, keeping one provider per workflow."""
+        candidates = [m for m in self.models if model_id is None or m["id"] == model_id]
+        if not candidates:
+            raise RuntimeError("No LLM providers configured")
+        last_error = None
+        async with httpx.AsyncClient() as client:
+            for config in candidates:
+                try:
+                    if config["api"] == "vercel_ai":
+                        payload = _bridge_payload(config, messages, tools, force_tool)
+                        response = await client.post(
+                            config["base_url"], json=payload,
+                            headers={"X-Chat-Service-Token": settings.chat_service_token or ""},
+                            timeout=max(self.provider_timeout, 30.0))
+                        if response.status_code == 403:
+                            raise PermissionError("Promption bloqueó la llamada al modelo")
+                        response.raise_for_status()
+                        data = response.json()
+                        return {"text": data.get("text", ""), "calls": data.get("calls", []),
+                                "assistant": {}, "model": config["label"],
+                                "model_id": config["id"], "provider": config["provider"]}
+                    if config["api"] == "gemini":
+                        payload = self._build_gemini_payload(messages, config["temperature"], config["max_tokens"])
+                        payload["tools"] = [{"functionDeclarations": [
+                            {"name": item["function"]["name"],
+                             "description": item["function"]["description"],
+                             "parameters": {key: value for key, value in item["function"]["parameters"].items()
+                                            if key != "additionalProperties"}}
+                            for item in tools]}] if tools else []
+                        payload["toolConfig"] = {"functionCallingConfig": {
+                            "mode": "ANY" if force_tool else "AUTO",
+                            **({"allowedFunctionNames": [force_tool]} if force_tool else {}),
+                        }}
+                        url = f"{config['base_url']}?key={config['api_key']}"
+                        headers = {"Content-Type": "application/json"}
+                    else:
+                        payload = {"model": config["model"], "messages": messages,
+                                   "stream": False, "tools": tools,
+                                   "tool_choice": ({"type": "function", "function": {"name": force_tool}}
+                                                   if force_tool else "auto"),
+                                   "parallel_tool_calls": False}
+                        if config["provider"] == "openai" and config["model"].lower().startswith("gpt-5"):
+                            payload.update(max_completion_tokens=config["max_tokens"], reasoning_effort="minimal")
+                        else:
+                            payload.update(max_tokens=config["max_tokens"], temperature=config["temperature"])
+                        url = config["base_url"]
+                        headers = {"Content-Type": "application/json",
+                                   "Authorization": f"Bearer {config['api_key']}"}
+                        if config["provider"] == "openrouter":
+                            if settings.openrouter_site_url:
+                                headers["HTTP-Referer"] = settings.openrouter_site_url
+                            headers["X-Title"] = "Promption Shop Demo"
+                    response = await client.post(url, headers=headers, json=payload,
+                                                 timeout=self.provider_timeout)
+                    response.raise_for_status()
+                    data = response.json()
+                    if config["api"] == "gemini":
+                        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                        calls = [{"id": part["functionCall"].get("id"), "name": part["functionCall"]["name"],
+                                  "arguments": part["functionCall"].get("args", {})}
+                                 for i, part in enumerate(parts) if "functionCall" in part]
+                        content = "".join(part.get("text", "") for part in parts).strip()
+                        assistant = {"role": "assistant", "gemini_parts": parts}
+                    else:
+                        assistant = data["choices"][0]["message"]
+                        calls = [{"id": call["id"], "name": call["function"]["name"],
+                                  "arguments": call["function"].get("arguments", "{}")}
+                                 for call in assistant.get("tool_calls", [])]
+                        content = assistant.get("content") or ""
+                    if not content and not calls:
+                        raise RuntimeError("Empty LLM response")
+                    return {"text": content, "calls": calls, "assistant": assistant,
+                            "model": config["label"], "model_id": config["id"],
+                            "provider": config["provider"]}
+                except (httpx.HTTPError, KeyError, IndexError, ValueError, RuntimeError) as exc:
+                    last_error = f"{config['provider']}: {type(exc).__name__}"
+                    logger.warning("Tool turn failed provider=%s error=%s", config["provider"], type(exc).__name__)
+                    if model_id:
+                        break
+        raise RuntimeError(f"All LLM providers failed: {last_error}")
 
 
 # Singleton instance

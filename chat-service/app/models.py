@@ -31,6 +31,18 @@ class ChatRequest(BaseModel):
     context: Optional[Dict[str, Any]] = None
 
 
+class ConversationHistoryRequest(BaseModel):
+    conversation_id: str
+    user: User
+
+
+class AIGuardRequest(BaseModel):
+    text: str = Field(..., max_length=50000)
+    user_id: str = Field(..., min_length=1, max_length=128)
+    roles: List[UserRole]
+    direction: Literal["input", "output"]
+
+
 class SecurityStateUpdate(BaseModel):
     action: Literal["filter", "output_guard", "reset"]
     enabled: Optional[bool] = None
@@ -95,6 +107,7 @@ class ChatResponse(BaseModel):
     reply: str = ""
     leaked: bool = False
     audit: List[MCPToolCall] = Field(default_factory=list)
+    actions: List[Dict[str, Any]] = Field(default_factory=list)
     guard: str = "SKIPPED"
     filter_enabled: bool = True
     output_guard_enabled: bool = True

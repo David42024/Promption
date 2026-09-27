@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { isAdmin } from "../../../../lib/shop.js";
 import { readSessionToken } from "../../../../lib/session.js";
 
-const CHAT_API_URL = (process.env.NEXT_PUBLIC_CHAT_API_URL || "http://localhost:8001").replace(/\/$/, "");
+const CHAT_API_URL = (process.env.CHAT_API_URL || process.env.NEXT_PUBLIC_CHAT_API_URL || "").replace(/\/$/, "");
 
 function session() {
   return readSessionToken(cookies().get("demo_user")?.value);

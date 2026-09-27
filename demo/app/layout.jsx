@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  metadataBase: new URL("https://promption.dev"),
+  metadataBase: process.env.SITE_URL ? new URL(process.env.SITE_URL) : undefined,
   title: {
     default: "Promption · Demo Shop — Seguridad contra Prompt Injection",
     template: "%s · Promption Demo",
@@ -21,7 +21,7 @@ export const metadata = {
   openGraph: {
     type: "website",
     locale: "es_ES",
-    url: "https://promption.dev",
+    url: process.env.SITE_URL,
     title: "Promption · Demo Shop",
     description:
       "Protección multi-capa contra Prompt Injection en aplicaciones LLM. Heurística + Machine Learning + Output Guard.",
