@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
+from promption.api.models import ConversationEvidence
 
 
 class UserRole(str, Enum):
@@ -41,6 +42,7 @@ class AIGuardRequest(BaseModel):
     user_id: str = Field(..., min_length=1, max_length=128)
     roles: List[UserRole]
     direction: Literal["input", "output"]
+    messages: List[ConversationEvidence] = Field(default_factory=list, max_length=128)
 
 
 class SecurityStateUpdate(BaseModel):

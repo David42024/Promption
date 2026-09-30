@@ -4,14 +4,14 @@ Guía para trabajar en este repositorio (Proyecto académico: detección de Prom
 
 ## Estructura esencial
 
-- **`src/filter/`** — núcleo: `heuristic_filter.py` (regex, reglas en `config/heuristics.yaml`), `ml_filter.py` (SentenceTransformers `all-MiniLM-L6-v2` + `RandomForestClassifier`, singleton con carga lazy), `ensemble_filter.py` (orquesta capas, devuelve `EnsembleResult`).
-- **`src/api/`** — FastAPI. Endpoints en `routes.py` (prefijo `/api/v1`). Pydantic en `models.py`.
-- **`src/benchmark/`** — `runner.py` ejecuta el benchmark (mide ASR con un secreto `TOK-AZ9-KX7` que el LLM no debe revelar), `metrics.py` cálculos puros, `payloads.py` carga del dataset.
-- **`src/training/`** — `dataset.py` (CSV raw → `data/processed/training_data.csv`), `train.py` (embeddings → RandomForest → `models/random_forest.pkl`).
-- **`src/utils/pdf_extractor.py`** — PDF→texto por páginas con `pypdf` (benchmark `--pdf-dir` y página 7 del dashboard).
-- **`src/utils/audio_transcriber.py`** — audio→texto con `faster-whisper` (local, CPU; benchmark `--audio-dir` y página 8 del dashboard).
+- **`promption/filter/`** — núcleo: `heuristic_filter.py` (regex, reglas en `config/heuristics.yaml`), `ml_filter.py` (SentenceTransformers `all-MiniLM-L6-v2` + `RandomForestClassifier`, singleton con carga lazy), `ensemble_filter.py` (orquesta capas, devuelve `EnsembleResult`).
+- **`promption/api/`** — FastAPI. Endpoints en `routes.py` (prefijo `/api/v1`). Pydantic en `models.py`.
+- **`promption/benchmark/`** — `runner.py` ejecuta el benchmark (mide ASR con un secreto `TOK-AZ9-KX7` que el LLM no debe revelar), `metrics.py` cálculos puros, `payloads.py` carga del dataset.
+- **`promption/training/`** — `dataset.py` (CSV raw → `data/processed/training_data.csv`), `train.py` (embeddings → RandomForest → `models/random_forest.pkl`).
+- **`promption/utils/pdf_extractor.py`** — PDF→texto por páginas con `pypdf` (benchmark `--pdf-dir` y página 7 del dashboard).
+- **`promption/utils/audio_transcriber.py`** — audio→texto con `faster-whisper` (local, CPU; benchmark `--audio-dir` y página 8 del dashboard).
 - **`dashboard/`** — Streamlit multipágina. `app.py` + `pages/` (convención de nombres `1_.., 2_..`). Componentes reutilizables en `dashboard/components/` (Plotly), carga de datos en `dashboard/utils/data_loader.py`, filtro en proceso en `dashboard/utils/filter_runner.py`.
-- **`config/`** — `config.yaml` (rutas, modelo, ensemble, llm) y `heuristics.yaml` (reglas regex). Cargar SIEMPRE vía `src/utils/config.py` (`load_config`, `load_heuristics`), que resuelve rutas absolutas respecto a la raíz.
+- **`config/`** — `config.yaml` (rutas, modelo, ensemble, llm) y `heuristics.yaml` (reglas regex). Cargar SIEMPRE vía `promption/utils/config.py` (`load_config`, `load_heuristics`), que resuelve rutas absolutas respecto a la raíz.
 
 ## Convenciones y reglas
 
@@ -34,7 +34,7 @@ python scripts/generate_pdf_payloads.py           # corpus de prueba en PDF -> d
 python scripts/run_benchmark.py --pdf-dir data/pdf_payloads --no-train --no-llm  # benchmark sobre PDFs
 python scripts/generate_audio_payloads.py           # corpus WAV (TTS SAPI Windows) -> data/audio_payloads/
 python scripts/run_benchmark.py --audio-dir data/audio_payloads --no-train --no-llm  # benchmark sobre audios
-uvicorn src.api.main:app --reload --port 8000     # API
+uvicorn promption.api.main:app --reload --port 8000     # API
 streamlit run dashboard/app.py --server.port 8501 # dashboard
 python scripts/generate_report.py --pdf           # reporte
 ```
@@ -44,10 +44,16 @@ python scripts/generate_report.py --pdf           # reporte
 1. `python -m pytest tests/ -q` — todos verdes.
 2. `python scripts/run_benchmark.py --no-llm` — genera `data/results/benchmark_results.csv` sin errores (necesita el modelo entrenado).
 3. Arranque del dashboard en modo smoke: `streamlit run dashboard/app.py` sin excepciones de import.
-4. La API: `uvicorn src.api.main:app` y `GET /api/v1/health` → 200.
+4. La API: `uvicorn promption.api.main:app` y `GET /api/v1/health` → 200.
 
 ## No hacer
 
 - No meter secretos en el repo ni en logs (`.env`, claves, tokens).
 - No escribir prompts/emails/URLs inventados como si fueran CDN oficiales; si se descargan payloads usar `scripts/download_datasets.py`.
 - No mezclar lógica de Plotly (dashboard) con matplotlib (src/utils/visualizer.py se usa solo en scripts/reportes).
+## Librería reusable
+
+- `promption/`: paquete Python instalable; `src/` mantiene aliases compatibles.
+- `packages/ai-sdk/`: paquete `@promption/ai-sdk`, middleware AI SDK 6 y tipos TypeScript.
+- La app conserva datos y reglas de negocio; los mecanismos de protección pertenecen a la librería.
+- Ver `LIBRARY.md`; ejecutar también `node --test packages/ai-sdk/test/*.test.js`.

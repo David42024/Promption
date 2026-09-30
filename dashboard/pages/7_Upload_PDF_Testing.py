@@ -16,7 +16,7 @@ from dashboard.components.metrics import section_header
 from dashboard.components.sidebar import setup_page
 from dashboard.utils.filter_runner import filter_text
 from dashboard.utils.theme import get_palette
-from src.utils.pdf_extractor import extract_pdf_pages
+from promption.utils.pdf_extractor import extract_pdf_pages
 
 MAX_PAGES = 40
 
@@ -84,8 +84,8 @@ for file in uploaded:
         sel = st.selectbox("Página a enviar al LLM", options=range(1, len(results) + 1),
                            format_func=lambda p: f"Página {p}", key=f"llm_page_{file.name}")
         if st.button("⚡ Consultar LLM", key=f"llm_btn_{file.name}"):
-            from src.benchmark.runner import SYSTEM_PROMPT, contains_secret
-            from src.llm import get_llm_client
+            from promption.benchmark.runner import SYSTEM_PROMPT, contains_secret
+            from promption.llm import get_llm_client
 
             idx = sel - 1
             with st.spinner("Consultando LLM…"):

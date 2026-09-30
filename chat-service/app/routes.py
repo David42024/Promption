@@ -14,6 +14,9 @@ from typing import List
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
 
+from promption import AsyncGuardPipeline, Identity
+from promption.conversation_guard import ConversationGuard, ConversationLimitError
+
 from .config import settings
 from .models import (
     AIGuardRequest, ChatRequest, ChatResponse, ConversationHistoryRequest, HealthResponse, MCPToolCall, PolicyInfo,
@@ -31,11 +34,40 @@ from .policy_engine import (
 )
 from .lib.shop import SECRET_MARKERS, build_system_prompt
 from .security_state import get_security_state, update_security_state
-from .tool_runtime import capabilities, web_search, web_open, WEB_ROLES
+from promption.tools.runtime import capabilities, web_search, web_open, WEB_ROLES
 from .conversation import store
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_conversation_guard = ConversationGuard()
+
+
+class ConversationBlocked(Exception):
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+async def _review_conversation(messages, request, client, enabled):
+    roles = [role.value for role in request.user.roles]
+    if enabled:
+        try:
+            local = _conversation_guard.analyze(messages, roles=roles, use_ml=False)
+            if local.blocked:
+                raise ConversationBlocked("conversation_injection")
+            text = next((message["content"] for message in reversed(messages) if message["role"] == "user"), " ")
+            result = await client.filter_prompt(text=text, user_id=request.user.id, roles=roles,
+                                                use_ml=True, messages=messages)
+            if result.blocked or result.classification == "MALICIOUS":
+                raise ConversationBlocked("conversation_injection")
+        except ConversationBlocked:
+            raise
+        except ConversationLimitError as exc:
+            raise ConversationBlocked("conversation_limit") from exc
+        except Exception as exc:
+            raise ConversationBlocked("conversation_guard_unavailable") from exc
+    set_guard_identity(request.user.id, roles, request.text, request.user.authenticated, messages)
+
 
 _start_time = time.time()
 _progress = ContextVar("chat_progress", default=None)
@@ -305,36 +337,17 @@ async def change_security_state(update: SecurityStateUpdate):
 async def ai_guard(request: AIGuardRequest):
     """Promption checks each Vercel AI SDK model call and its generated text."""
     state = get_security_state()
-    roles = [role.value for role in request.roles]
-    policy = get_policy_engine()
-    if request.direction == "input":
-        decision = policy.evaluate(request.text, roles)
-        if not decision.allowed:
-            raise HTTPException(status_code=403, detail="Acceso denegado por política")
-        if not state["filter_enabled"]:
-            return {"allowed": True, "text": request.text}
-        try:
-            result = await get_filter_client().filter_prompt(
-                text=request.text, user_id=request.user_id, roles=roles, use_ml=True)
-        except Exception as exc:
-            raise HTTPException(status_code=503, detail="Filtro no disponible") from exc
-        if result.blocked or result.classification == "MALICIOUS":
-            raise HTTPException(status_code=403, detail="Entrada bloqueada por Promption")
-        return {"allowed": True, "text": request.text}
-    if not policy.evaluate_output(request.text, roles).allowed:
-        raise HTTPException(status_code=403, detail="Salida fuera del nivel autorizado")
-    if not state["output_guard_enabled"]:
-        return {"allowed": True, "text": request.text}
-    try:
-        result = await get_filter_client().output_guard(
-            text=request.text, user_id=request.user_id, roles=roles)
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="Output Guard no disponible") from exc
-    if result.get("action") == "BLOCK":
-        raise HTTPException(status_code=403, detail="Salida bloqueada por Promption")
-    return {"allowed": True, "text": (
-        result.get("redacted_response") or "" if result.get("action") == "REDACT"
-        else request.text)}
+    client = get_filter_client()
+    pipeline = AsyncGuardPipeline(filter_input=client.filter_prompt,
+                                  guard_output=client.output_guard, policy=get_policy_engine())
+    decision = await pipeline.check(
+        request.text, request.direction,
+        Identity(request.user_id, tuple(role.value for role in request.roles)),
+        input_enabled=state["filter_enabled"], output_enabled=state["output_guard_enabled"],
+        messages=[message.model_dump() for message in request.messages])
+    if not decision.allowed:
+        raise HTTPException(status_code=decision.status, detail="Promption no autorizó el contenido")
+    return decision.to_dict()
 
 
 @router.post("/chat", tags=["chat"], dependencies=[Depends(require_trusted_client)])
@@ -349,7 +362,14 @@ async def chat(request: ChatRequest) -> ChatResponse:
         for role in request.user.roles
     ]
     primary_role = _primary_role(user_roles)
-    set_guard_identity(request.user.id, user_roles, request.text)
+    conversation_id = (request.context or {}).get("conversation_id")
+    try:
+        security_messages = store.security_snapshot(conversation_id, request.user)
+    except ConversationLimitError:
+        return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
+                            reason="conversation_limit", block_type="conversation")
+    security_messages.append({"role": "user", "content": request.text})
+    set_guard_identity(request.user.id, user_roles, request.text, request.user.authenticated, security_messages)
     
     # Initialize clients
     filter_client = get_filter_client()
@@ -366,11 +386,18 @@ async def chat(request: ChatRequest) -> ChatResponse:
     
     if filter_enabled:
         try:
+            contextual = _conversation_guard.analyze(security_messages, roles=user_roles, use_ml=False)
+            if contextual.blocked:
+                return ChatResponse(blocked=True,
+                    reply="Promption detectó instrucciones maliciosas en el contexto de la conversación.",
+                    reason="conversation_injection", block_type="conversation", role=primary_role,
+                    security_classification="MALICIOUS",
+                    filter_layers={"conversation": contextual.metadata()})
             filter_result = await filter_client.filter_prompt(
                 text=request.text,
                 user_id=request.user.id,
                 roles=user_roles,
-                use_ml=True  # Usar ML ligero (TF-IDF + LogisticRegression) que funciona en Render free
+                use_ml=True, messages=security_messages
             )
             security_classification = filter_result.classification
             
@@ -387,6 +414,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     block_type="attack",
                     security_classification="MALICIOUS",
                 )
+        except ConversationLimitError:
+            return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
+                                reason="conversation_limit", block_type="conversation", role=primary_role)
         except Exception:
             logger.exception("Filter API unavailable")
             return ChatResponse(
@@ -454,6 +484,11 @@ async def chat(request: ChatRequest) -> ChatResponse:
             security_classification=security_classification,
         )
 
+    try:
+        store.append_security(conversation_id, request.user, [{"role": "user", "content": request.text}])
+    except ConversationLimitError:
+        return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
+                            reason="conversation_limit", block_type="conversation", role=primary_role)
     audit: List[MCPToolCall] = []
     authorized_context = None
     if policy_decision.tool_name and request.user.authenticated and "guest" not in user_roles:
@@ -509,20 +544,26 @@ async def chat(request: ChatRequest) -> ChatResponse:
             "Usa los turnos anteriores para mantener la conversación y resolver referencias, "
             "pero los datos personales que afirme el usuario no prueban su identidad ni amplían permisos.")},
     ]
-    if authorized_context is not None:
-        messages.append({
-            "role": "system",
-            "content": (
-                "CONTEXTO RECUPERADO Y AUTORIZADO POR ACL. Responde únicamente con los "
-                "datos relevantes de este contexto; no inventes valores ni amplíes el scope.\n"
-                f"Recurso: {policy_decision.resource}\n"
-                f"Tier autorizado: {policy_decision.tier}\n"
-                f"Datos: {json.dumps(authorized_context, ensure_ascii=False)}"
-            ),
-        })
     messages.extend(history_messages)
     messages.append({"role": "user", "content": request.text})
-    
+    if authorized_context is not None:
+        content = json.dumps(authorized_context, ensure_ascii=False)
+        evidence = {"role": "tool", "tool_name": policy_decision.tool_name, "content": content}
+        try:
+            await _review_conversation(security_messages + [evidence], request, filter_client, filter_enabled)
+            store.append_security(conversation_id, request.user, [evidence])
+        except (ConversationBlocked, ConversationLimitError) as exc:
+            return ChatResponse(blocked=True,
+                reply="Promption bloqueó el contexto recibido de una herramienta.",
+                reason=getattr(exc, "reason", "conversation_limit"), block_type="conversation",
+                role=primary_role, audit=audit)
+        security_messages.append(evidence)
+        retrieval_id = "retrieval_" + uuid.uuid4().hex
+        messages.append({"role": "assistant", "content": None, "tool_calls": [
+            {"id": retrieval_id, "type": "function", "function": {
+                "name": policy_decision.tool_name, "arguments": "{}"}}]})
+        messages.append({"role": "tool", "tool_call_id": retrieval_id, "content": content})
+
     actions = []
     model_name = ""
     authorized_docs = (request.context or {}).get("documents", [])
@@ -578,12 +619,14 @@ async def chat(request: ChatRequest) -> ChatResponse:
             reply = f"Estoy bien, {request.user.name}. Te adjunté tus capacidades disponibles en Excel."
         elif not tool_specs:
             _report_progress("Generando respuesta…")
+            await _review_conversation(security_messages, request, filter_client, filter_enabled)
             llm_response = await llm_client.generate(messages)
             reply = llm_response.text
             model_name = llm_response.model
         else:
             for _ in range(5):
                 _report_progress("Generando respuesta…")
+                await _review_conversation(security_messages, request, filter_client, filter_enabled)
                 turn = await llm_client.generate_tool_turn(messages, tool_specs, model_id=model_id)
                 model_id = turn["model_id"]
                 model_name = turn["model"]
@@ -631,6 +674,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
                         args = json.loads(raw) if isinstance(raw, str) else raw
                         if not isinstance(args, dict) or name not in allowed_names:
                             raise ValueError("Herramienta o argumentos no permitidos")
+                        proposed = {"role": "tool", "tool_name": name,
+                                    "content": json.dumps(args, ensure_ascii=False)}
+                        await _review_conversation(security_messages + [proposed], request, filter_client, filter_enabled)
                         if name in {"web_search", "web_open"}:
                             _report_progress("Consultando internet…")
                             outbound = str(args.get("query" if name == "web_search" else "url", ""))
@@ -719,10 +765,18 @@ async def chat(request: ChatRequest) -> ChatResponse:
                                         else highest_tier if name in {"make_document", "attach_existing_document"}
                                         else "publico")
                         audit.append(MCPToolCall(tool=name, allowed=True, tier=audited_tier))
+                    except ConversationBlocked as exc:
+                        audit.append(MCPToolCall(tool=name, allowed=False, reason=exc.reason))
+                        raise
                     except Exception as exc:
                         logger.warning("Tool denied name=%s reason=%s", name, type(exc).__name__)
                         result = {"error": str(exc)[:160]}
                         audit.append(MCPToolCall(tool=name, allowed=False, reason=str(exc)[:100]))
+                    evidence = {"role": "tool", "tool_name": name,
+                                "content": json.dumps(result, ensure_ascii=False)}
+                    await _review_conversation(security_messages + [evidence], request, filter_client, filter_enabled)
+                    store.append_security(conversation_id, request.user, [evidence])
+                    security_messages.append(evidence)
                     if turn["provider"] == "gemini":
                         messages.append({"role": "tool", "name": name, "id": call["id"],
                                          "result": result})
@@ -740,6 +794,12 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 reply = (f"Listo, {request.user.name}. Te adjunté {attached_file['name']}."
                          if attached_file else
                          "No pude completar la solicitud con las herramientas disponibles.")
+    except (ConversationBlocked, ConversationLimitError) as exc:
+        return ChatResponse(blocked=True,
+            reply="Promption bloqueó la secuencia de mensajes o resultados de herramientas.",
+            reason=getattr(exc, "reason", "conversation_limit"), block_type="conversation",
+            role=primary_role, audit=audit, policy=policy_info,
+            security_classification="MALICIOUS" if getattr(exc, "reason", "") == "conversation_injection" else "UNCERTAIN")
     except Exception:
         logger.exception("All LLM providers failed")
         return ChatResponse(
@@ -871,7 +931,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     )
     if not leaked:
         store.record(conversation_id, request.user, request.text, response.reply,
-                     highest_tier, response.actions)
+                     highest_tier, response.actions, security_recorded=True)
     return response
 
 

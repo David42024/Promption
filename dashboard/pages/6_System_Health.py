@@ -19,7 +19,7 @@ from dashboard.components.metrics import kpi_card, section_header, status_badge
 from dashboard.components.sidebar import setup_page
 from dashboard.utils.data_loader import API_URL, api_health, api_last_error, api_reachable
 from dashboard.utils.paths import CONFIG_DIR, MODELS_DIR, RESULTS_DIR
-from src.filter.ensemble_filter import EnsembleFilter
+from promption.filter.ensemble_filter import EnsembleFilter
 
 setup_page("System Health — Prompt Injection Filter", "⚡")
 

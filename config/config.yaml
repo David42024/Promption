@@ -77,3 +77,7 @@ logging:
   file: "logs/system.log"
   max_bytes: 5242880
   backup_count: 5
+
+conversation_guard:
+  max_messages: 128
+  max_chars: 100000

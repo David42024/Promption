@@ -115,8 +115,8 @@ if result is not None:
     section_header("Comparación con el LLM")
     st.caption("Envía el mismo prompt al LLM (sin filtro vs con filtro) y comprueba si logra robar el código secreto.")
     if st.button("⚡ Consultar LLM", type="secondary"):
-        from src.benchmark.runner import SYSTEM_PROMPT, apply_output_guard, contains_secret
-        from src.llm import get_llm_client
+        from promption.benchmark.runner import SYSTEM_PROMPT, apply_output_guard, contains_secret
+        from promption.llm import get_llm_client
         with st.spinner("Consultando LLM… esto puede tardar unos segundos."):
             client = get_llm_client()
             health = client.health()

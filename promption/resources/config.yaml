@@ -1,0 +1,69 @@
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  results: data/results
+  plots: data/results/plots
+  models: models
+  logs: logs
+  reports: reports
+  pdf_payloads: data/pdf_payloads
+  audio_payloads: data/audio_payloads
+stt:
+  model: tiny
+  language: null
+model:
+  embedding_model: intfloat/multilingual-e5-small
+  embedding_prefix: 'query: '
+  classifier_path: models/random_forest.pkl
+  lightweight_classifier_path: models/lightweight_classifier.pkl
+  n_trees: 400
+  max_depth: 20
+  min_samples_leaf: 1
+  random_state: 42
+  confidence_threshold: 0.66
+  chunk_chars: 250
+  chunk_overlap: 100
+  use_lightweight_ml: true
+ensemble:
+  heuristic_weight: 0.4
+  ml_weight: 0.6
+  final_threshold: 0.5
+  decision_low_threshold: 0.33
+  decision_high_threshold: 0.66
+  require_llm_veto: false
+classification:
+  ml_benign_threshold: 0.33
+  ml_malicious_threshold: 0.66
+llm:
+  provider: auto
+  host: http://localhost:11434
+  model: mistral:latest
+  temperature: 0.2
+  max_tokens: 200
+  timeout: 60
+  health_timeout: 5
+  openai:
+    base_url: https://api.groq.com/openai/v1
+    model: openai/gpt-oss-120b
+api:
+  host: 0.0.0.0
+  port: 8000
+  reload: true
+dashboard:
+  host: 0.0.0.0
+  port: 8501
+benchmark:
+  sample_size: null
+  min_llm_queries: 3
+  save_history: true
+  history_dir: data/results/history
+logging:
+  level: INFO
+  format: '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s'
+  file: null
+  max_bytes: 5242880
+  backup_count: 5
+
+conversation_guard:
+  max_messages: 128
+  max_chars: 100000

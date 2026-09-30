@@ -17,7 +17,7 @@ from dashboard.components.sidebar import setup_page
 from dashboard.components.tables import render_table
 from dashboard.utils.data_loader import load_benchmark_results
 from dashboard.utils.filters import filter_df, sidebar_filters
-from src.benchmark.metrics import all_metrics, confusion_counts, roc
+from promption.benchmark.metrics import all_metrics, confusion_counts, roc
 
 setup_page("Benchmark Results — Prompt Injection Filter", "📈")
 

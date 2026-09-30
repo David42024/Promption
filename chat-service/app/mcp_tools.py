@@ -1,53 +1,13 @@
-"""Business tool catalog backed by the official MCP Python SDK."""
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Callable, Dict, List, Literal, Optional
-
-from anyio import to_process
-
-from .tool_runtime import make_document
-
-from mcp.server import MCPServer
+"""Shop handlers and access rules consumed by the Promption MCP library."""
+from typing import Any, List, Optional
+from promption.tools.mcp import (
+    MCPToolExecutor as BaseMCPToolExecutor, Tier, ToolPolicy, mcp_make_document,
+)
 
 
-class Tier(str, Enum):
-    PUBLICO = "publico"
-    INTERNO = "interno"
-    CONFIDENCIAL = "confidencial"
-
-
-@dataclass(frozen=True)
-class ToolPolicy:
-    name: str
-    description: str
-    tier: Tier
-    requires_roles: List[str]
-    handler: Callable[..., Dict[str, Any]]
-
-
-async def mcp_make_document(title: str, content: str,
-                            format: Literal["txt", "csv", "pdf", "docx", "xlsx"]) -> dict[str, Any]:
-    """Run document creation in a cancellable server worker process."""
-    return await to_process.run_sync(make_document, title, content, format, cancellable=True)
-
-
-class MCPToolExecutor:
-    """Keep role policy outside the SDK and delegate tool mechanics to MCPServer."""
-
+class MCPToolExecutor(BaseMCPToolExecutor):
     def __init__(self):
-        self.tools = self._initialize_tools()
-        self._policies = {tool.name: tool for tool in self.tools}
-        self.servers = {}
-        for role in ("customer", "ventas", "admin"):
-            server = MCPServer(f"Promption Shop {role}", version="1.0.0")
-            for policy in self.tools:
-                if not self._permitted(policy, [role], True):
-                    continue
-                server.add_tool(policy.handler, name=policy.name,
-                                description=policy.description,
-                                structured_output=True)
-            self.servers[role] = server
+        super().__init__(self._initialize_tools(), name="Promption Shop")
 
     def _initialize_tools(self) -> List[ToolPolicy]:
         """Initialize all MCP tools"""
@@ -141,49 +101,6 @@ class MCPToolExecutor:
             ),
         ]
     
-    async def available(self, roles: List[str], authenticated: bool):
-        if not authenticated or "guest" in roles:
-            return []
-        server = self._server_for(roles, authenticated)
-        return await server.list_tools() if server else []
-
-    def _server_for(self, roles: List[str], authenticated: bool):
-        if not authenticated or "guest" in roles:
-            return None
-        for role in ("admin", "ventas", "customer"):
-            if role in roles:
-                return self.servers[role]
-        return None
-
-    def _permitted(self, policy: ToolPolicy, roles: List[str], authenticated: bool) -> bool:
-        return (authenticated and "guest" not in roles
-                and (not policy.requires_roles
-                     or bool(set(policy.requires_roles).intersection(roles))))
-
-    async def execute(self, tool_name: str, args: Dict[str, Any],
-                      user_roles: List[str], authenticated: bool = True) -> dict[str, Any]:
-        policy = self._policies.get(tool_name)
-        audit = {"tool": tool_name, "tier": policy.tier.value if policy else "unknown",
-                 "roles": user_roles, "allowed": False,
-                 "at": datetime.now(timezone.utc).isoformat()}
-        if policy is None:
-            audit["reason"] = "tool desconocida"
-            return {"result": {"error": "Tool desconocida"}, "audit": audit}
-        server = self._server_for(user_roles, authenticated)
-        if server is None or not self._permitted(policy, user_roles, authenticated):
-            audit["reason"] = "sesión o rol insuficiente"
-            return {"result": {"error": "Permiso denegado"}, "audit": audit}
-        try:
-            result = await server.call_tool(tool_name, args or {})
-            if result.is_error or result.structured_content is None:
-                raise ValueError("La herramienta no devolvió un resultado válido")
-        except Exception:
-            audit["reason"] = "error de ejecución"
-            return {"result": {"error": "La herramienta no pudo ejecutarse"},
-                    "audit": audit}
-        audit["allowed"] = True
-        return {"result": result.structured_content, "audit": audit}
-
     def _get_brand_info(self) -> dict[str, Any]:
         return {
             "brand": {

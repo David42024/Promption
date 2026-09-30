@@ -35,3 +35,11 @@ reports/*.md
 .env
 *.env
 .streamlit/secrets.toml
+
+**/.env*
+!**/.env.example
+**/node_modules/
+**/.next/
+dist/
+build/
+packages/**/*.tgz

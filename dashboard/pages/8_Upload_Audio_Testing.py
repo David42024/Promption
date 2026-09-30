@@ -14,7 +14,7 @@ import streamlit as st
 from dashboard.components.metrics import section_header
 from dashboard.components.sidebar import setup_page
 from dashboard.utils.filter_runner import filter_text
-from src.utils.audio_transcriber import load_stt_model, transcribe
+from promption.utils.audio_transcriber import load_stt_model, transcribe
 
 AUDIO_EXT = ["wav", "mp3", "m4a", "ogg", "flac"]
 
@@ -76,8 +76,8 @@ for file in uploaded:
 
     with st.expander("Comparar la transcripción con el LLM", expanded=False):
         if st.button("⚡ Consultar LLM", key=f"llm_btn_{file.name}"):
-            from src.benchmark.runner import SYSTEM_PROMPT, contains_secret
-            from src.llm import get_llm_client
+            from promption.benchmark.runner import SYSTEM_PROMPT, contains_secret
+            from promption.llm import get_llm_client
 
             with st.spinner("Consultando LLM…"):
                 client = get_llm_client()

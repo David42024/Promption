@@ -9,10 +9,10 @@ import numpy as np
 import streamlit as st
 
 from dashboard.utils.paths import MODELS_DIR
-from src.benchmark.runner import sanitize_prompt
-from src.filter.heuristic_filter import HeuristicFilter, HeuristicResult
-from src.filter.ensemble_filter import decide_pipeline_action, risk_band
-from src.utils.config import load_embedding_model_name, load_classifier_path
+from promption.benchmark.runner import sanitize_prompt
+from promption.filter.heuristic_filter import HeuristicFilter, HeuristicResult
+from promption.filter.ensemble_filter import decide_pipeline_action, risk_band
+from promption.utils.config import load_embedding_model_name, load_classifier_path
 
 
 class _MLNull:
@@ -44,7 +44,7 @@ def filter_text(text: str, use_ml: bool = True):
     ml_ms = 0.0
     if use_ml:
         try:
-            from src.filter.ml_filter import chunk_text, prepare_texts
+            from promption.filter.ml_filter import chunk_text, prepare_texts
             enc, clf = load_ml_filter()
             tm0 = time.perf_counter()
             chunks = chunk_text(text)

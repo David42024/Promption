@@ -1,0 +1,64 @@
+"""FastAPI entry point.
+
+Run:
+    uvicorn promption.api.main:app --reload --port 8000
+"""
+import os
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+from promption.utils.config import ROOT_DIR, load_config
+
+load_dotenv(ROOT_DIR / ".env", override=False)
+
+from promption.api.routes import router
+from promption.utils.logger import logger
+
+_CONF = load_config()
+
+app = FastAPI(
+    title="Promption Filter API",
+    description="API multi-tenant para proteger entradas y salidas de chatbots con "
+                "heurísticas, ML y Output Guard.",
+    version="1.0.0",
+)
+
+_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("PROMPTION_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-API-Key",
+        "X-Promption-API-Key",
+    ],
+)
+
+app.include_router(router, prefix="/api/v1")
+
+
+@app.get("/", tags=["root"])
+def root():
+    return {
+        "service": "Prompt Injection Filter",
+        "docs": "/docs",
+        "health": "/api/v1/health",
+        "filter": "POST /api/v1/filter",
+        "output_guard": "POST /api/v1/output-guard",
+        "authentication": "X-Promption-API-Key",
+        "benchmark": "POST /api/v1/benchmark",
+        "version": "1.0.0",
+        "deployment_marker": "filter-api-2026-09-14-multitenant",
+    }
+
+
+logger.info("API inicializada (config: %s)", _CONF["paths"]["root"])

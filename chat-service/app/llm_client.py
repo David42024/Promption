@@ -16,8 +16,8 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _guard_identity = ContextVar("vercel_ai_guard_identity", default=None)
 
 
-def set_guard_identity(user_id: str, roles: list[str], original_text: str):
-    _guard_identity.set({"user_id": user_id, "roles": roles, "original_text": original_text})
+def set_guard_identity(user_id: str, roles: list[str], original_text: str, authenticated: bool = False, security_messages: list | None = None):
+    _guard_identity.set({"user_id": user_id, "roles": roles, "original_text": original_text, "authenticated": authenticated, "security_messages": security_messages or []})
 
 
 def _bridge_payload(config: dict, messages: list, tools: list | None = None,
@@ -28,7 +28,9 @@ def _bridge_payload(config: dict, messages: list, tools: list | None = None,
     return {"model": config["model"], "messages": messages, "tools": tools or [],
             "force_tool": force_tool, "max_tokens": max_tokens or config["max_tokens"],
             "user_id": identity.get("user_id", "system"),
-            "roles": identity.get("roles", ["guest"]), "original_text": original_text}
+            "roles": identity.get("roles", ["guest"]), "original_text": original_text,
+            "authenticated": identity.get("authenticated", False),
+            "security_messages": identity.get("security_messages", [])}
 
 
 

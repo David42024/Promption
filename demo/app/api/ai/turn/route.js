@@ -59,15 +59,17 @@ export async function POST(request) {
       || typeof body.original_text !== "string" || !body.original_text.trim()
       || typeof body.user_id !== "string" || !Array.isArray(body.roles)
       || body.roles.some(role => !["guest", "customer", "ventas", "admin"].includes(role))
-      || !Array.isArray(body.tools) || body.tools.length > 25) {
+      || !Array.isArray(body.tools) || body.tools.length > 25
+      || (body.security_messages !== undefined && (!Array.isArray(body.security_messages)
+          || body.security_messages.length > 128))) {
     return Response.json({ error: "Solicitud de modelo inválida" }, { status: 400 });
   }
   try {
     const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const identity = { userId: body.user_id, roles: body.roles };
+    const identity = { userId: body.user_id, roles: body.roles, authenticated: body.authenticated === true };
     const model = wrapLanguageModel({
       model: provider(body.model),
-      middleware: promptionMiddleware(identity, body.original_text, request.signal),
+      middleware: promptionMiddleware(identity, body.original_text, request.signal, body.security_messages),
     });
     const tools = Object.fromEntries(body.tools.map(spec => [
       spec.function.name,

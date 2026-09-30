@@ -14,8 +14,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.filter.ensemble_filter import EnsembleFilter  # noqa: E402
-from src.filter.ml_filter import MLFilter  # noqa: E402
+from promption.filter.ensemble_filter import EnsembleFilter  # noqa: E402
+from promption.filter.ml_filter import MLFilter  # noqa: E402
 
 
 def guess_cause(row: pd.Series, rules: list) -> str:

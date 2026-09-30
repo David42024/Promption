@@ -28,9 +28,9 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.utils.config import load_config
-from src.utils.lang import is_spanish
-from src.utils.logger import logger
+from promption.utils.config import load_config
+from promption.utils.lang import is_spanish
+from promption.utils.logger import logger
 
 HF_BASE = "https://datasets-server.huggingface.co/rows"
 HF_RESOLVE = "https://huggingface.co/datasets/{id}/resolve/main/{path}"

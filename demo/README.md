@@ -70,3 +70,6 @@ no un fallo de la demo.
 
 Matriz esperada (como ana/ventas): docs visibles = público+interno;
 `getSueldos`/`getClientesVip` denegadas; como jefe: todo visible y ejecutable.
+
+El middleware se importa de `@promption/ai-sdk`, dependencia local en `packages/ai-sdk`.
+Consulta [LIBRARY.md](../LIBRARY.md) para reutilizarlo en otra app.

@@ -18,14 +18,14 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.benchmark.metrics import all_metrics, by_attack_type, by_dataset  # noqa: E402
-from src.benchmark.runner import (BenchmarkRunner, RunnerOptions, SYSTEM_PROMPT,  # noqa: E402
+from promption.benchmark.metrics import all_metrics, by_attack_type, by_dataset  # noqa: E402
+from promption.benchmark.runner import (BenchmarkRunner, RunnerOptions, SYSTEM_PROMPT,  # noqa: E402
                                   apply_output_guard, contains_secret, is_compromised,
                                   is_refusal, sanitize_prompt)
-from src.filter.ensemble_filter import build_default  # noqa: E402
-from src.llm import get_llm_client  # noqa: E402
-from src.output_guard import Action  # noqa: E402
-from src.utils.logger import logger  # noqa: E402
+from promption.filter.ensemble_filter import build_default  # noqa: E402
+from promption.llm import get_llm_client  # noqa: E402
+from promption.output_guard import Action  # noqa: E402
+from promption.utils.logger import logger  # noqa: E402
 
 
 class EvenRateLimiter:

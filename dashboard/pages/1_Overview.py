@@ -19,7 +19,7 @@ from dashboard.utils.data_loader import (
     load_benchmark_results,
     load_latest_json,
 )
-from src.benchmark.metrics import all_metrics
+from promption.benchmark.metrics import all_metrics
 
 setup_page("Overview — Prompt Injection Filter", "📊")
 

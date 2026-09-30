@@ -1,5 +1,8 @@
 # 🛡️ Prompt Injection Filter — Sistema de detección en dos capas
 
+Promption se consume como librería Python y como middleware de Vercel AI SDK.
+Consulta [la guía de integración](LIBRARY.md) para instalar y usar los paquetes.
+
 Sistema académico de prueba de concepto para detectar **Prompt Injection** en aplicaciones web con LLMs. Combina dos capas de defensa:
 
 | Capa | Técnica | Velocidad |
@@ -88,11 +91,11 @@ El video debe explicar **únicamente la funcionalidad del sistema**. No es neces
 
 ## 🧩 Componentes
 
-- **API FastAPI** (`src/api/`) — endpoints de filtrado, benchmark y monitorización.
+- **API FastAPI** (`promption/api/`) — endpoints de filtrado, benchmark y monitorización.
 - **Dashboard Streamlit** (`dashboard/`) — evaluación interactiva con 6 páginas y gráficas Plotly.
-- **Benchmark** (`src/benchmark/`) — mide ASR (Attack Success Rate), precisión, recall, F1, FPR/FNR y latencia.
-- **Entrenamiento** (`src/training/`) — pipeline de datos → embeddings → Random Forest.
-- **LLM** (`src/llm/`) — cliente para Ollama (Llama 3 / Mistral), usado como "LLM vulnerable".
+- **Benchmark** (`promption/benchmark/`) — mide ASR (Attack Success Rate), precisión, recall, F1, FPR/FNR y latencia.
+- **Entrenamiento** (`promption/training/`) — pipeline de datos → embeddings → Random Forest.
+- **LLM** (`promption/llm/`) — cliente para Ollama (Llama 3 / Mistral), usado como "LLM vulnerable".
 
 ## 🚀 Puesta en marcha
 
@@ -164,7 +167,7 @@ Los PDFs se convierten a texto por páginas con `pypdf` y los audios se transcri
 
 ```bash
 # Terminal 1 — API
-uvicorn src.api.main:app --reload --port 8000
+uvicorn promption.api.main:app --reload --port 8000
 
 # Terminal 2 — Dashboard (si no se usó el paso 3)
 streamlit run dashboard/app.py --server.port 8501

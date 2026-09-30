@@ -59,8 +59,8 @@ uvicorn app.main:app --reload --port 8001
 
 ### Docker
 ```bash
-docker build -t promption-chat-service .
-docker run -p 8000:8000 promption-chat-service
+docker build -f chat-service/Dockerfile -t promption-chat-service .
+docker run --env-file chat-service/.env -p 8001:8001 promption-chat-service
 ```
 
 ### Render
@@ -155,3 +155,6 @@ El almacenamiento actual está en memoria del proceso: reiniciar Chat Service bo
 `POST /api/v1/chat/stream` transmite eventos SSE `status` y un evento final `result`. Next.js los reenvía desde el mismo origen mediante `POST /api/chat` con `Accept: text/event-stream`, manteniendo el token del servicio en el servidor. Ambos chats muestran la etapa actual: revisión, consulta de herramientas, generación de archivo y validación de salida. El endpoint JSON sigue disponible. Mientras una conversación procesa una petición, el servidor rechaza otro turno con HTTP 409. `POST /api/v1/chat/cancel` permite detener la tarea activa.
 
 Cuando el usuario solicita un archivo, el servicio exige `make_document` si el modelo no lo llamó por sí solo. La herramienta corre mediante el SDK MCP en el servidor y admite DOCX, PDF, XLSX, TXT y CSV. La interfaz muestra un botón de descarga únicamente si la respuesta contiene una acción `attachment` o un documento existente autorizado. Si no se pudo crear el adjunto, la respuesta lo indica explícitamente.
+
+El build Docker usa la raíz del repositorio como contexto. El núcleo, las reglas ACL y
+la ejecución MCP provienen del paquete `promption`; ver [LIBRARY.md](../LIBRARY.md).

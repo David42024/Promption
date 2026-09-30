@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 curl && \
     rm -rf /var/lib/apt/lists/*
 
+COPY pyproject.toml LIBRARY.md ./
+COPY promption/ ./promption/
+COPY src/ ./src/
 COPY requirements-api.txt ./
 RUN pip install --upgrade pip && \
     pip install -r requirements-api.txt
@@ -22,4 +25,4 @@ EXPOSE 8000 8501
 
 # default: FastAPI (docker-compose overrides for the dashboard service)
 # $PORT permite que Render/Heroku inyecten el puerto de escucha (usa 8000 localmente)
-CMD uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD uvicorn promption.api.main:app --host 0.0.0.0 --port ${PORT:-8000}

@@ -12,8 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.utils.config import load_config  # noqa: E402
-from src.utils.logger import logger  # noqa: E402
+from promption.utils.config import load_config  # noqa: E402
+from promption.utils.logger import logger  # noqa: E402
 
 _CONF = load_config()
 

@@ -19,9 +19,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.training.dataset import load_raw_data  # noqa: E402
-from src.utils.config import load_config  # noqa: E402
-from src.utils.logger import logger  # noqa: E402
+from promption.training.dataset import load_raw_data  # noqa: E402
+from promption.utils.config import load_config  # noqa: E402
+from promption.utils.logger import logger  # noqa: E402
 
 _CONF = load_config()
 

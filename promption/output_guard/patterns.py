@@ -1,0 +1,91 @@
+"""Output Guard: tabla de patrones valor-conscientes (nunca keywords sueltas).
+
+Cada patrón detecta un VALOR sensible en contexto (asignación, formato
+estructural, prefijo conocido). Las menciones conceptuales
+("¿Qué es una API key?") no calzan porque exigen `=`/`:`/formato.
+"""
+from __future__ import annotations
+
+PLACEHOLDER_VALUES = {
+    "your_api_key", "your_password", "your_token", "your_secret",
+    "changeme", "example", "test", "demo", "xxx", "***", "...",
+    "test123", "password123",
+}
+
+PLACEHOLDER_RE = (
+    r"<[^<>\n]{1,40}>|\$\{[A-Za-z_][A-Za-z0-9_]*\}|YOUR_[A-Za-z_]+|"
+    r"process\.env\.[A-Za-z_]+|os\.getenv\([\"']?[A-Za-z_]+[\"']?\)|ENV\[[\"']?[A-Za-z_]+[\"']?\]"
+)
+
+# (name, category, severity, pattern, confidence, redact_whole_match[, validator])
+# validator(value) -> bool extra; "entropy" exige token con letras+dígitos.
+PATTERNS: list[tuple] = [
+    ("secret_proximity", "api_key", "MEDIUM",
+     r"(?i)\b(clave|key|secreto|secret|contrase[ñn]a|password|token|credencial|c[óo]digo)\b[^.\n]{0,60}?\b([A-Za-z0-9_\-]{8,})\b",
+     0.7, False, "secret_entropy"),
+    ("private_key_block", "private_key", "CRITICAL",
+     r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
+     0.99, True),
+    ("certificate_block", "private_key", "MEDIUM",
+     r"-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----",
+     0.6, True),
+    ("private_key_lone", "private_key", "HIGH",
+     r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
+     0.85, True),
+    ("connection_string", "connection_string", "CRITICAL",
+     r"\b(?:postgresql|postgres|mysql|mongodb(?:\+srv)?|redis|amqp):\/\/[^\s\/]*:[^@\s]{3,}@[^\s]+",
+     0.97, True),
+    ("connection_generic", "connection_string", "HIGH",
+     r"\b[a-z][a-z0-9+.-]{1,20}:\/\/[^:\s\/]{1,40}:[^@\s]{4,}@[^\s]{3,}",
+     0.85, True),
+    ("jwt", "jwt", "HIGH",
+     r"(?<![A-Za-z0-9_.-])([A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})(?![A-Za-z0-9_.-])",
+     0.88, True),
+    ("aws_access_key", "cloud", "HIGH", r"\bAKIA[0-9A-Z]{16}\b", 0.95, True),
+    ("aws_secret", "cloud", "HIGH",
+     r"(?i)\baws_secret_access_key\b\s*[:=]\s*['\"]?([A-Za-z0-9/+=]{20,})", 0.9, False),
+    ("github_token", "cloud", "HIGH", r"\bgh[opsu]_[A-Za-z0-9]{10,}\b", 0.93, True),
+    ("slack_token", "cloud", "HIGH", r"\bxox[bap]-[A-Za-z0-9-]{8,}\b", 0.93, True),
+    ("google_oauth", "cloud", "HIGH", r"\bya29\.[A-Za-z0-9_-]{10,}\b", 0.9, True),
+    ("groq_key", "api_key", "HIGH", r"\bgsk_[A-Za-z0-9]{10,}\b", 0.93, True),
+    ("promption_key", "api_key", "HIGH",
+     r"(?<![A-Za-z0-9._-])(pk-[A-Za-z0-9][A-Za-z0-9._-]{11,})(?![A-Za-z0-9._-])", 0.93, True),
+    ("sk_key", "api_key", "HIGH", r"\bsk-(?!test\b)[A-Za-z0-9]{10,}\b", 0.9, True),
+    ("bearer_token", "api_key", "HIGH",
+     r"(?i)\bbearer\s+([A-Za-z0-9\-._~+/=]{12,})", 0.88, False),
+    ("api_key_assign", "api_key", "HIGH",
+     r"(?i)\b(api[_-]?key|apikey|access_token|auth_token|client_secret)\b\s*[:=]\s*['\"]?([^\s'\",;]{8,})",
+     0.85, False),
+    ("secret_assign", "api_key", "HIGH",
+     r"(?i)\bsecret\b\s*[:=]\s*['\"]?([^\s'\",;]{8,})", 0.8, False),
+    ("api_key_bare_value", "api_key", "HIGH",
+     r"(?i)\bapi[_-]?key\b\s+((?:sk-|gsk-|ghp_|gho_|AKIA|xox[bap]-)[A-Za-z0-9\-_]{6,}[A-Za-z0-9\-_.=]*)",
+     0.9, False),
+    ("password_assign", "password", "HIGH",
+     r"(?i)\b(passwd|password|pwd|contrase[ñn]a|clave(?: privada)?)\b\s*[:=]\s*['\"]?([^\s'\",;]{4,})", 0.85, False),
+    ("user_pass_pair", "password", "CRITICAL",
+     r"(?i)\b(user(name)?|login)\b\s*[:=]\s*['\"]?[^\s'\",;]+\s+(?:\S+\s+)?\b(passwd|password|pwd)\b\s*[:=]\s*['\"]?[^\s'\",;]{4,}",
+     0.9, True),
+    ("login_pair", "password", "CRITICAL",
+     r"(?i)\buser\s*:\s*[^\s,;]+\s+password\s*:\s*[^\s,;]{4,}", 0.9, True),
+    # Patrones de negación genérica (evitar respuestas vacías del LLM)
+    ("generic_refusal_es", "refusal", "MEDIUM",
+     r"(?i)(lo siento|no puedo|no estoy|no seré|no me es posible|no estoy programado|no tengo permiso|no puedo ayudar|no puedo proporcionar|no puedo revelar|no puedo compartir|no puedo dar|no puedo mostrar|no dispongo|no cuento|no tengo acceso|no tengo información|no soy capaz).{0,100}(con eso|con esto|con esa información|con ese dato|con esos datos|con esa solicitud|con esa petición|con ese tema|con ese asunto|ese tipo de información|esa lista|esos datos|esa información|$)",
+     0.75, True),
+    ("generic_refusal_en", "refusal", "MEDIUM",
+     r"(?i)(i'm sorry|i cannot|i am not|i will not|i am not able|i do not have permission|i cannot help|i cannot provide|i cannot reveal|i cannot share|i cannot give|i cannot show|i don't have access|i don't have information|i'm not capable).{0,100}(with that|with this|with that information|with that data|with those details|with that request|with that topic|that type of information|that list|those data|that information|$)",
+     0.75, True),
+    ("polite_refusal_es", "refusal", "LOW",
+     r"(?i)(disculpa|perdona|lamentablemente|por desgracia|desafortunadamente).{0,30}(no puedo|no puedo ayudar|no está disponible|no tengo acceso|no me es posible)",
+     0.65, True),
+    ("polite_refusal_en", "refusal", "LOW",
+     r"(?i)(i apologize|sorry|unfortunately|regrettably).{0,30}(i cannot|i cannot help|it is not available|i do not have access|i am not able)",
+     0.65, True),
+    # Patrón específico para "no tengo permiso para compartir..."
+    ("permission_refusal_es", "refusal", "MEDIUM",
+     r"(?i)(no tengo permiso|no cuento con permiso|no dispongo de permiso|no estoy autorizado|no me está permitido).{0,60}(para compartir|para mostrar|para revelar|para proporcionar|para dar|para facilitar|para acceder a|para ver|para consultar)",
+     0.8, True),
+    ("permission_refusal_en", "refusal", "MEDIUM",
+     r"(?i)(i don't have permission|i don't have the permission|i am not authorized|i am not permitted|i don't have access).{0,60}(to share|to show|to reveal|to provide|to give|to facilitate|to access|to see|to view|to consult)",
+     0.8, True),
+]
