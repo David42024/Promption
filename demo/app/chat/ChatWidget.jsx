@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import PermissionsConfig from "./PermissionsConfig";
 import ChatActions from "./ChatActions";
+import MarkdownMessage from "./MarkdownMessage.mjs";
 import { sendChat } from "./chatStream";
 
 const SendIcon = () => (
@@ -36,49 +37,6 @@ const SettingsIcon = () => (
   </svg>
 );
 
-// Función para formatear mensajes del bot de manera más bonita y estructurada
-function formatBotMessage(text) {
-  if (!text) return "";
-  
-  // Dividir en secciones basadas en encabezados
-  const sections = text.split(/(?=### |## |\*\*[^*]+\*\*:)/);
-  
-  // Si no hay secciones claras, dividir por párrafos
-  if (sections.length <= 1) {
-    const paragraphs = text.split('\n\n').filter(p => p.trim());
-    if (paragraphs.length > 1) {
-      return paragraphs.map((p, i) => {
-        if (i === 0) return p; // Primer párrafo normal
-        return `\n\n${p}`; // Resto con separación
-      }).join('');
-    }
-    return text;
-  }
-  
-  // Formatear secciones con encabezados
-  return sections.map((section, index) => {
-    if (index === 0) return section; // Primera sección normal
-    
-    // Detectar si es un encabezado
-    const headerMatch = section.match(/^(#{1,3})\s+(.+)$/m);
-    if (headerMatch) {
-      const [, hashes, title] = headerMatch;
-      const level = hashes.length;
-      const emoji = level === 1 ? '🎯' : level === 2 ? '📋' : '📌';
-      return `\n\n${emoji} **${title}**\n${section.replace(headerMatch[0], '').trim()}`;
-    }
-    
-    // Detectar si es lista con negritas como títulos
-    const boldMatch = section.match(/^\*\*([^*]+)\*\*:/);
-    if (boldMatch) {
-      const [, title] = boldMatch;
-      const emoji = '📋';
-      return `\n\n${emoji} **${title}**\n${section.replace(boldMatch[0], '').trim()}`;
-    }
-    
-    return `\n\n${section.trim()}`;
-  }).join('');
-}
 
 export default function ChatWidget() {
   const { msgs, setMsgs, isOpen, setIsOpen, historyLoaded, newConversation } = useChat();
@@ -170,8 +128,6 @@ export default function ChatWidget() {
         // Ocultar siempre el span del modelo por defecto
         const modelTag = ""; 
         
-        // Formatear la respuesta para que sea más bonita y estructurada
-        const formattedReply = formatBotMessage(data.reply);
         
         // Indicador de estado del filtro
         const filterIndicator = data.filter_skipped 
@@ -186,7 +142,7 @@ export default function ChatWidget() {
             from: "bot",
             actions: data.actions || [],
             text:
-              formattedReply +
+              data.reply +
               filterIndicator +
               (data.leaked ? "\n\n⚠️ (el modelo filtró el secreto)" : "") +
               (data.guard === "BLOCK" || data.guard === "REDACT" ? "\n\n🛡️ (Respuesta filtrada por seguridad)" : "") +
@@ -394,7 +350,7 @@ export default function ChatWidget() {
                     : "bot"
               }`}
             >
-              {m.text}
+              {m.from === "blocked" ? m.text : <MarkdownMessage text={m.text} />}
               {m.actions?.length > 0 && <ChatActions actions={m.actions}
                 onAnswer={(question, value) => send(null, `Respuesta a la pregunta "${question}": ${value}`)} />}
             </div>

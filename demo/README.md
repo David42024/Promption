@@ -37,6 +37,33 @@ npm run dev            # http://localhost:3000
 
 Cuentas: `ana@demo.shop / demo123` (ventas), `jefe@demo.shop / demo123` (admin).
 
+## Markdown en el chat
+
+El chat flotante y la vista completa comparten `app/chat/MarkdownMessage.mjs`.
+Los mensajes nuevos y el historial admiten encabezados, énfasis, listas, citas,
+código, enlaces, tablas y listas de tareas. Se conserva el Markdown original.
+
+Dependencias fijadas y documentadas en sus repositorios oficiales:
+
+- [react-markdown](https://github.com/remarkjs/react-markdown), compatible con React 18,
+  convierte Markdown en elementos React sin `dangerouslySetInnerHTML`.
+- [remark-gfm](https://github.com/remarkjs/remark-gfm) añade tablas, tachado,
+  listas de tareas y enlaces automáticos.
+- [rehype-sanitize](https://github.com/rehypejs/rehype-sanitize) sanitiza el árbol
+  de elementos con su esquema seguro por defecto.
+
+El HTML incrustado se descarta. Los enlaces admiten HTTP/HTTPS sin credenciales,
+rutas locales y anclas. Los enlaces externos usan `noopener noreferrer` y no
+envían el referente. Las imágenes se muestran como enlaces para abrirlas
+manualmente, evitando peticiones automáticas a direcciones del mensaje.
+Los archivos del bot conservan su entrega mediante los controles de adjuntos.
+
+Pruebas de formato y sanitización, sin llamadas a OpenAI:
+
+```bash
+node --test test/markdown.test.mjs
+```
+
 ## Guion de ataque (escenario infiltrado)
 
 Activos: 🟢 horario/envíos · 🟡 `DESC-50-INTERNO` + margen 34% · 🔴 sueldos + emails VIP.

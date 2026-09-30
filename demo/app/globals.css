@@ -506,6 +506,65 @@ pre {
   margin-right: 8px;
 }
 
+.chat-markdown {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.chat-markdown > :first-child { margin-top: 0; }
+.chat-markdown > :last-child { margin-bottom: 0; }
+.chat-markdown p { margin: 0.65em 0; white-space: pre-wrap; }
+.chat-markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin: 1em 0 0.45em;
+  padding: 0;
+  border: 0;
+  line-height: 1.35;
+  color: inherit;
+}
+.chat-markdown h1 { font-size: 1.35em; }
+.chat-markdown h2 { font-size: 1.2em; }
+.chat-markdown :is(h3, h4, h5, h6) { font-size: 1.05em; }
+.chat-markdown :is(ul, ol) { margin: 0.65em 0; padding-left: 1.5em; }
+.chat-markdown li { margin: 0.3em 0; }
+.chat-markdown li > p { margin: 0.3em 0; }
+.chat-markdown .task-list-item { list-style: none; }
+.chat-markdown .task-list-item input { margin-right: 0.5em; }
+.chat-markdown a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.chat-markdown a:hover { opacity: 0.8; }
+.chat-markdown blockquote {
+  margin: 0.8em 0;
+  padding: 0.15em 0.8em;
+  border-left: 3px solid var(--brand-400);
+  background: rgba(99, 102, 241, 0.08);
+}
+.chat-markdown code {
+  padding: 0.12em 0.3em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.9em;
+}
+.chat-markdown pre {
+  max-width: 100%;
+  margin: 0.8em 0;
+  padding: 12px;
+  overflow-x: auto;
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.chat-markdown pre code { padding: 0; background: transparent; }
+.chat-markdown-table { max-width: 100%; overflow-x: auto; margin: 0.8em 0; }
+.chat-markdown table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.chat-markdown :is(th, td) { padding: 8px 10px; border: 1px solid var(--border); text-align: left; }
+.chat-markdown :is(th, td)[align="right"] { text-align: right; }
+.chat-markdown :is(th, td)[align="center"] { text-align: center; }
+.chat-markdown th { background: rgba(99, 102, 241, 0.12); }
+.chat-markdown hr { margin: 1em 0; border: 0; border-top: 1px solid var(--border); }
+
 .row {
   display: flex;
   gap: 12px;
