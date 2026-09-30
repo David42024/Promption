@@ -20,9 +20,17 @@ async function request(url, body, headers, config, signal) {
       body: JSON.stringify(body), signal: controller.signal, cache: "no-store",
       redirect: "error",
     });
-    if (!response.ok) throw new PromptionError("GUARD_REQUEST_FAILED", {
-      status: response.status === 403 ? 403 : 503,
-    });
+    if (!response.ok) {
+      let detail;
+      try { detail = (await response.json())?.detail; } catch {}
+      const code = response.status === 403 && detail?.code === "CONTENT_BLOCKED"
+        ? "CONTENT_BLOCKED" : response.status === 503 && detail?.code === "GUARD_UNAVAILABLE"
+          ? "GUARD_UNAVAILABLE" : "GUARD_REQUEST_FAILED";
+      throw new PromptionError(code, {
+        status: response.status === 403 ? 403 : 503,
+        direction: ["input", "output"].includes(detail?.direction) ? detail.direction : undefined,
+      });
+    }
     return await response.json();
   } catch (error) {
     if (signal?.aborted) throw signal.reason || error;

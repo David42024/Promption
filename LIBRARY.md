@@ -122,6 +122,98 @@ Esta capa detecta los patrones y reconstrucciones cubiertos por sus reglas y el
 modelo disponible; no garantiza detectar cualquier estrategia semántica nueva. La
 ACL y Output Guard se mantienen como controles independientes.
 
+### Alcance y límites del prompt del sistema
+
+Activa la evaluación semántica con `scopeEvaluator`. El middleware toma como
+referencia las instrucciones enviadas mediante `system` y revisa la petición actual
+con el historial. También comprueba las llamadas a herramientas antes de ejecutarlas.
+El evaluador usa la salida estructurada de AI SDK, sin ejecutar herramientas:
+
+```ts
+import { createPromption, createScopeEvaluator } from '@promption/ai-sdk';
+
+const protection = createPromption({
+  baseUrl: process.env.FILTER_API_URL!,
+  apiKey: process.env.PROMPTION_API_KEY!,
+  scopeEvaluator: createScopeEvaluator({ model: openai(process.env.OPENAI_MODEL!) }),
+});
+const system = 'Ayuda solo con productos, compras y envíos de nuestra tienda.';
+const model = wrapLanguageModel({
+  model: openai(process.env.OPENAI_MODEL!),
+  middleware: protection.middleware({ identity }),
+});
+await generateText({ model, system, prompt: text });
+
+const scope = await protection.checkScope(text, { identity, systemPrompt: system, messages: securityMessages });
+// { classification: 'IN_SCOPE' | 'OUT_OF_SCOPE' | 'UNCERTAIN', reason, allowed, status }
+```
+
+`OUT_OF_SCOPE` distingue un tema ajeno (`topic_outside_scope`) de un límite infringido
+(`system_limit`). Una solicitud mixta con una tarea prohibida también se rechaza.
+`UNCERTAIN`, los fallos y los resultados inválidos bloquean la operación. Los errores
+del middleware exponen `OUT_OF_SCOPE` o `SCOPE_UNCERTAIN` y una decisión en `error.scope`.
+`onDecision` recibe esa clasificación sin incluir prompts, datos ni explicaciones del modelo.
+
+La política siempre debe pertenecer al servidor. El contenido del usuario, las
+respuestas anteriores y las tools sirven como evidencia, sin ampliar el alcance ni
+los permisos. No conviertas políticas enviadas por el navegador en `systemPrompt`.
+Para `protectTool`, proporciona `systemPrompt` y el historial de `execute` o
+`originalText`, además de la identidad validada. Puedes sustituir el evaluador por
+una función propia que devuelva la clasificación y el código de motivo.
+
+La app incluye una política explícita de tienda en `build_system_prompt`, evalúa el
+alcance antes de recuperar datos o generar archivos y lo vuelve a comprobar para
+cada operación propuesta. Devuelve `scope` en la respuesta del chat y usa
+`block_type: 'scope'` para mostrar el motivo correcto. El endpoint protegido
+`POST /api/v1/ai/scope` de Chat Service permite consultar el resultado; recibe texto,
+usuario validado e historial y construye la política en el servidor.
+
+Las evaluaciones se ejecutan en Next.js con AI SDK y `OPENAI_MODEL` (nano en esta
+app), con un límite de 30 segundos. Añaden llamadas y latencia de clasificación.
+No requieren nuevas variables de entorno. Esta revisión semántica es probabilística;
+las reglas de inyección, ACL y Output Guard siguen aplicándose aunque indique `IN_SCOPE`.
+
+En Python, `ScopeGuard(evaluator)` y `AsyncScopeGuard(evaluator)` reciben un
+evaluador propio. Este obtiene un diccionario con `text`, `system_prompt`, `messages`,
+`identity` y, si corresponde, `tool`. Devuelve `classification` y `reason` con los
+mismos valores que el SDK:
+
+```python
+from promption import Promption, ScopeGuard
+
+protection = Promption(scope_guard=ScopeGuard(my_semantic_evaluator))
+decision = protection.check_input(text, identity, system_prompt=system, messages=history)
+```
+
+`AsyncGuardPipeline` acepta `scope_guard=AsyncScopeGuard(...)` y `system_prompt`
+en `check`. Desactivar el filtro de inyección no desactiva la política de alcance.
+
+### Solicitudes con revisión de salida
+
+El filtro de inyección y el evaluador de alcance toman decisiones distintas:
+
+| Componente | Resultado | Acción |
+| --- | --- | --- |
+| Filtro de inyección | `BLOCKED` / `MALICIOUS` | Bloquear, incluso si el usuario tiene permiso. |
+| Filtro de inyección | `GUARDED` / `UNCERTAIN` | Mantener la incertidumbre y exigir Output Guard. También se aplican ACL, contexto y alcance. |
+| Evaluador de alcance | `UNCERTAIN` / `OUT_OF_SCOPE` | Bloquear antes de recuperar datos o ejecutar herramientas. |
+
+`AsyncGuardPipeline` aplica esta distinción automáticamente. Para integrar una
+respuesta del filtro ya obtenida, usa `input_guard_decision(text, result,
+message_count=len(history), output_enabled=True)`. Un estado `GUARDED` no necesita
+una excepción por frase ni ser reclasificado como benigno para continuar.
+Si Output Guard está desactivado o no se inspeccionó el contexto completo, bloquea.
+
+`output_guard_decision(text, result)` valida `PASS`, `REDACT` y `BLOCK`. Las
+respuestas incompletas bloquean; una redacción vacía nunca recupera el texto original.
+La app usa la misma validación para respuestas y contenido de documentos antes del MCP.
+
+El evaluador semántico usa un único veredicto enumerado y deriva la clasificación
+y el motivo, evitando combinaciones contradictorias. Tolera saludos, cortesía y
+errores de escritura cuando el tema y los permisos son claros. Su evaluación interna
+se descarta. El esquema utiliza las salidas estructuradas del AI SDK, compatibles
+con [Structured Outputs de OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs).
+
 ## Paquete Python
 
 ```bash
@@ -158,6 +250,7 @@ en `site-packages`, y los valores por defecto no crean archivos de logs.
 | Heurística, ML y ensemble | `promption.filter` |
 | Detección y redacción de salida | `promption.output_guard` |
 | Detección acumulativa | `promption.ConversationGuard`, `ConversationMessage` |
+| Alcance semántico y límites del sistema | `promption.ScopeGuard`, `AsyncScopeGuard`, `ScopeDecision` |
 | Pipeline local y async | `promption.Promption`, `promption.AsyncGuardPipeline` |
 | ACL de recursos configurable | `promption.policies.PolicyEngine`, `ResourcePolicy` |
 | Registro MCP y ACL por herramienta | `promption.tools.mcp.MCPToolExecutor`, `ToolPolicy` |

@@ -114,7 +114,7 @@ RESOURCE_POLICIES = (
         tier="interno",
         tool_name="getStockInfo",
         patterns=(
-            r"\b(stock\s+critico|unidades\s+(?:restantes|disponibles)|almacen|reponiendo|rotura\s+de\s+stock|proveedor(?:es)?|margen\s+con)\b",
+            r"\b(stock|stcok|inventario|existencias|unidades\s+(?:restantes|disponibles)|almacen|reponiendo|rotura\s+de\s+stock|proveedor(?:es)?|margen\s+con)\b",
         ),
         confidence=0.94,
     ),
@@ -124,6 +124,7 @@ RESOURCE_POLICIES = (
         tier="interno",
         tool_name="getPromotions",
         patterns=(
+            r"\bpolitica(?:s)?\s+(?:de|sobre)\s+(?:descuento(?:s)?|promocion(?:es)?)\b",
             r"\b(descuento|codigo)\b.{0,45}\b(emplead\w*|interno|sin\s+aprobacion|con\s+aprobacion|jefe|excepcional)\b",
             r"\b(empleado-?25|desc-?50-?interno|politica(?:s)?\s+comercial(?:es)?)\b",
         ),

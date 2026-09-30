@@ -58,6 +58,13 @@ def load_heuristics() -> dict:
     return _read_yaml(HEURISTICS_PATH)
 
 
+def reload_heuristics() -> dict:
+    """Discard cached rule files before rebuilding filters in a running service."""
+    _read_yaml.cache_clear()
+    load_heuristics.cache_clear()
+    return load_heuristics()
+
+
 def load_embedding_model_name() -> str:
     return str(load_config()["model"].get("embedding_model", "all-MiniLM-L6-v2"))
 

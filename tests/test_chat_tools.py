@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("scope_in_scope")
+
 CHAT_SERVICE = Path(__file__).resolve().parents[1] / "chat-service"
 if str(CHAT_SERVICE) not in sys.path:
     sys.path.insert(0, str(CHAT_SERVICE))
@@ -50,7 +52,7 @@ def test_csv_formula_is_not_executable():
 def test_model_cannot_force_admin_tool_for_customer(monkeypatch):
     class Filter:
         async def filter_prompt(self, **kwargs):
-            return SimpleNamespace(blocked=False, classification="BENIGN", layers={},
+            return SimpleNamespace(blocked=False, classification="BENIGN", layers={"conversation": {"message_count": len(kwargs.get("messages") or []), "blocked": False}},
                                    reason="", confidence=0.1)
 
         async def output_guard(self, **kwargs):
@@ -75,7 +77,7 @@ def test_model_cannot_force_admin_tool_for_customer(monkeypatch):
 
     monkeypatch.setattr(routes, "get_filter_client", lambda: Filter())
     monkeypatch.setattr(routes, "get_llm_client", lambda: LLM())
-    request = ChatRequest(text="Hola, ¿qué puedes hacer?", user=User(
+    request = ChatRequest(text="Hola, ayúdame con la tienda.", user=User(
         id="c1", name="Cliente", email="c@example.com", roles=["customer"], authenticated=True))
     response = asyncio.run(routes.chat(request))
     assert response.blocked is False
@@ -166,7 +168,7 @@ def test_document_action_requires_confirmation_for_confidential_scope(monkeypatc
 
     class Filter:
         async def filter_prompt(self, **kwargs):
-            return SimpleNamespace(blocked=False, classification="BENIGN", layers={},
+            return SimpleNamespace(blocked=False, classification="BENIGN", layers={"conversation": {"message_count": len(kwargs.get("messages") or []), "blocked": False}},
                                    reason="", confidence=0.1)
 
         async def output_guard(self, **kwargs):
@@ -202,7 +204,7 @@ def test_guest_uses_no_tools_even_for_public_policy(monkeypatch):
 
     class Filter:
         async def filter_prompt(self, **kwargs):
-            return SimpleNamespace(blocked=False, classification="BENIGN", layers={},
+            return SimpleNamespace(blocked=False, classification="BENIGN", layers={"conversation": {"message_count": len(kwargs.get("messages") or []), "blocked": False}},
                                    reason="", confidence=0.1)
 
         async def output_guard(self, **kwargs):
@@ -290,7 +292,7 @@ def test_sales_capabilities_xlsx_uses_authorized_catalog(monkeypatch, verb):
 
     class Filter:
         async def filter_prompt(self, **kwargs):
-            return SimpleNamespace(blocked=False, classification="BENIGN", layers={},
+            return SimpleNamespace(blocked=False, classification="BENIGN", layers={"conversation": {"message_count": len(kwargs.get("messages") or []), "blocked": False}},
                                    reason="", confidence=0.1)
 
         async def output_guard(self, **kwargs):

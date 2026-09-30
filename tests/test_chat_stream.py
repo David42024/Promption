@@ -6,6 +6,9 @@ import sys
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
+import pytest
+
+pytestmark = pytest.mark.usefixtures("scope_in_scope")
 
 CHAT_SERVICE = Path(__file__).resolve().parents[1] / "chat-service"
 if str(CHAT_SERVICE) not in sys.path:
@@ -18,7 +21,7 @@ from app.models import ChatRequest, User
 
 class Filter:
     async def filter_prompt(self, **kwargs):
-        return SimpleNamespace(blocked=False, classification="BENIGN", layers={},
+        return SimpleNamespace(blocked=False, classification="BENIGN", layers={"conversation": {"message_count": len(kwargs.get("messages") or []), "blocked": False}},
                                reason="", confidence=0.1)
 
     async def output_guard(self, **kwargs):

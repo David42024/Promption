@@ -372,6 +372,12 @@ rules:
 # Señales benignas explícitas. Una coincidencia completa da score 0 y permite
 # omitir el veto ML únicamente cuando ninguna regla maliciosa coincide.
 benign:
+  - name: "assistant_capabilities"
+    pattern: '^\s*[¿¡]?(?:(?:hola+|buenas|oye)[\s,!.¿?]+)?(?:(?:dime|cu[eé]ntame|expl[ií]came|mu[eé]strame|lista|enumera)\s+)?(?:(?:qu[eé]|(?:todo\s+)?lo\s+que)\s+(?:puedes|puedo|podemos)\s+(?:hacer|ahcer|hcaer)|qu[eé]\s+(?:haces|sabes\s+hacer|servicios\s+ofreces)|(?:cu[aá]les\s+son\s+)?(?:tus|mis|las)\s+(?:capacidades|funciones|permisos|herramientas)(?:\s+(?:disponibles|actuales|autorizadas))?|(?:en\s+qu[eé]|c[oó]mo)\s+(?:me\s+)?puedes\s+ayudar(?:me)?|qu[eé]\s+(?:funciones|herramientas)\s+(?:tienes|tengo))(?:\s+(?:en\s+(?:este\s+)?(?:chat|promption\s+shop)|con\s+mi\s+(?:cuenta|sesi[oó]n)|por\s+m[ií]))?(?:\s+y\s+qu[eé]\s+no(?:\s+puedes\s+hacer)?)?[\s,!.¿?]*(?:por\s+favor|porfa)?[\s,!.¿?]*$'
+    description: "Pregunta completa sobre funciones o permisos; no autoriza herramientas ni datos"
+  - name: "business_discount_policy"
+    pattern: '^\s*[¿¡]?(?:por\s+favor[,:]?\s+)?(?:dame|mu[eé]strame|expl[ií]came|cu[aá]l\s+es|cu[aá]les\s+son)\s+(?:tu|tus|la|las|su|sus)\s+pol[ií]ticas?\s+(?:de|sobre)\s+(?:descuentos?|promociones)(?:\s+de\s+la\s+tienda)?(?:[,;]?\s+por\s+favor)?\s*[.!?]*\s*$'
+    description: "Consulta completa de política comercial; los permisos se validan por separado"
   - name: "politeness"
     pattern: "^\\s*(gracias|muchas gracias|por favor|porfa|thank you|thanks|please)\\s*[.!¡¿?]*\\s*$"
     description: "Cortesía breve y completa"

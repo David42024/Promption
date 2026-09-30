@@ -306,6 +306,8 @@ def get_config(tenant: TenantContext = Depends(_require_admin)):
 def reload_filter(tenant: TenantContext = Depends(_require_admin)):
     """Reload the heuristic rules / ML model without restarting the API."""
     global _filter
+    from promption.utils.config import reload_heuristics
+    reload_heuristics()
     _filter = EnsembleFilter()
     _tenant_filters.clear()
     return {"status": "reloaded", "layers": _filter.layers_status()}

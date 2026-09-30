@@ -1,6 +1,8 @@
 import { conversationEvidence } from "./conversation.js";
 import { PromptionError } from "./errors.js";
 import { createFilterApiTransport } from "./transports.js";
+import { validateScopeDecision, validateScopeRequest } from "./scope.js";
+export { createScopeEvaluator } from "./scope.js";
 export { PromptionError } from "./errors.js";
 export { createFilterApiTransport, createGuardEndpointTransport } from "./transports.js";
 
@@ -47,6 +49,33 @@ export function createPromption(config) {
   for (const limit of [config.maxConversationMessages ?? 128, config.maxConversationChars ?? 100000]) {
     if (!Number.isSafeInteger(limit) || limit < 1) throw new TypeError("Conversation limits must be positive integers");
   }
+
+  async function checkScope(text, options) {
+    if (typeof config.scopeEvaluator !== "function") throw new TypeError("Configure a semantic scope evaluator");
+    const request = { ...options, text, identity: identityOf(options.identity) };
+    validateScopeRequest(request);
+    options.signal?.throwIfAborted();
+    let decision;
+    try { decision = validateScopeDecision(await config.scopeEvaluator(request)); }
+    catch (error) {
+      if (options.signal?.aborted) throw error;
+      decision = { classification: "UNCERTAIN", reason: "scope_unavailable", allowed: false, status: 503 };
+    }
+    options.signal?.throwIfAborted();
+    config.onDecision?.({ direction: "input", allowed: decision.allowed,
+      action: decision.allowed ? "PASS" : "BLOCK", userId: request.identity.userId, scope: decision });
+    return decision;
+  }
+
+  async function enforceScope(text, options) {
+    const decision = await checkScope(text, options);
+    if (!decision.allowed) {
+      const error = new PromptionError(decision.classification === "OUT_OF_SCOPE" ? "OUT_OF_SCOPE" : "SCOPE_UNCERTAIN",
+        { status: decision.status, direction: "input" });
+      error.scope = decision;
+      throw error;
+    }
+  }
   const maxTextChars = config.maxTextChars ?? 100000;
   const maxStreamBytes = config.maxStreamBytes ?? 1048576;
   if (typeof transport !== "function" || !Number.isFinite(maxTextChars) || maxTextChars < 1
@@ -84,6 +113,17 @@ export function createPromption(config) {
     });
     const evidence = params => conversationEvidence(params?.prompt ?? [], options.securityMessages,
       { maxMessages: config.maxConversationMessages, maxChars: config.maxConversationChars });
+    const scopeGuard = async (params, tool) => {
+      if (!config.scopeEvaluator) return;
+      const systemPrompt = options.systemPrompt ?? (params?.prompt ?? [])
+        .filter(message => message.role === "system").map(textOf).join("\n\n");
+      const lastText = textOf((params?.prompt ?? []).filter(message => message.role === "user").at(-1));
+      const texts = new Set([options.originalText ?? lastText, ...(lastText ? [lastText] : [])]);
+      for (const text of texts) {
+        await enforceScope(text, { identity, systemPrompt, messages: evidence(params), tool,
+          signal: options.signal ?? params?.abortSignal });
+      }
+    };
     const conversationGuard = async (text, params, extra = []) => {
       const messages = [...evidence(params), ...extra];
       if (!messages.length) return;
@@ -107,6 +147,8 @@ export function createPromption(config) {
         } else if (part.type === "tool-call") {
           assertTool(part.toolName, identity, options.toolPolicies, params?.tools);
           await conversationGuard(part.input, params, [{ role: "tool", content: part.input, tool_name: part.toolName }]);
+          await scopeGuard(params, { name: part.toolName, input: part.input,
+            description: params?.tools?.find(tool => tool.name === part.toolName)?.description });
           const safe = await guard(part.input, "output", params);
           if (safe !== part.input) throw new PromptionError("TOOL_ARGUMENTS_REDACTED");
           checked.push({ ...part, providerMetadata: undefined });
@@ -145,6 +187,7 @@ export function createPromption(config) {
           }
         }
         await conversationGuard(safeLast || safe, { ...params, prompt });
+        await scopeGuard({ ...params, prompt });
         const tools = params.tools?.filter(tool => permitted(tool.name, identity, options.toolPolicies));
         if (params.toolChoice?.type === "tool") {
           assertTool(params.toolChoice.toolName, identity, options.toolPolicies, tools);
@@ -234,6 +277,14 @@ export function createPromption(config) {
             messages: [...messages, { role: "tool", content: raw, tool_name: options.name }] });
           if (safe !== raw) throw new PromptionError("TOOL_ARGUMENTS_REDACTED");
         }
+        if (config.scopeEvaluator) {
+          const lastText = messages.filter(message => message.role === "user").at(-1)?.content;
+          const texts = new Set([options.originalText ?? lastText, ...(lastText ? [lastText] : [])]);
+          for (const text of texts) {
+            await enforceScope(text, { identity, signal, systemPrompt: options.systemPrompt, messages,
+              tool: { name: options.name, input: raw, description: definition.description } });
+          }
+        }
         const result = await definition.execute(input, execution);
         const original = serialize(result);
         const safe = await check(original, { direction: "output", identity, signal });
@@ -245,5 +296,5 @@ export function createPromption(config) {
     };
   }
 
-  return Object.freeze({ check, middleware, protectTool });
+  return Object.freeze({ check, checkScope, middleware, protectTool });
 }

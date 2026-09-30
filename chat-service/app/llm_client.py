@@ -16,6 +16,33 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _guard_identity = ContextVar("vercel_ai_guard_identity", default=None)
 
 
+class AIGuardBlocked(Exception):
+    """Carry a sanitized model-guard failure without treating it as provider downtime."""
+
+    def __init__(self, code: str, scope: dict | None = None):
+        self.code = code
+        self.scope = scope
+        super().__init__(code)
+
+
+def _raise_bridge_guard(response):
+    if response.status_code not in {403, 503}:
+        return
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    codes = {"OUT_OF_SCOPE", "SCOPE_UNCERTAIN", "CONTENT_BLOCKED", "GUARD_UNAVAILABLE",
+             "INVALID_GUARD_RESPONSE", "GUARD_REQUEST_FAILED", "TOOL_ACCESS_DENIED",
+             "CONVERSATION_TOO_LARGE", "CONVERSATION_NOT_CHECKED", "CONVERSATION_REDACTED",
+             "UNTRUSTED_TOOL_CONTENT", "TOOL_ARGUMENTS_REDACTED", "STRUCTURED_OUTPUT_REDACTED",
+             "UNINSPECTED_MODEL_FILE"}
+    code = data.get("code") if isinstance(data, dict) else None
+    if code in codes or response.status_code == 403:
+        scope = data.get("scope") if isinstance(data, dict) else None
+        raise AIGuardBlocked(code if code in codes else "CONTENT_BLOCKED", scope)
+
+
 def set_guard_identity(user_id: str, roles: list[str], original_text: str, authenticated: bool = False, security_messages: list | None = None):
     _guard_identity.set({"user_id": user_id, "roles": roles, "original_text": original_text, "authenticated": authenticated, "security_messages": security_messages or []})
 
@@ -321,8 +348,8 @@ class LLMClient:
                         )
                         break
                     else:
-                        if model_config["api"] == "vercel_ai" and response.status_code == 403:
-                            raise PermissionError("Promption bloqueó la llamada al modelo")
+                        if model_config["api"] == "vercel_ai":
+                            _raise_bridge_guard(response)
                         if response.is_success:
                             try:
                                 data = response.json()
@@ -396,8 +423,7 @@ class LLMClient:
                             config["base_url"], json=payload,
                             headers={"X-Chat-Service-Token": settings.chat_service_token or ""},
                             timeout=max(self.provider_timeout, 30.0))
-                        if response.status_code == 403:
-                            raise PermissionError("Promption bloqueó la llamada al modelo")
+                        _raise_bridge_guard(response)
                         response.raise_for_status()
                         data = response.json()
                         return {"text": data.get("text", ""), "calls": data.get("calls", []),

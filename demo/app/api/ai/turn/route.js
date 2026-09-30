@@ -1,17 +1,11 @@
-import { timingSafeEqual } from "node:crypto";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, jsonSchema, tool, wrapLanguageModel } from "ai";
 import { promptionMiddleware } from "../../../../lib/ai/promptionMiddleware.js";
+import { trustedAIRequest } from "../../../../lib/ai/trusted.js";
+import { aiFailure } from "../../../../lib/ai/errors.mjs";
 
 export const maxDuration = 300;
 export const runtime = "nodejs";
-
-function trusted(request) {
-  const expected = process.env.CHAT_SERVICE_TOKEN;
-  const received = request.headers.get("x-chat-service-token") || "";
-  if (!expected || expected.length !== received.length) return false;
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(received));
-}
 
 function transcript(messages) {
   const names = new Map();
@@ -47,7 +41,7 @@ function transcript(messages) {
 }
 
 export async function POST(request) {
-  if (!trusted(request)) return Response.json({ error: "No autorizado" }, { status: 401 });
+  if (!trustedAIRequest(request)) return Response.json({ error: "No autorizado" }, { status: 401 });
   if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL || !process.env.OPENAI_TOOL_MODEL) {
     return Response.json({ error: "Configuración de OpenAI incompleta en Next.js" }, { status: 503 });
   }
@@ -69,7 +63,8 @@ export async function POST(request) {
     const identity = { userId: body.user_id, roles: body.roles, authenticated: body.authenticated === true };
     const model = wrapLanguageModel({
       model: provider(body.model),
-      middleware: promptionMiddleware(identity, body.original_text, request.signal, body.security_messages),
+      middleware: promptionMiddleware(identity, body.original_text, request.signal, body.security_messages,
+        provider(process.env.OPENAI_MODEL)),
     });
     const tools = Object.fromEntries(body.tools.map(spec => [
       spec.function.name,
@@ -91,6 +86,10 @@ export async function POST(request) {
       maxOutputTokens: Math.min(Math.max(Number(body.max_tokens) || 1200, 100), 6000),
       abortSignal: request.signal,
     });
+    if (!result.text.trim() && !result.toolCalls.length) {
+      console.warn("AI turn returned no usable output", { model: body.model, finishReason: result.finishReason });
+      return Response.json({ error: "El modelo no produjo una respuesta", code: "MODEL_EMPTY_RESPONSE" }, { status: 503 });
+    }
     return Response.json({
       text: result.text,
       calls: result.toolCalls.map(call => ({
@@ -101,7 +100,10 @@ export async function POST(request) {
       model: body.model,
     });
   } catch (error) {
-    const status = error.status === 403 ? 403 : 503;
-    return Response.json({ error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta" }, { status });
+    const { code, status, scope } = aiFailure(error);
+    console.warn("AI turn failed", { code, status, model: body.model,
+      errorType: error.name, providerStatus: error.statusCode });
+    return Response.json({ error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta",
+      code, ...(scope ? { scope } : {}) }, { status });
   }
 }

@@ -51,3 +51,22 @@ los límites o si el backend no confirma la revisión. Los transportes personali
 deben evaluar `request.messages`; la detección no garantiza cubrir toda estrategia
 semántica nueva.
 El paquete se distribuye localmente con `npm pack`; no está publicado en un registry.
+
+## Alcance del sistema
+
+Añade `scopeEvaluator: createScopeEvaluator({ model: openai(process.env.OPENAI_MODEL) })`
+a `createPromption` para evaluar el alcance definido en `generateText({ system, ... })`
+o `streamText`. Importa `createScopeEvaluator` desde `@promption/ai-sdk`.
+El middleware comprueba solicitudes y llamadas a herramientas con el historial.
+`checkScope(text, { identity, systemPrompt, messages })` permite consultar la decisión:
+`IN_SCOPE`, `OUT_OF_SCOPE` o `UNCERTAIN`, con `reason`, `allowed` y `status`.
+Solo `IN_SCOPE` permite continuar. Los errores exponen la clasificación en `error.scope`.
+El evaluador distingue las políticas comerciales de una petición de revelar instrucciones
+del sistema. Identifica primero el tema y el permiso aplicable; esa evaluación interna
+se descarta y solo se devuelve la clasificación con un código fijo de motivo.
+
+Usa un modelo sin envolver para el clasificador, evitando recursión. Las instrucciones
+deben proceder del servidor. Para `protectTool`, añade `systemPrompt` y contexto del
+usuario. Una decisión de alcance no sustituye ACL, filtro de inyección ni Output Guard.
+La evaluación semántica es probabilística y añade llamadas al modelo; el evaluador
+predeterminado usa salida estructurada de AI SDK y un timeout de 30 segundos.

@@ -45,6 +45,12 @@ class AIGuardRequest(BaseModel):
     messages: List[ConversationEvidence] = Field(default_factory=list, max_length=128)
 
 
+class ScopeCheckRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=5000)
+    user: User
+    messages: List[ConversationEvidence] = Field(default_factory=list, max_length=128)
+
+
 class SecurityStateUpdate(BaseModel):
     action: Literal["filter", "output_guard", "reset"]
     enabled: Optional[bool] = None
@@ -123,6 +129,7 @@ class ChatResponse(BaseModel):
     block_type: Optional[str] = None
     policy: Optional[PolicyInfo] = None
     security_classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
+    scope: Optional[Dict[str, Any]] = None
 
 
 class HealthResponse(BaseModel):

@@ -8,6 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("scope_in_scope")
+
 from promption import ConversationGuard, ConversationMessage, Promption, Identity
 from promption.conversation_guard import ConversationLimitError, conversation_views
 from promption.conversation import ConversationStore
@@ -118,7 +120,7 @@ def test_security_overflow_fails_closed_instead_of_dropping_old_fragments():
 
 class AllowFilter:
     async def filter_prompt(self, **kwargs):
-        return SimpleNamespace(blocked=False, classification="BENIGN", layers={}, reason="", confidence=0.1)
+        return SimpleNamespace(blocked=False, classification="BENIGN", layers={"conversation": {"message_count": len(kwargs.get("messages") or []), "blocked": False}}, reason="", confidence=0.1)
     async def output_guard(self, **kwargs):
         return {"action": "PASS"}
     async def audit_event(self, **kwargs):

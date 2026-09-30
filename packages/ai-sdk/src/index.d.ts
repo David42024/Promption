@@ -1,4 +1,4 @@
-import type { LanguageModelMiddleware } from "ai";
+import type { LanguageModelMiddleware, LanguageModel } from "ai";
 
 export interface Identity {
   userId: string;
@@ -11,6 +11,21 @@ export interface ConversationMessage {
   tool_name?: string;
 }
 export type Direction = "input" | "output";
+export interface ScopeDecision {
+  classification: "IN_SCOPE" | "OUT_OF_SCOPE" | "UNCERTAIN";
+  reason: string;
+  allowed: boolean;
+  status: number;
+}
+export interface ScopeRequest {
+  text: string;
+  systemPrompt: string;
+  identity: Identity;
+  messages?: ConversationMessage[];
+  tool?: { name: string; input: unknown; description?: string };
+  signal?: AbortSignal;
+}
+export type ScopeEvaluator = (request: ScopeRequest) => Promise<Pick<ScopeDecision, "classification" | "reason">>;
 export interface GuardRequest {
   text: string;
   direction: Direction;
@@ -36,6 +51,7 @@ export interface FilterApiOptions extends HttpOptions {
 export interface GuardEndpointOptions extends HttpOptions { url: string; token: string; }
 export interface ToolPolicy { roles?: readonly string[]; }
 export interface MiddlewareOptions {
+  systemPrompt?: string;
   identity: Identity;
   originalText?: string;
   securityMessages?: ConversationMessage[];
@@ -45,6 +61,8 @@ export interface MiddlewareOptions {
   includeReasoning?: boolean;
 }
 export interface ProtectToolOptions {
+  systemPrompt?: string;
+  originalText?: string;
   name: string;
   securityMessages?: ConversationMessage[];
   identity: Identity;
@@ -52,22 +70,26 @@ export interface ProtectToolOptions {
   signal?: AbortSignal;
 }
 export type PromptionOptions = (FilterApiOptions | { transport: GuardTransport }) & {
+  scopeEvaluator?: ScopeEvaluator;
   maxTextChars?: number;
   maxConversationMessages?: number;
   maxConversationChars?: number;
   maxStreamBytes?: number;
-  onDecision?: (event: { direction: Direction; allowed: boolean; action?: string; userId: string }) => void;
+  onDecision?: (event: { direction: Direction; allowed: boolean; action?: string; userId: string; scope?: ScopeDecision }) => void;
 };
 export class PromptionError extends Error {
   code: string;
   status: number;
   direction?: Direction;
+  scope?: ScopeDecision;
   constructor(code: string, options?: { status?: number; direction?: Direction; cause?: unknown });
 }
 export function createFilterApiTransport(options: FilterApiOptions): GuardTransport;
 export function createGuardEndpointTransport(options: GuardEndpointOptions): GuardTransport;
+export function createScopeEvaluator(options: { model: LanguageModel; timeoutMs?: number; maxOutputTokens?: number }): ScopeEvaluator;
 export function createPromption(options: PromptionOptions): {
   check(text: string, options: Omit<GuardRequest, "text">): Promise<string>;
+  checkScope(text: string, options: Omit<ScopeRequest, "text">): Promise<ScopeDecision>;
   middleware(options: MiddlewareOptions): LanguageModelMiddleware;
   protectTool<T extends { execute?: (...args: any[]) => any }>(definition: T, options: ProtectToolOptions): T;
 };

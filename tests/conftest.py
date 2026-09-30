@@ -16,3 +16,15 @@ def _reset_singletons():
     MLFilter._instance = None
     yield
     MLFilter._instance = None
+
+
+@pytest.fixture
+def scope_in_scope(monkeypatch):
+    """Stub the independent semantic classifier for unrelated chat unit tests."""
+    from promption import AsyncScopeGuard
+    from app import routes
+
+    async def evaluate(request):
+        return {"classification": "IN_SCOPE", "reason": "in_scope"}
+
+    monkeypatch.setattr(routes, "get_scope_guard", lambda: AsyncScopeGuard(evaluate))

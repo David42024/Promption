@@ -130,19 +130,18 @@ export default function ChatWidget() {
           },
         ]);
       } else if (data.blocked) {
-        const score = Number.isFinite(Number(data.confidence))
-          ? ` · score ${Number(data.confidence).toFixed(2)}`
-          : "";
         const fallbackScore = data.filter_layers?.ensemble?.score
           ?? data.filter_layers?.heuristic?.score
           ?? data.filter_layers?.ml?.probability;
         const blockingScore = Number.isFinite(Number(data.confidence ?? fallbackScore))
           ? ` · score ${Number(data.confidence ?? fallbackScore).toFixed(2)}`
           : "";
-        const blockedText = data.block_type === "authorization"
+        const blockedText = ["scope", "model_guard"].includes(data.block_type)
+          ? data.reply
+          : data.block_type === "authorization"
           ? `Acceso denegado por Policy Engine · recurso ${data.policy?.resource || "protegido"} [${data.policy?.tier || "scope restringido"}]. ${data.reply} Tu mensaje no llegó al LLM.`
           : data.block_type === "security_review"
-            ? `Solicitud no clasificada con suficiente confianza${score}. ${data.reply} Por seguridad, no se consultó información protegida ni se llamó al LLM.`
+            ? data.reply
           : data.block_type === "output_guard"
             ? data.reason === "output_guard_unavailable"
               ? data.reply
