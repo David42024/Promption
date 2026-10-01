@@ -36,11 +36,20 @@ _QUESTION = re.compile(
     r"(?:\s+y\s+que\s+no(?:\s+puedes\s+hacer)?)?"
     r"[\s,!.¿?]*(?:por\s+favor|porfa)?[\s,!.¿?]*"
 )
+_GREETING = re.compile(
+    r"(?:hola+|buenos dias|buenas tardes|buenas noches|hello|hi|hey)"
+    r"(?:[, ]+¿?(?:como estas|que tal))?[\s.!¡¿?]*"
+)
 
 
 def is_capabilities_question(text: str) -> bool:
     """Recognize standalone feature questions, preserving checks for mixed requests."""
     return _QUESTION.fullmatch(normalize_text(text)) is not None
+
+
+def is_simple_greeting(text: str) -> bool:
+    """Recognize standalone greetings that do not need semantic classification."""
+    return _GREETING.fullmatch(normalize_text(text)) is not None
 
 
 def describe_capabilities(tool_specs: list[dict], *, authenticated: bool) -> str:

@@ -11,7 +11,7 @@ from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'chat-service'))
 from app import routes
-from app.capabilities import CAPABILITY_LABELS, describe_capabilities, is_capabilities_question
+from app.capabilities import CAPABILITY_LABELS, describe_capabilities, is_capabilities_question, is_simple_greeting
 from app.conversation import ConversationStore
 from app.mcp_tools import MCPToolExecutor
 from app.models import AIGuardRequest, ChatRequest, User
@@ -69,6 +69,19 @@ def test_known_capability_scope_does_not_depend_on_an_external_classification(mo
 
     monkeypatch.setattr(scope.httpx, 'AsyncClient', unavailable)
     result = asyncio.run(scope._evaluate({'text': question, 'messages': [], 'system_prompt': 'Server-owned policy'}))
+    assert result == {'classification': 'IN_SCOPE', 'reason': 'in_scope'}
+
+
+@pytest.mark.parametrize('greeting', ['Hola', 'HOLA', 'hola!', 'buenos días', 'Buenas tardes', 'hello', 'hi'])
+def test_simple_greeting_scope_does_not_depend_on_an_external_classification(monkeypatch, greeting):
+    from app import scope
+
+    def unavailable(*args, **kwargs):
+        pytest.fail('Standalone greetings do not need a model to determine scope')
+
+    assert is_simple_greeting(greeting)
+    monkeypatch.setattr(scope.httpx, 'AsyncClient', unavailable)
+    result = asyncio.run(scope._evaluate({'text': greeting, 'messages': [], 'system_prompt': 'Server-owned policy'}))
     assert result == {'classification': 'IN_SCOPE', 'reason': 'in_scope'}
 
 
