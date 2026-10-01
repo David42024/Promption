@@ -42,7 +42,6 @@ from .capabilities import (
     CAPABILITY_LABELS as _CAPABILITY_LABELS,
     describe_capabilities,
     is_capabilities_question,
-    is_simple_greeting,
 )
 
 router = APIRouter()
@@ -629,12 +628,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             and _CAPABILITIES_REQUEST.search(normalized_request)
             and any(spec["function"]["name"] == "make_document" for spec in tool_specs)
         )
-        if is_simple_greeting(request.text) and not history_messages:
-            await _review_conversation(security_messages, request, filter_client, filter_enabled)
-            reply = ("Hola. Puedo ayudarte con consultas de Promption Shop, productos, envíos, "
-                     "garantías y funciones disponibles para tu cuenta.")
-            model_name = "Promption"
-        elif is_capabilities_question(request.text):
+        if is_capabilities_question(request.text):
             await _review_conversation(security_messages, request, filter_client, filter_enabled)
             reply = describe_capabilities(tool_specs,
                 authenticated=request.user.authenticated and "guest" not in user_roles)

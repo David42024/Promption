@@ -179,17 +179,6 @@ def test_capability_chat_is_guarded_stored_and_does_not_execute_tools(monkeypatc
 
 
 @pytest.mark.usefixtures('scope_in_scope')
-def test_simple_greeting_chat_does_not_require_an_llm_provider(monkeypatch):
-    client = Filter()
-    configure(monkeypatch, client)
-    req = request('guest', 'Holaa')
-    response = asyncio.run(routes.chat(req))
-    assert not response.blocked and response.model == 'Promption'
-    assert 'Promption Shop' in response.reply
-    assert client.outputs == [response.reply]
-
-
-@pytest.mark.usefixtures('scope_in_scope')
 @pytest.mark.parametrize('role', ['ventas', 'admin'])
 def test_unsigned_role_claim_cannot_add_capabilities(monkeypatch, role):
     client = Filter()
