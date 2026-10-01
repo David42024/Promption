@@ -220,7 +220,7 @@ def test_guard_denial_reports_only_safe_direction_reason_and_policy_metadata(mon
 
 
 @pytest.mark.usefixtures('scope_in_scope')
-def test_simple_greeting_uses_provider_with_output_safe_instruction(monkeypatch):
+def test_simple_greeting_uses_provider_response(monkeypatch):
     client = Filter()
     model = GreetingModel()
     monkeypatch.setattr(routes, 'store', ConversationStore())
@@ -236,9 +236,8 @@ def test_simple_greeting_uses_provider_with_output_safe_instruction(monkeypatch)
     assert response.reply == '¡Hola! ¿En qué puedo ayudarte?'
     assert response.model == 'provider-test'
     assert model.messages is not None
-    greeting_instruction = next(message['content'] for message in model.messages
-        if message['role'] == 'system' and 'solamente un saludo' in message['content'])
-    assert 'No enumeres capacidades' in greeting_instruction
+    assert model.messages[-1] == {'role': 'user', 'content': 'Holaa'}
+    assert not any(message['role'] == 'assistant' for message in model.messages)
 
 
 @pytest.mark.parametrize('classification,reason', [('OUT_OF_SCOPE', 'system_limit'), ('UNCERTAIN', 'scope_unavailable')])
