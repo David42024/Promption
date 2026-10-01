@@ -148,6 +148,15 @@ class NoModel:
         pytest.fail('The feature catalog must not execute a model-proposed tool')
 
 
+class GreetingModel:
+    def __init__(self):
+        self.messages = None
+
+    async def generate(self, messages):
+        self.messages = messages
+        return SimpleNamespace(text='¡Hola! ¿En qué puedo ayudarte?', model='provider-test')
+
+
 def configure(monkeypatch, filter_client):
     monkeypatch.setattr(routes, 'store', ConversationStore())
     monkeypatch.setattr(routes, 'get_filter_client', lambda: filter_client)
@@ -208,6 +217,28 @@ def test_guard_denial_reports_only_safe_direction_reason_and_policy_metadata(mon
     assert error.value.detail == {'code': 'CONTENT_BLOCKED', 'direction': 'output', 'reason': 'insufficient_scope'}
     assert client.events[0]['details']['policy_id'] == 'internal.stock'
     assert text not in json.dumps(client.events)
+
+
+@pytest.mark.usefixtures('scope_in_scope')
+def test_simple_greeting_uses_provider_with_output_safe_instruction(monkeypatch):
+    client = Filter()
+    model = GreetingModel()
+    monkeypatch.setattr(routes, 'store', ConversationStore())
+    monkeypatch.setattr(routes, 'get_filter_client', lambda: client)
+    monkeypatch.setattr(routes, 'get_llm_client', lambda: model)
+    monkeypatch.setattr(routes, 'get_mcp_executor', MCPToolExecutor)
+    monkeypatch.setattr(routes, 'get_security_state',
+        lambda: {'filter_enabled': True, 'output_guard_enabled': True})
+
+    response = asyncio.run(routes.chat(request('guest', text='Holaa')))
+
+    assert not response.blocked
+    assert response.reply == '¡Hola! ¿En qué puedo ayudarte?'
+    assert response.model == 'provider-test'
+    assert model.messages is not None
+    greeting_instruction = next(message['content'] for message in model.messages
+        if message['role'] == 'system' and 'solamente un saludo' in message['content'])
+    assert 'No enumeres capacidades' in greeting_instruction
 
 
 @pytest.mark.parametrize('classification,reason', [('OUT_OF_SCOPE', 'system_limit'), ('UNCERTAIN', 'scope_unavailable')])

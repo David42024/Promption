@@ -267,8 +267,11 @@ en `site-packages`, y los valores por defecto no crean archivos de logs.
 Las dependencias pesadas son opcionales: `api`, `mcp`, `embeddings`, `media`,
 `reports`, `http`. `AsyncGuardPipeline` compone funciones async de filtrado y salida con
 un `PolicyEngine`; tu framework adapta la decisión a HTTP. Configura ese motor con
-reglas y asignaciones de roles de tu negocio. El executor MCP recibe tus handlers y
-sus `ToolPolicy`, y usa el SDK oficial MCP para esquemas, registro y ejecución.
+reglas y asignaciones de roles de tu negocio. Cada `ResourcePolicy` puede definir
+`output_patterns` cuando detectar una solicitud requiere reglas más amplias que
+detectar una divulgación en la respuesta. Si se omite, se reutilizan `patterns`.
+El executor MCP recibe tus handlers y sus `ToolPolicy`, y usa el SDK oficial MCP
+para esquemas, registro y ejecución.
 
 ## Construcción, distribución y comprobación
 

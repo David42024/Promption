@@ -130,6 +130,19 @@ def test_public_promotion_output_is_not_overblocked_for_customer():
     assert engine.evaluate_output(response, ["customer"]).allowed is True
 
 
+def test_generic_stock_mention_is_not_treated_as_internal_data():
+    engine = PolicyEngine()
+    response = "Puedo orientarte sobre productos y consultas de stock e inventario."
+    assert engine.evaluate_output(response, ["guest"]).allowed is True
+
+
+def test_concrete_stock_output_remains_scope_checked():
+    engine = PolicyEngine()
+    response = "Stock crítico: iPhone 15 Pro, 3 unidades disponibles."
+    assert engine.evaluate_output(response, ["guest"]).allowed is False
+    assert engine.evaluate_output(response, ["ventas"]).allowed is True
+
+
 def test_policy_catalog_matches_tool_tiers_and_roles():
     executor = MCPToolExecutor()
     tools = {tool.name: tool for tool in executor.tools}
