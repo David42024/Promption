@@ -5,11 +5,11 @@ import httpx
 
 from promption import AsyncScopeGuard
 from .config import settings
-from .capabilities import is_capabilities_question
+from .capabilities import is_capabilities_question, is_simple_greeting
 
 
 async def _evaluate(request: dict) -> dict:
-    if "tool" not in request and is_capabilities_question(request["text"]):
+    if "tool" not in request and (is_capabilities_question(request["text"]) or is_simple_greeting(request["text"])):
         return {"classification": "IN_SCOPE", "reason": "in_scope"}
     if not settings.vercel_ai_url or not settings.chat_service_token:
         raise RuntimeError("Scope classifier is not configured")
