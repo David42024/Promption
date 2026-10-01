@@ -100,10 +100,10 @@ export async function POST(request) {
       model: body.model,
     });
   } catch (error) {
-    const { code, status, scope } = aiFailure(error);
+    const { code, status, reason, scope } = aiFailure(error);
     console.warn("AI turn failed", { code, status, model: body.model,
-      errorType: error.name, providerStatus: error.statusCode });
+      guardReason: reason, errorType: error.name, providerStatus: error.statusCode });
     return Response.json({ error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta",
-      code, ...(scope ? { scope } : {}) }, { status });
+      code, ...(reason ? { reason } : {}), ...(scope ? { scope } : {}) }, { status });
   }
 }

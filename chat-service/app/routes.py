@@ -38,7 +38,11 @@ from .security_state import get_security_state, update_security_state
 from .scope import get_scope_guard
 from promption.tools.runtime import capabilities, web_search, web_open, WEB_ROLES
 from .conversation import store
-from .capabilities import CAPABILITY_LABELS as _CAPABILITY_LABELS, describe_capabilities, is_capabilities_question
+from .capabilities import (
+    CAPABILITY_LABELS as _CAPABILITY_LABELS,
+    describe_capabilities,
+    is_capabilities_question,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

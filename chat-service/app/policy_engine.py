@@ -117,6 +117,11 @@ RESOURCE_POLICIES = (
             r"\b(stock|stcok|inventario|existencias|unidades\s+(?:restantes|disponibles)|almacen|reponiendo|rotura\s+de\s+stock|proveedor(?:es)?|margen\s+con)\b",
         ),
         confidence=0.94,
+        output_patterns=(
+            r"\b(stock|inventario|existencias)\b.{0,45}\b(interno|critico|actual|bajo|agotado|disponible|quedan|hay|\d+)\b",
+            r"\b(interno|critico|actual|bajo|agotado|disponible|quedan|hay|\d+)\b.{0,45}\b(stock|inventario|existencias)\b",
+            r"\b(unidades\s+(?:restantes|disponibles)|rotura\s+de\s+stock|reponiendo|proveedor(?:es)?|margen(?:es)?(?:\s+promedio)?|stockcritico)\b",
+        ),
     ),
     ResourcePolicy(
         policy_id="internal.promotions",

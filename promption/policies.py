@@ -13,6 +13,7 @@ class ResourcePolicy:
     tool_name: Optional[str]
     patterns: tuple[str, ...]
     confidence: float = 0.95
+    output_patterns: Optional[tuple[str, ...]] = None
 
 
 @dataclass(frozen=True)
@@ -60,10 +61,17 @@ class PolicyEngine:
             (policy, tuple(re.compile(pattern, re.IGNORECASE) for pattern in policy.patterns))
             for policy in self.policies
         )
+        self._compiled_output = tuple(
+            (policy, tuple(re.compile(pattern, re.IGNORECASE)
+                           for pattern in (policy.patterns if policy.output_patterns is None
+                                           else policy.output_patterns)))
+            for policy in self.policies
+        )
 
-    def classify(self, text: str) -> Optional[ResourcePolicy]:
+    def classify(self, text: str, *, output: bool = False) -> Optional[ResourcePolicy]:
         normalized = normalize_text(text)
-        for policy, patterns in self._compiled:
+        compiled = self._compiled_output if output else self._compiled
+        for policy, patterns in compiled:
             if any(pattern.search(normalized) for pattern in patterns):
                 return policy
         return None
@@ -73,9 +81,10 @@ class PolicyEngine:
         text: str,
         roles: Iterable[str],
         excluded_policy_ids: frozenset[str] = frozenset(),
+        output: bool = False,
     ) -> PolicyDecision:
         role_set = {str(role).strip().lower() for role in roles if str(role).strip()}
-        policy = self.classify(text)
+        policy = self.classify(text, output=output)
         if policy and policy.policy_id in excluded_policy_ids:
             policy = None
         if policy is None:
@@ -117,6 +126,6 @@ class PolicyEngine:
 
     def evaluate_output(self, text: str, roles: Iterable[str]) -> PolicyDecision:
         """Evaluate output scope while leaving concrete secret detection to Output Guard."""
-        return self._evaluate(text, roles, self.output_excluded_policy_ids)
+        return self._evaluate(text, roles, self.output_excluded_policy_ids, output=True)
 
 
