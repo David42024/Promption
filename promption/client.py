@@ -1,4 +1,5 @@
 """Filter API client integration"""
+import asyncio
 import logging
 import httpx
 from typing import Optional, Dict, Any
@@ -6,6 +7,26 @@ from .api.models import FilterResponse
 
 
 logger = logging.getLogger(__name__)
+
+
+class FilterRateLimited(RuntimeError):
+    """The remote filter rejected the request after bounded retries."""
+
+
+def _retry_delay(response: httpx.Response, attempt: int) -> float:
+    try:
+        return min(max(float(response.headers.get("Retry-After", "")), 0.0), 2.0)
+    except ValueError:
+        return 0.25 * (attempt + 1)
+
+
+async def _post_with_rate_limit_retry(client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+    for attempt in range(3):
+        response = await client.post(url, **kwargs)
+        if response.status_code != 429 or attempt == 2:
+            return response
+        await asyncio.sleep(_retry_delay(response, attempt))
+    raise RuntimeError("Rate limit retry exhausted")
 
 
 class FilterClient:
@@ -66,7 +87,7 @@ class FilterClient:
         """Filter a prompt through the Filter API"""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
+                response = await _post_with_rate_limit_retry(client,
                     f"{self.base_url}/api/v1/filter",
                     headers=self.headers,
                     json={
@@ -81,6 +102,8 @@ class FilterClient:
                 
                 if response.status_code == 401:
                     raise ValueError("Invalid Filter API key")
+                if response.status_code == 429:
+                    raise FilterRateLimited("Filter API rate limit exceeded")
                 
                 if response.status_code != 200:
                     raise RuntimeError(f"Filter API error {response.status_code}")
@@ -96,6 +119,8 @@ class FilterClient:
                 
         except httpx.TimeoutException:
             raise Exception("Filter API timeout")
+        except FilterRateLimited:
+            raise
         except Exception as e:
             logger.warning("Filter client error: %s", e)
             raise Exception(f"Filter API error: {str(e)}")
@@ -109,7 +134,7 @@ class FilterClient:
         """Check output through Output Guard"""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
+                response = await _post_with_rate_limit_retry(client,
                     f"{self.base_url}/api/v1/output-guard",
                     headers=self.headers,
                     json={
@@ -122,6 +147,8 @@ class FilterClient:
                 
                 if response.status_code == 401:
                     raise ValueError("Invalid Filter API key")
+                if response.status_code == 429:
+                    raise FilterRateLimited("Output Guard rate limit exceeded")
                 if not response.is_success:
                     raise Exception(f"Output Guard error {response.status_code}")
                 data = response.json()

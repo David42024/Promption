@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from promption import AsyncGuardPipeline, Identity, ScopeDecision, input_guard_decision, output_guard_decision
 from promption.conversation_guard import ConversationGuard, ConversationLimitError
+from promption.client import FilterRateLimited
 
 from .config import settings
 from .models import (
@@ -450,6 +451,19 @@ async def chat(request: ChatRequest) -> ChatResponse:
         except ConversationLimitError:
             return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
                                 reason="conversation_limit", block_type="conversation", role=primary_role)
+        except FilterRateLimited:
+            logger.warning("Filter API rate limit exceeded")
+            return ChatResponse(
+                blocked=True,
+                reply="El servicio de seguridad está temporalmente saturado. Inténtalo de nuevo en unos segundos.",
+                filter_enabled=filter_enabled,
+                filter_skipped=True,
+                role=primary_role,
+                reason="filter_rate_limited",
+                confidence=1.0,
+                block_type="filter_unavailable",
+                security_classification="UNCERTAIN",
+            )
         except Exception:
             logger.exception("Filter API unavailable")
             return ChatResponse(
