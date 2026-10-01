@@ -29,6 +29,8 @@ async function request(url, body, headers, config, signal) {
       throw new PromptionError(code, {
         status: response.status === 403 ? 403 : 503,
         direction: ["input", "output"].includes(detail?.direction) ? detail.direction : undefined,
+        reason: ["malicious_input", "insufficient_scope", "sensitive_output"].includes(detail?.reason)
+          ? detail.reason : undefined,
       });
     }
     return await response.json();

@@ -17,6 +17,7 @@ for (const [status, detail, expected] of [
       assert.equal(error.code, expected);
       assert.equal(error.status, status === 403 ? 403 : 503);
       assert.equal(error.direction, ['input', 'output'].includes(detail.direction) ? detail.direction : undefined);
+      assert.equal(error.reason, detail.reason === 'insufficient_scope' ? 'insufficient_scope' : undefined);
       assert.ok(!error.message.includes('arbitrary secret'));
       return true;
     });
