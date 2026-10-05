@@ -124,15 +124,14 @@ class MLFilter:
         with MLFilter._lock:
             if self._encoder is not None and self._clf is not None:
                 return
-            logger.info("Loading embedding model '%s'…", _EMBED_MODEL)
-            from sentence_transformers import SentenceTransformer
-            self._encoder = SentenceTransformer(_EMBED_MODEL)
-            logger.info("Embedding model loaded.")
-
             if not self.model_path.exists():
                 raise FileNotFoundError(
                     f"Trained classifier not found: {self.model_path}. Run `python src/training/train.py` first."
                 )
+            logger.info("Loading embedding model '%s'…", _EMBED_MODEL)
+            from sentence_transformers import SentenceTransformer
+            self._encoder = SentenceTransformer(_EMBED_MODEL)
+            logger.info("Embedding model loaded.")
             import joblib
             self._clf = joblib.load(self.model_path)
             logger.info("RandomForest classifier loaded from %s", self.model_path)

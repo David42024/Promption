@@ -4,6 +4,30 @@ import { createPromption, createFilterApiTransport, PromptionError } from "../sr
 
 const identity = { userId: "u1", roles: ["customer"], authenticated: true };
 const params = () => ({ prompt: [{ role: "user", content: [{ type: "text", text: "Hola" }] }], tools: [] });
+
+test("missing or inherited tool policies never authorize a tool", async () => {
+  const sdk = createPromption({ transport: pass });
+  for (const toolPolicies of [undefined, {}, Object.create({ catalog: {} })]) {
+    const middleware = sdk.middleware({ identity, toolPolicies });
+    const input = { ...params(), tools: [{ name: "catalog" }] };
+    const transformed = await middleware.transformParams({ params: input, type: "generate" });
+    assert.deepEqual(transformed.tools, []);
+    await assert.rejects(middleware.wrapGenerate({ params: input, doGenerate: async () => ({
+      content: [{ type: "tool-call", toolName: "catalog", toolCallId: "1", input: "{}" }],
+    }) }), error => error.code === "TOOL_ACCESS_DENIED");
+  }
+});
+
+test("protectTool requires an explicit policy before side effects", async () => {
+  let calls = 0;
+  const sdk = createPromption({ transport: pass });
+  const definition = { execute: async () => { calls++; return "ok"; } };
+  const denied = sdk.protectTool(definition, { name: "catalog", identity });
+  await assert.rejects(denied.execute({}), error => error.code === "TOOL_ACCESS_DENIED");
+  assert.equal(calls, 0);
+  assert.equal(await sdk.protectTool(definition, { name: "catalog", identity, policy: {} }).execute({}), "ok");
+  assert.equal(calls, 1);
+});
 const pass = async ({ text }) => ({ allowed: true, text, action: "PASS" });
 function from(chunks) { return new ReadableStream({ start(c) { chunks.forEach(v => c.enqueue(v)); c.close(); } }); }
 async function collect(stream) { const rows = []; for await (const value of stream) rows.push(value); return rows; }
@@ -109,7 +133,7 @@ test("protectTool blocks unauthorized execution and validates its output", async
   const forbidden = sdk.protectTool(definition, { name: "payroll", identity, policy: { roles: ["admin"] } });
   await assert.rejects(forbidden.execute({}));
   assert.equal(executed, 0);
-  const allowed = sdk.protectTool(definition, { name: "catalog", identity });
+  const allowed = sdk.protectTool(definition, { name: "catalog", identity, policy: {} });
   await assert.rejects(allowed.execute({}));
   assert.equal(executed, 1);
 });

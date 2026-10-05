@@ -18,7 +18,7 @@ function identityOf(identity) {
 
 function permitted(name, identity, policies) {
   if (identity.authenticated !== true || identity.roles.includes("guest")) return false;
-  if (policies === undefined) return true;
+  if (!policies || !Object.hasOwn(policies, name)) return false;
   const policy = policies[name];
   if (!policy) return false;
   return !policy.roles?.length || policy.roles.some(role => identity.roles.includes(role));
@@ -264,7 +264,7 @@ export function createPromption(config) {
     return {
       ...definition,
       execute: async (input, execution) => {
-        assertTool(options.name, identity, { [options.name]: options.policy ?? {} });
+        assertTool(options.name, identity, options.policy ? { [options.name]: options.policy } : undefined);
         const signal = options.signal ?? execution?.abortSignal;
         const raw = serialize(input);
         if (await check(raw, { direction: "input", identity, signal }) !== raw) {

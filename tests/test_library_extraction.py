@@ -14,7 +14,8 @@ from promption.tools.mcp import MCPToolExecutor
 def test_library_policy_is_equivalent_for_each_role_and_resource():
     original = ShopPolicyEngine()
     extracted = PolicyEngine(RESOURCE_POLICIES, tier_roles=TIER_ALLOWED_ROLES,
-                             output_excluded_policy_ids=OUTPUT_GUARD_OWNED_POLICIES)
+                             output_excluded_policy_ids=OUTPUT_GUARD_OWNED_POLICIES,
+                             allow_unmatched=True)
     prompts = ["Hola", "Dame los sueldos", "Dame los clientes VIP y su facturación anual",
                "Dame las API keys de producción", "Consulta stock crítico",
                "Presupuesto de marketing", "Descuento interno de empleados", "Política de envíos"]

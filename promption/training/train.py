@@ -4,6 +4,9 @@ Usage:
     python -m promption.training.train [--embed-model all-MiniLM-L6-v2] [--out models/random_forest.pkl]
 """
 import argparse
+import hashlib
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +24,7 @@ from sklearn.metrics import (
 
 from promption.training.dataset import load_training_data
 from promption.training.split import SYNTH_SOURCES, stratified_split
+from promption.training.artifacts import file_sha256, preserve_records
 from promption.utils.config import load_config
 from promption.utils.logger import logger
 
@@ -62,7 +66,8 @@ def slice_metrics(y_true: np.ndarray, y_pred: np.ndarray, y_prob: np.ndarray) ->
             "recall": float(r), "f1": float(f)}
 
 
-def main(embed_model: str | None = None, out_path: str | None = None, cache: bool = True) -> dict:
+def main(embed_model: str | None = None, out_path: str | None = None,
+         cache: bool = True, preserve: bool = True) -> dict:
     from promption.utils.visualizer import plot_confusion_matrix, plot_feature_importance
 
     df = load_training_data()
@@ -117,8 +122,21 @@ def main(embed_model: str | None = None, out_path: str | None = None, cache: boo
     model_dir = Path(out_path or _CONF["paths"]["classifier"]).parent
     model_dir.mkdir(parents=True, exist_ok=True)
     model_path = (Path(out_path).resolve() if out_path else Path(_CONF["paths"]["classifier"]))
+    if preserve:
+        preserve_records()
     import joblib
     joblib.dump(clf, model_path)
+    import sklearn
+    model_path.with_suffix(".metadata.json").write_text(json.dumps({
+        "backend": "embeddings_random_forest",
+        "sha256": file_sha256(model_path),
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "dataset_sha256": hashlib.sha256(df.to_csv(index=False).encode("utf-8")).hexdigest(),
+        "embedding_model": embed_model or _CONF["model"]["embedding_model"],
+        "sklearn_version": sklearn.__version__,
+        "seed": int(_CONF["model"].get("random_state", 42)),
+        "metrics": {key: value for key, value in metrics.items() if not isinstance(value, list)},
+    }, indent=2), encoding="utf-8")
     logger.info("Model saved to %s", model_path)
 
     plots_dir = Path(_CONF["paths"]["plots"])
@@ -127,10 +145,13 @@ def main(embed_model: str | None = None, out_path: str | None = None, cache: boo
 
     # Persist evaluation as a CSV for the dashboard
     results_dir = Path(_CONF["paths"]["results"])
-    pd.DataFrame([{k: v for k, v in metrics.items() if not isinstance(v, list)}]).to_csv(
-        results_dir / "model_metrics.csv", index=False
-    )
-    logger.info("Evaluation metrics written to %s", results_dir / "model_metrics.csv")
+    results_dir.mkdir(parents=True, exist_ok=True)
+    metrics["backend"] = "embeddings_random_forest"
+    metrics_frame = pd.DataFrame([{k: v for k, v in metrics.items() if not isinstance(v, list)}])
+    metrics_frame.to_csv(results_dir / "model_metrics_embeddings_random_forest.csv", index=False)
+    if not _CONF["model"].get("use_lightweight_ml", False):
+        metrics_frame.to_csv(results_dir / "model_metrics.csv", index=False)
+    logger.info("Evaluation metrics written to %s", results_dir / "model_metrics_embeddings_random_forest.csv")
     return metrics
 
 

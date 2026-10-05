@@ -27,6 +27,7 @@ class PolicyDecision:
     required_roles: tuple[str, ...]
     confidence: float
     reason: str
+    matched_policy_ids: tuple[str, ...] = ()
 
     def to_dict(self) -> dict:
         return {
@@ -39,6 +40,7 @@ class PolicyDecision:
             "required_roles": list(self.required_roles),
             "confidence": self.confidence,
             "reason": self.reason,
+            "matched_policy_ids": list(self.matched_policy_ids),
         }
 
 
@@ -53,8 +55,10 @@ class PolicyEngine:
     """Classify a requested business resource and enforce its tier ACL."""
 
     def __init__(self, policies: Iterable[ResourcePolicy], *, tier_roles: dict,
-                 output_excluded_policy_ids: frozenset[str] = frozenset()):
+                 output_excluded_policy_ids: frozenset[str] = frozenset(),
+                 allow_unmatched: bool = False):
         self.tier_roles = tier_roles
+        self.allow_unmatched = allow_unmatched
         self.output_excluded_policy_ids = output_excluded_policy_ids
         self.policies = tuple(policies)
         self._compiled = tuple(
@@ -69,12 +73,15 @@ class PolicyEngine:
         )
 
     def classify(self, text: str, *, output: bool = False) -> Optional[ResourcePolicy]:
+        """Return the most restrictive match for display; evaluate enforces every match."""
+        matches = self.classify_all(text, output=output)
+        return min(matches, key=lambda policy: len(self.tier_roles[policy.tier]), default=None)
+
+    def classify_all(self, text: str, *, output: bool = False) -> tuple[ResourcePolicy, ...]:
         normalized = normalize_text(text)
         compiled = self._compiled_output if output else self._compiled
-        for policy, patterns in compiled:
-            if any(pattern.search(normalized) for pattern in patterns):
-                return policy
-        return None
+        return tuple(policy for policy, patterns in compiled
+                     if any(pattern.search(normalized) for pattern in patterns))
 
     def _evaluate(
         self,
@@ -84,27 +91,28 @@ class PolicyEngine:
         output: bool = False,
     ) -> PolicyDecision:
         role_set = {str(role).strip().lower() for role in roles if str(role).strip()}
-        policy = self.classify(text, output=output)
-        if policy and policy.policy_id in excluded_policy_ids:
-            policy = None
-        if policy is None:
+        matches = tuple(policy for policy in self.classify_all(text, output=output)
+                        if policy.policy_id not in excluded_policy_ids)
+        if not matches:
             return PolicyDecision(
-                allowed=True,
+                allowed=self.allow_unmatched,
                 matched=False,
-                policy_id="public.general",
+                policy_id="unclassified",
                 resource="general_assistance",
-                tier="publico",
+                tier="unclassified",
                 tool_name=None,
                 required_roles=(),
                 confidence=0.5,
-                reason="No protected business resource was identified",
+                reason="No resource identified; application unmatched policy applied",
             )
 
+        denied = tuple(policy for policy in matches if not role_set & self.tier_roles[policy.tier])
+        policy = min(denied or matches, key=lambda item: len(self.tier_roles[item.tier]))
         allowed_roles = self.tier_roles[policy.tier]
-        allowed = bool(role_set & allowed_roles)
+        allowed = not denied
         required_roles = tuple(sorted(allowed_roles)) if policy.tier != "publico" else ()
         reason = (
-            f"Role authorized for tier {policy.tier}"
+            "Roles authorized for every matched resource"
             if allowed
             else f"Insufficient scope for tier {policy.tier}"
         )
@@ -118,6 +126,7 @@ class PolicyEngine:
             required_roles=required_roles,
             confidence=policy.confidence,
             reason=reason,
+            matched_policy_ids=tuple(item.policy_id for item in matches),
         )
 
     def evaluate(self, text: str, roles: Iterable[str]) -> PolicyDecision:

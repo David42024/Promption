@@ -1,0 +1,22 @@
+{
+  "backend": "tfidf_logistic_regression",
+  "sha256": "86d9fa1d748c674c7e64c0d6a06052fb44f5d5f295d924a665d8ef323e0240d7",
+  "trained_at": "2026-10-04T20:12:04.003969+00:00",
+  "dataset_sha256": "483447b5fea66c7ba739b28aa3d84ca8096902573d64b335e41c39697273d527",
+  "sklearn_version": "1.9.0",
+  "seed": 42,
+  "metrics": {
+    "accuracy": 0.918918918918919,
+    "f1": 0.9097744360902256,
+    "precision": 0.9201520912547528,
+    "recall": 0.8996282527881041,
+    "auc": 0.9784202469874665,
+    "size_mb": 0.8499689102172852,
+    "n_train": 6639,
+    "n_test": 1184,
+    "n_samples": 7823,
+    "n_features": 20000,
+    "backend": "tfidf_logistic_regression",
+    "roc_auc": 0.9784202469874665
+  }
+}

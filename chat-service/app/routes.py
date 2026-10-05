@@ -610,7 +610,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                                    await mcp_executor.available(user_roles, request.user.authenticated),
                                    authorized_docs)
     tool_specs = permitted_specs
-    if (policy_decision.tier != "publico" or history_protected or not filter_enabled
+    if (policy_decision.tier not in {"publico", "unclassified"} or history_protected or not filter_enabled
         or not security_state["output_guard_enabled"]):
         tool_specs = [spec for spec in tool_specs if spec["function"]["name"] not in {"web_search", "web_open"}]
     model_id = None
@@ -734,7 +734,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                         if name in {"web_search", "web_open"}:
                             _report_progress("Consultando internet…")
                             outbound = str(args.get("query" if name == "web_search" else "url", ""))
-                            if not WEB_ROLES.intersection(user_roles) or policy_decision.tier != "publico":
+                            if not WEB_ROLES.intersection(user_roles) or policy_decision.tier not in {"publico", "unclassified"}:
                                 raise ValueError("Internet no permitido para esta solicitud")
                             private_values = (request.user.email, request.user.id)
                             if (any(value and value.lower() in outbound.lower() for value in private_values)

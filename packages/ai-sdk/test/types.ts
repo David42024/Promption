@@ -4,11 +4,11 @@ import { wrapLanguageModel, generateText, streamText, tool, jsonSchema } from 'a
 declare const baseModel: Parameters<typeof wrapLanguageModel>[0]['model'];
 const identity = { userId: 'server-user', roles: ['customer'], authenticated: true };
 const protection = createPromption({ baseUrl: 'http://localhost:8000', apiKey: 'server-only' });
-const model = wrapLanguageModel({ model: baseModel, middleware: protection.middleware({ identity }) });
+const model = wrapLanguageModel({ model: baseModel, middleware: protection.middleware({ identity, toolPolicies: { catalog: {} } }) });
 void generateText({ model, prompt: 'Hola' });
 void streamText({ model, prompt: 'Hola' });
 const catalog = tool({ inputSchema: jsonSchema<{ query: string }>({ type: 'object' }), execute: async input => input.query });
-const protectedCatalog = protection.protectTool(catalog, { name: 'catalog', identity });
+const protectedCatalog = protection.protectTool(catalog, { name: 'catalog', identity, policy: {} });
 void generateText({ model, prompt: 'Consulta', tools: { catalog: protectedCatalog } });
 void createFilterApiTransport({ baseUrl: 'http://localhost:8000', apiKey: 'server-only' });
 const scoped = createPromption({ baseUrl: 'http://localhost:8000', apiKey: 'server-only',

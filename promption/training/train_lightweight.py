@@ -3,9 +3,12 @@
 Usage:
     python -m promption.training.train_lightweight --out models/lightweight_classifier.pkl
 
-This model is ~10-50MB and works on Render free (no SentenceTransformers).
+This backend runs without SentenceTransformers.
 """
 import argparse
+import io
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +19,6 @@ from sklearn.pipeline import FeatureUnion
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
-    confusion_matrix,
     f1_score,
     precision_score,
     recall_score,
@@ -26,6 +28,7 @@ import joblib
 
 from promption.training.dataset import load_training_data
 from promption.training.split import stratified_split
+from promption.training.artifacts import file_sha256, preserve_records
 from promption.utils.config import load_config
 from promption.utils.logger import logger
 
@@ -121,13 +124,9 @@ def evaluate_model(vectorizer, classifier, df: pd.DataFrame, y_true):
     logger.info("=" * 60)
     
     # Estimar tamaño del modelo en disco
-    import tempfile
-    import os
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pkl') as f:
-        temp_path = Path(f.name)
-        joblib.dump({'vectorizer': vectorizer, 'classifier': classifier}, temp_path)
-        size_mb = temp_path.stat().st_size / (1024 * 1024)
-        # No eliminar temporalmente para evitar error de permisos en Windows
+    buffer = io.BytesIO()
+    joblib.dump({'vectorizer': vectorizer, 'classifier': classifier}, buffer)
+    size_mb = buffer.tell() / (1024 * 1024)
     
     logger.info("Estimated model size: %.2f MB", size_mb)
     
@@ -141,53 +140,63 @@ def evaluate_model(vectorizer, classifier, df: pd.DataFrame, y_true):
     }
 
 
+def train(data_path: str | None = None, out_path: str | Path | None = None,
+          max_features: int = 10000, *, preserve: bool = True) -> dict:
+    """Train the same lightweight artifact loaded by the configured ensemble."""
+    if preserve:
+        preserve_records()
+    if data_path is None:
+        df = load_training_data()
+    else:
+        df = pd.read_csv(data_path)
+        if "lang" not in df.columns:
+            from promption.utils.lang import detect_lang
+            df["lang"] = df["prompt"].map(detect_lang)
+    logger.info("Loaded %d training samples", len(df))
+    test_indices = stratified_split(df, seed=int(_CONF["model"].get("random_state", 42)))
+    test_set = set(test_indices.tolist())
+    train_indices = np.array([index for index in range(len(df)) if index not in test_set])
+    train_df = df.iloc[train_indices].reset_index(drop=True)
+    test_df = df.iloc[test_indices].reset_index(drop=True)
+    if train_df["label"].nunique() != 2 or test_df["label"].nunique() != 2:
+        raise ValueError("Training and evaluation partitions must both contain benign and malicious samples")
+    vectorizer, classifier, _ = train_lightweight_model(train_df, max_features=max_features)
+    metrics = evaluate_model(vectorizer, classifier, test_df, test_df["label"].to_numpy(int))
+    metrics.update(n_train=len(train_df), n_test=len(test_df), n_samples=len(df),
+                   n_features=len(vectorizer.get_feature_names_out()),
+                   backend="tfidf_logistic_regression", roc_auc=metrics["auc"])
+    target = Path(out_path or _CONF["model"]["lightweight_classifier_path"])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump({'vectorizer': vectorizer, 'classifier': classifier, 'metrics': metrics,
+                 'model_type': 'tfidf_logistic_regression', 'max_features': max_features,
+                 'feature_mode': 'word_and_char_ngrams'}, target)
+    import sklearn
+    import hashlib
+    dataset_hash = hashlib.sha256(df.to_csv(index=False).encode("utf-8")).hexdigest()
+    metadata = {"backend": metrics["backend"], "sha256": file_sha256(target),
+                "trained_at": datetime.now(timezone.utc).isoformat(),
+                "dataset_sha256": dataset_hash, "sklearn_version": sklearn.__version__,
+                "seed": int(_CONF["model"].get("random_state", 42)), "metrics": metrics}
+    target.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    results = Path(_CONF["paths"]["results"])
+    results.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([metrics]).to_csv(results / "model_metrics_tfidf.csv", index=False)
+    if _CONF["model"].get("use_lightweight_ml", False):
+        pd.DataFrame([metrics]).to_csv(results / "model_metrics.csv", index=False)
+    logger.info("TF-IDF model saved: %s (sha256=%s)", target, metadata["sha256"])
+    return metadata
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train lightweight TF-IDF + LogisticRegression")
     parser.add_argument("--data", type=str, default=None, help="Path to training CSV")
     parser.add_argument("--max-features", type=int, default=10000, 
                        help="Max TF-IDF features (default: 10000)")
-    parser.add_argument("--out", type=str, default="models/lightweight_classifier.pkl",
+    parser.add_argument("--out", type=str, default=None,
                        help="Output path for model")
     args = parser.parse_args()
     
-    # Cargar datos
-    df = load_training_data(args.data)
-    logger.info("Loaded %d training samples", len(df))
-    
-    test_indices = stratified_split(
-        df,
-        seed=int(_CONF["model"].get("random_state", 42)),
-    )
-    test_set = set(test_indices.tolist())
-    train_indices = np.array([index for index in range(len(df)) if index not in test_set])
-    train_df = df.iloc[train_indices].reset_index(drop=True)
-    test_df = df.iloc[test_indices].reset_index(drop=True)
-
-    vectorizer, classifier, _ = train_lightweight_model(train_df, max_features=args.max_features)
-    y_test = test_df["label"].to_numpy(int)
-    metrics = evaluate_model(vectorizer, classifier, test_df, y_test)
-    metrics["n_train"] = int(len(train_df))
-    metrics["n_test"] = int(len(test_df))
-    
-    # Guardar modelo
-    out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    model_data = {
-        'vectorizer': vectorizer,
-        'classifier': classifier,
-        'metrics': metrics,
-        'model_type': 'tfidf_logistic_regression',
-        'max_features': args.max_features,
-        'feature_mode': 'word_and_char_ngrams',
-    }
-    
-    joblib.dump(model_data, out_path)
-    logger.info("Model saved to %s", out_path)
-    
-    logger.info("\n✅ Lightweight model ready for Render free!")
-    logger.info("   Estimated size: %.2f MB", metrics['size_mb'])
-    logger.info("   Accuracy: %.2f%%", metrics['accuracy'] * 100)
+    train(args.data, args.out, args.max_features)
 
 
 if __name__ == "__main__":

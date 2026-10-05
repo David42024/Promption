@@ -66,7 +66,7 @@ export interface ProtectToolOptions {
   name: string;
   securityMessages?: ConversationMessage[];
   identity: Identity;
-  policy?: ToolPolicy;
+  policy: ToolPolicy;
   signal?: AbortSignal;
 }
 export type PromptionOptions = (FilterApiOptions | { transport: GuardTransport }) & {
