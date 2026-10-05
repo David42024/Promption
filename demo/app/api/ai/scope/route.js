@@ -22,6 +22,12 @@ export async function POST(request) {
         authenticated: body.identity?.authenticated === true } });
     return Response.json(decision);
   } catch (error) {
+    console.error('[ai/scope] evaluation failed', {
+      name: typeof error?.name === 'string' ? error.name : 'UnknownError',
+      code: typeof error?.code === 'string' ? error.code.slice(0, 80) : undefined,
+      statusCode: Number.isInteger(error?.statusCode) ? error.statusCode : undefined,
+      causeName: typeof error?.cause?.name === 'string' ? error.cause.name : undefined,
+    });
     return Response.json({ classification: 'UNCERTAIN', reason: 'scope_unavailable', allowed: false },
       { status: error instanceof TypeError ? 400 : 503 });
   }
