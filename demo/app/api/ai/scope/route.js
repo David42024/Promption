@@ -15,7 +15,9 @@ export async function POST(request) {
   catch { return Response.json({ error: 'JSON inválido' }, { status: 400 }); }
   try {
     const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const evaluate = createScopeEvaluator({ model: provider(process.env.OPENAI_MODEL) });
+    const evaluate = createScopeEvaluator({
+      model: provider(process.env.OPENAI_MODEL, { reasoningEffort: 'minimal' }),
+    });
     const decision = await evaluate({ text: body.text, systemPrompt: body.system_prompt,
       messages: body.messages, tool: body.tool, signal: request.signal,
       identity: { userId: body.identity?.user_id || 'anonymous', roles: body.identity?.roles || [],

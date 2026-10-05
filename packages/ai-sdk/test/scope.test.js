@@ -24,6 +24,7 @@ test('scope classifier uses AI SDK structured output and separates trusted polic
   assert.equal(result.assessment, undefined);
   const params = classifier.doGenerateCalls[0];
   assert.equal(params.responseFormat.type, 'json');
+  assert.equal(params.maxOutputTokens, 4096);
   assert.equal(params.responseFormat.schema.additionalProperties, false);
   assert.deepEqual(params.responseFormat.schema.required, ['assessment', 'decision']);
   assert.ok(params.prompt[0].content.includes(JSON.stringify(system)));

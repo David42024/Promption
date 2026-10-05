@@ -64,7 +64,7 @@ export async function POST(request) {
     const model = wrapLanguageModel({
       model: provider(body.model),
       middleware: promptionMiddleware(identity, body.original_text, request.signal, body.security_messages,
-        provider(process.env.OPENAI_MODEL)),
+        provider(process.env.OPENAI_MODEL, { reasoningEffort: 'minimal' })),
     });
     const tools = Object.fromEntries(body.tools.map(spec => [
       spec.function.name,
