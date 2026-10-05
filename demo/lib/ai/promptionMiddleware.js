@@ -15,12 +15,24 @@ const toolPolicies = {
 };
 
 function promption(scopeModel) {
+  const evaluateScope = scopeModel ? createScopeEvaluator({ model: scopeModel }) : null;
   return createPromption({
     transport: createGuardEndpointTransport({
       url: `${CHAT_API_URL}/api/v1/ai/guard`, token: process.env.CHAT_SERVICE_TOKEN,
       timeoutMs: 60000,
     }),
-    ...(scopeModel ? { scopeEvaluator: createScopeEvaluator({ model: scopeModel }) } : {}),
+    ...(evaluateScope ? { scopeEvaluator: async request => {
+      try { return await evaluateScope(request); }
+      catch (error) {
+        console.error('[ai/turn] scope evaluation failed', {
+          name: typeof error?.name === 'string' ? error.name : 'UnknownError',
+          code: typeof error?.code === 'string' ? error.code.slice(0, 80) : undefined,
+          statusCode: Number.isInteger(error?.statusCode) ? error.statusCode : undefined,
+          causeName: typeof error?.cause?.name === 'string' ? error.cause.name : undefined,
+        });
+        throw error;
+      }
+    } } : {}),
   });
 }
 

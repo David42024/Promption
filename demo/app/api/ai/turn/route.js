@@ -102,7 +102,8 @@ export async function POST(request) {
   } catch (error) {
     const { code, status, reason, scope } = aiFailure(error);
     console.warn("AI turn failed", { code, status, model: body.model,
-      guardReason: reason, errorType: error.name, providerStatus: error.statusCode });
+      guardReason: reason, scopeReason: scope?.reason,
+      errorType: error.name, providerStatus: error.statusCode });
     return Response.json({ error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta",
       code, ...(reason ? { reason } : {}), ...(scope ? { scope } : {}) }, { status });
   }
