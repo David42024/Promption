@@ -111,7 +111,7 @@ class LLMClient:
              "base_url": settings.vercel_ai_url,
              "temperature": 0.2, "max_tokens": max_tokens}
             for model_id, model, max_tokens in (
-                ("openai-primary", settings.openai_model, 900),
+                ("openai-primary", settings.openai_model, 2500),
                 ("openai-tools", settings.openai_tool_model, 4500),
             )
         ]

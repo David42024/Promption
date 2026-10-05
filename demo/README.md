@@ -89,6 +89,8 @@ no un fallo de la demo.
 - Chat Service registra las herramientas de tienda y `make_document` en el SDK MCP
   oficial. La lista ofrecida al modelo depende de la sesión; el ejecutor vuelve a
   validar el rol antes de cada llamada y registra el resultado en la auditoría.
+- Las consultas públicas de visitantes también recuperan datos con MCP en el servidor;
+  sin sesión, el modelo no puede solicitar herramientas ni crear archivos.
 - `make_document` crea DOCX, PDF, XLSX, TXT y CSV en el servidor y entrega el archivo
   como adjunto descargable en el chat cuando termina la ejecución.
 - Defensa en profundidad: el filtro frena la *inyección*; Policy Engine bloquea

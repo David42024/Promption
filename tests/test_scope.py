@@ -125,7 +125,7 @@ def test_chat_reports_scope_before_any_tool_or_reply_model(monkeypatch, classifi
 
 def test_scope_endpoint_uses_server_policy_and_role_context(monkeypatch):
     async def evaluate(request):
-        assert "Sin sesión no uses herramientas" in request["system_prompt"]
+        assert "Sin sesión solo puedes recuperar datos públicos con MCP" in request["system_prompt"]
         assert request["messages"][0]["role"] == "user"
         assert request["identity"]["authenticated"] is False
         return {"classification": "OUT_OF_SCOPE", "reason": "system_limit"}

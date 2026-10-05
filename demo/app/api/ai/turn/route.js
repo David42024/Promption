@@ -62,7 +62,8 @@ export async function POST(request) {
     const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const identity = { userId: body.user_id, roles: body.roles, authenticated: body.authenticated === true };
     const model = wrapLanguageModel({
-      model: provider(body.model),
+      model: provider(body.model, /^gpt-5(?:-(?:nano|mini))?(?:-\d{4}-\d{2}-\d{2})?$/.test(body.model)
+        ? { reasoningEffort: "minimal" } : {}),
       middleware: promptionMiddleware(identity, body.original_text, request.signal, body.security_messages,
         provider(process.env.OPENAI_MODEL, { reasoningEffort: 'minimal' })),
     });

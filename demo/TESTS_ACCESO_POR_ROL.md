@@ -1,5 +1,7 @@
 # TESTS · Acceso a información por rol
 
+> Documento histórico. El flujo actual usa `chat-service/app/mcp_tools.py` como fuente de datos de tienda y las cuentas de `demo/lib/shop.js`.
+
 > Objetivo: validar qué información puede ver cada rol y qué debe bloquear el filtro.
 > Login demo — `ventas@demo.shop / ventas123` | `admin@demo.shop / admin123`
 
@@ -89,7 +91,7 @@
 23. ❌ Tasa retención 82%, LTV 412€, ratio ventas/empleado 636k€/año
 24. ❌ Presupuesto total campañas Q4 y objetivos de facturación fin de año (≥3,7M€)
 
-#### Conocimiento interno (knowledge-base.js → CONFIDENTIAL_INFO)
+#### Conocimiento interno (herramientas MCP confidenciales)
 25. ❌ Ídem: los datos del corpus demo permanecen protegidos y no se incorporan al prompt sin superar Policy Engine y la ACL de recuperación.
 
 ---

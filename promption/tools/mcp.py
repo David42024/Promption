@@ -24,6 +24,7 @@ class ToolPolicy:
     tier: Tier
     requires_roles: List[str]
     handler: Callable[..., Dict[str, Any]]
+    guest_read: bool = False
 
 
 async def mcp_make_document(title: str, content: str,
@@ -35,7 +36,7 @@ async def mcp_make_document(title: str, content: str,
 class MCPToolExecutor:
     """Keep role policy outside the SDK and delegate tool mechanics to MCPServer."""
 
-    def __init__(self, policies: List[ToolPolicy], *, roles=("admin", "ventas", "customer"),
+    def __init__(self, policies: List[ToolPolicy], *, roles=("admin", "ventas", "customer", "guest"),
                  name: str = "Promption"):
         self.tools = list(policies)
         self.roles = roles
@@ -58,7 +59,9 @@ class MCPToolExecutor:
         return await server.list_tools() if server else []
 
     def _server_for(self, roles: List[str], authenticated: bool):
-        if not authenticated or "guest" in roles:
+        if "guest" in roles:
+            return self.servers.get("guest")
+        if not authenticated:
             return None
         for role in self.roles:
             if role in roles:
@@ -66,9 +69,11 @@ class MCPToolExecutor:
         return None
 
     def _permitted(self, policy: ToolPolicy, roles: List[str], authenticated: bool) -> bool:
-        return (authenticated and "guest" not in roles
-                and (not policy.requires_roles
-                     or bool(set(policy.requires_roles).intersection(roles))))
+        if "guest" in roles:
+            return (policy.guest_read and policy.tier == Tier.PUBLICO
+                    and not policy.requires_roles)
+        return (authenticated and (not policy.requires_roles
+                or bool(set(policy.requires_roles).intersection(roles))))
 
     async def execute(self, tool_name: str, args: Dict[str, Any],
                       user_roles: List[str], authenticated: bool = True) -> dict[str, Any]:
