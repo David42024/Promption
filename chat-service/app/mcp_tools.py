@@ -25,21 +25,24 @@ class MCPToolExecutor(BaseMCPToolExecutor):
                 description="Datos públicos de marca, contacto, dirección y teléfono.",
                 tier=Tier.PUBLICO,
                 requires_roles=[],
-                handler=self._get_brand_info
+                handler=self._get_brand_info,
+                guest_read=True,
             ),
             ToolPolicy(
                 name="getShippingPolicy",
                 description="Políticas públicas de envío, devoluciones, garantías y horarios.",
                 tier=Tier.PUBLICO,
                 requires_roles=[],
-                handler=self._get_shipping_policy
+                handler=self._get_shipping_policy,
+                guest_read=True,
             ),
             ToolPolicy(
                 name="getCatalogSummary",
                 description="Lista resumida de categorías de productos disponibles en la tienda.",
                 tier=Tier.PUBLICO,
                 requires_roles=[],
-                handler=self._get_catalog_summary
+                handler=self._get_catalog_summary,
+                guest_read=True,
             ),
             
             ToolPolicy(
@@ -120,7 +123,9 @@ class MCPToolExecutor(BaseMCPToolExecutor):
             "envios": {
                 "gratis": "Pedidos +50€",
                 "estandar": "3-5 días laborables",
-                "express": "1-2 días laborables (+5€)"
+                "express": "1-2 días laborables (+5€)",
+                "baleares": "3-5 días; gastos 4,99€",
+                "canarias_ceuta_melilla": "5-7 días; gastos 9,99€",
             },
             "garantias": {
                 "devolucion": "30 días",

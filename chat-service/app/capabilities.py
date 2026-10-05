@@ -57,8 +57,8 @@ def describe_capabilities(tool_specs: list[dict], *, authenticated: bool) -> str
     lines = ["Puedo ayudarte con Promption Shop: productos, compras, envíos, garantías "
              "e información pública de la tienda."]
     if not authenticated:
-        lines.append("Estás como visitante sin sesión. Puedo responder consultas públicas, "
-                     "pero para usar herramientas y recibir archivos debes iniciar sesión.")
+        lines.append("Estás como visitante sin sesión. Puedo consultar información pública "
+                     "de la tienda mediante MCP; para crear archivos debes iniciar sesión.")
     elif tool_specs:
         lines.append("Con tu sesión actual tienes disponibles estas funciones:")
         for spec in tool_specs:

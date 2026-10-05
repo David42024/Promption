@@ -199,7 +199,7 @@ def test_document_action_requires_confirmation_for_confidential_scope(monkeypatc
     assert response.actions[0]["name"] == "reporte.txt"
 
 
-def test_guest_uses_no_tools_even_for_public_policy(monkeypatch):
+def test_guest_gets_public_mcp_context_without_model_tools(monkeypatch):
     from app.models import LLMResponse
 
     class Filter:
@@ -215,6 +215,8 @@ def test_guest_uses_no_tools_even_for_public_policy(monkeypatch):
 
     class LLM:
         async def generate(self, messages):
+            assert any(message.get("role") == "tool" and "canarias_ceuta_melilla" in message.get("content", "")
+                       for message in messages)
             return LLMResponse(text="Consulta la política de envíos en la tienda.",
                                model="test", latency_ms=1)
 
@@ -227,7 +229,7 @@ def test_guest_uses_no_tools_even_for_public_policy(monkeypatch):
         id="guest", name="Visitante", email="guest@example.com", roles=["guest"], authenticated=False))
     response = asyncio.run(routes.chat(request))
     assert response.blocked is False
-    assert response.audit == []
+    assert [(item.tool, item.allowed) for item in response.audit] == [("getShippingPolicy", True)]
     assert response.actions == []
 
 

@@ -34,6 +34,24 @@ def test_sdk_clients_only_see_their_role_catalog():
     asyncio.run(check())
 
 
+def test_guest_can_read_only_explicit_public_mcp_data():
+    executor = MCPToolExecutor()
+
+    async def check():
+        assert await executor.available(["guest"], False) == []
+        async with Client(executor.servers["guest"]) as guest:
+            names = {tool.name for tool in (await guest.list_tools()).tools}
+            assert names == {"getBrandInfo", "getShippingPolicy", "getCatalogSummary"}
+        shipping = await executor.execute("getShippingPolicy", {}, ["guest"], authenticated=False)
+        assert shipping["audit"]["allowed"]
+        assert shipping["result"]["envios"]["canarias_ceuta_melilla"].startswith("5-7 días")
+        for name in ("getEmployees", "getStockInfo", "make_document"):
+            denied = await executor.execute(name, {}, ["guest"], authenticated=False)
+            assert denied["audit"]["allowed"] is False
+
+    asyncio.run(check())
+
+
 def test_mcp_generates_office_and_pdf_files_without_formula_execution():
     import base64
     import io

@@ -533,7 +533,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
                             reason="conversation_limit", block_type="conversation", role=primary_role)
     audit: List[MCPToolCall] = []
     authorized_context = None
-    if policy_decision.tool_name and request.user.authenticated and "guest" not in user_roles:
+    if policy_decision.tool_name and (
+        request.user.authenticated or policy_decision.tier == "publico"
+    ):
         tool_response = await mcp_executor.execute(policy_decision.tool_name, {}, user_roles,
                                              authenticated=request.user.authenticated)
         tool_audit = tool_response.get("audit", {})

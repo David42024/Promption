@@ -9,7 +9,7 @@ El sistema de seguridad de Demo Shop implementa múltiples capas de protección 
    - Bloqueo de patrones sensibles (`/credentials`, `/apikey`, `/password`, etc.)
    - Validación antes de ejecutar llamadas a API
 
-2. **Autorización de MCP Tools** (`demo/lib/mcp.js`)
+2. **Autorización de MCP Tools** (`promption/tools/mcp.py` y `chat-service/app/mcp_tools.py`)
    - Validación de roles antes de ejecutar tools
    - Detección de patrones sensibles en nombres/descripciones de tools
    - Logging seguro de intentos de autorización

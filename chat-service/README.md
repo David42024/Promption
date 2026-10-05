@@ -108,9 +108,10 @@ docker run --env-file chat-service/.env -p 8001:8001 promption-chat-service
 
 Las tools de datos de la tienda usan [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 versión 2.2.0. `MCPServer` registra funciones de negocio, genera los esquemas y valida
-sus argumentos. Se crea un catálogo MCP independiente para cliente, ventas y administrador;
-el visitante no recibe tools y la tool de secretos restringidos no se registra. El chat
-vuelve a comprobar sesión y roles antes de llamar a `MCPServer.call_tool`.
+sus argumentos. Se crea un catálogo MCP independiente para visitante, cliente, ventas y
+administrador. El visitante solo puede consultar las herramientas públicas de lectura;
+el modelo no recibe un catálogo de herramientas sin sesión. El chat vuelve a comprobar
+sesión y roles antes de llamar a `MCPServer.call_tool`.
 
 La conexión es interna al proceso: no se publica `/mcp`, porque la autenticación de la demo
 entra por el proxy firmado de Next.js. Las funciones que devuelven los datos de prueba,
@@ -123,7 +124,7 @@ antes de ejecutar cada llamada. El endpoint directo `/tools/execute` devuelve 40
 
 | Perfil | Consultas de tienda | Internet | Diálogos | Archivos en chat |
 |---|---|---|---|---|
-| Visitante sin sesión | No usa tools | No | No | No |
+| Visitante sin sesión | Datos públicos vía MCP en el servidor | No | No | No |
 | Cliente | Datos públicos | No | Sí | DOCX, PDF, XLSX, TXT, CSV y documentos Markdown autorizados |
 | Ventas | Datos públicos e internos | Sí | Sí | DOCX, PDF, XLSX, TXT, CSV y documentos Markdown autorizados |
 | Administrador | Datos públicos, internos y confidenciales | Sí | Sí | DOCX, PDF, XLSX, TXT, CSV y documentos Markdown autorizados |
