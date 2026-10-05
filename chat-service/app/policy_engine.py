@@ -194,7 +194,8 @@ class PolicyEngine(BasePolicyEngine):
 
     def __init__(self, policies: Iterable[ResourcePolicy] = RESOURCE_POLICIES):
         super().__init__(policies, tier_roles=TIER_ALLOWED_ROLES,
-                         output_excluded_policy_ids=OUTPUT_GUARD_OWNED_POLICIES)
+                         output_excluded_policy_ids=OUTPUT_GUARD_OWNED_POLICIES,
+                         allow_unmatched=True)
 
 
 def authorization_message(decision: PolicyDecision) -> str:

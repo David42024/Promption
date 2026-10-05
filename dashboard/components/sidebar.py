@@ -11,6 +11,7 @@ import streamlit as st
 
 from dashboard.utils.data_loader import API_URL, api_health, api_reachable, latest_benchmark_timestamp
 from dashboard.utils.theme import get_palette, inject_css
+from promption.training.artifacts import selected_backend
 
 _ASSETS = Path(__file__).resolve().parents[1] / "assets"
 
@@ -40,7 +41,9 @@ def render_sidebar() -> None:
         if logo.exists():
             st.image(str(logo), width=120)
         st.markdown("## 🛡️ Prompt Injection Filter")
-        st.caption("Sistema anti-prompt-injection en dos capas\nheurística + embeddings/RandomForest")
+        backend, _ = selected_backend()
+        ml_label = "TF-IDF/regresión logística" if backend == "tfidf_logistic_regression" else "embeddings/Random Forest"
+        st.caption(f"Sistema anti-prompt-injection en dos capas\nheurística + {ml_label}")
 
         render_theme_toggle()
 

@@ -15,7 +15,7 @@ from promption.utils.config import load_config
 from promption.utils.logger import logger
 
 _CONF = load_config()
-_MODEL_PATH = _CONF["paths"].get("lightweight_classifier", "models/lightweight_classifier.pkl")
+_MODEL_PATH = _CONF["model"]["lightweight_classifier_path"]
 
 
 @dataclass

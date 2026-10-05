@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.metrics import classification_report
 
 from dashboard.components import charts
@@ -21,6 +21,10 @@ from dashboard.components.sidebar import setup_page
 from dashboard.utils.data_loader import load_benchmark_results, load_history, load_model_metrics
 from dashboard.utils.paths import MODELS_DIR
 from dashboard.utils.theme import get_palette
+from promption.utils.config import load_config
+from promption.training.artifacts import selected_backend
+from promption.filter.ml_filter import prepare_texts
+_backend, _model_path = selected_backend()
 setup_page("Model Analysis — Prompt Injection Filter", "🔬")
 
 st.title("🔬 Model Analysis — Análisis del modelo ML")
@@ -29,17 +33,21 @@ st.title("🔬 Model Analysis — Análisis del modelo ML")
 @st.cache_resource(show_spinner="Cargando clasificador…")
 def get_classifier_importance():
     import joblib
-    path = str(MODELS_DIR / "random_forest.pkl")
-    clf = joblib.load(path)
-    imp = clf.feature_importances_
+    model = joblib.load(_model_path)
+    if _backend == "tfidf_logistic_regression":
+        imp = np.abs(model["classifier"].coef_[0])
+        names = model["vectorizer"].get_feature_names_out()
+    else:
+        imp = model.feature_importances_
+        names = [f"dim_{i}" for i in range(len(imp))]
     dims = np.argsort(imp)[::-1][:30]
-    return [{"dimension": f"dim_{i}", "importance": float(imp[i])} for i in dims]
+    return [{"dimension": str(names[i]), "importance": float(imp[i])} for i in dims]
 
 
 @st.cache_resource(show_spinner="Cargando encoder de embeddings…")
 def get_encoder():
     from sentence_transformers import SentenceTransformer
-    return SentenceTransformer("all-MiniLM-L6-v2")
+    return SentenceTransformer(load_config()["model"]["embedding_model"])
 
 
 df = load_benchmark_results()
@@ -47,6 +55,8 @@ model_metrics = load_model_metrics()
 
 # ------------------------------------------------------------- feature import
 section_header("Feature importance")
+st.caption("TF-IDF + regresión logística (magnitud de coeficientes)" if _backend == "tfidf_logistic_regression"
+           else "Embeddings + Random Forest")
 try:
     items = get_classifier_importance()
     charts.render_chart(charts.plot_feature_importance(items, top=20))
@@ -56,7 +66,7 @@ try:
                    f"Precision: {mrow.get('precision', 0):.3f} · Recall: {mrow.get('recall', 0):.3f} · "
                    f"F1: {mrow.get('f1', 0):.3f} · ROC-AUC: {mrow.get('roc_auc', 0):.3f}")
 except FileNotFoundError:
-    st.info("Modelo no entrenado todavía (falta models/random_forest.pkl). Ejecuta `python src/training/train.py`.")
+    st.info("Modelo no entrenado todavía. Ejecuta `python scripts/run_benchmark.py --train-only`.")
 
 # ------------------------------------------------------------- learning curve
 section_header("Curva de aprendizaje (histórico)")
@@ -72,16 +82,21 @@ else:
     st.info("No hay ejecuciones históricas guardadas todavía.")
 
 # ------------------------------------------------------------- embeddings PCA
-section_header("Distribución de embeddings (PCA)")
+section_header("Distribución TF-IDF (SVD)" if _backend == "tfidf_logistic_regression" else "Distribución de embeddings (PCA)")
 if not df.empty:
     try:
         n_pca = min(len(df), 1500)
         probe = df.sample(n=n_pca, random_state=42) if n_pca < len(df) else df
-        encoder = get_encoder()
-        with st.spinner("Calculando embeddings de los prompts del benchmark…"):
-            emb = np.asarray(encoder.encode(probe["prompt"].tolist(), normalize_embeddings=True, batch_size=32),
-                             dtype=np.float32)
-        pca = PCA(n_components=2, random_state=42)
+        if _backend == "tfidf_logistic_regression":
+            import joblib
+            vectorizer = joblib.load(_model_path)["vectorizer"]
+            emb = vectorizer.transform(probe["prompt"].tolist())
+            pca = TruncatedSVD(n_components=2, random_state=42)
+        else:
+            encoder = get_encoder()
+            emb = np.asarray(encoder.encode(prepare_texts(probe["prompt"].tolist()), normalize_embeddings=True,
+                                           batch_size=32), dtype=np.float32)
+            pca = PCA(n_components=2, random_state=42)
         coords = pca.fit_transform(emb)
         pca_df = pd.DataFrame({"PC1": coords[:, 0], "PC2": coords[:, 1],
                                "label": probe["label"].astype(int).map({1: "Malicioso", 0: "Benigno"})})
@@ -90,7 +105,7 @@ if not df.empty:
                          color_discrete_map={"Malicioso": pal["red"], "Benigno": pal["green"]},
                          opacity=0.75, labels={"PC1": f"PC1 ({pca.explained_variance_ratio_[0]:.1%})",
                                                "PC2": f"PC2 ({pca.explained_variance_ratio_[1]:.1%})"})
-        charts.apply_theme(fig, title="Proyección PCA de los embeddings")
+        charts.apply_theme(fig, title="Proyección del modelo activo")
         charts.render_chart(fig)
         if n_pca < len(df):
             st.caption(f"PCA calculado sobre una muestra de {n_pca} de {len(df)} prompts "

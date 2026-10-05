@@ -75,32 +75,69 @@ class Promption:
         self.scope_guard = scope_guard
 
     def check_input(self, text: str, identity: Identity | None = None, *, use_ml: bool = True,
-                    system_prompt: str | None = None, messages: list[dict] | None = None) -> GuardDecision:
+                    system_prompt: str | None = None, messages: list[dict] | None = None,
+                    output_enabled: bool = False) -> GuardDecision:
+        """Inspect current input and supplied history; guarded inputs require output protection."""
+        from .conversation_guard import ConversationGuard, ConversationLimitError, validate_messages
         identity = identity or Identity("anonymous")
+        if not isinstance(text, str):
+            return GuardDecision(False, "", "BLOCK", "invalid_input", 400)
         if self.policy and not self.policy.evaluate(text, identity.roles).allowed:
             return GuardDecision(False, "", "BLOCK", "insufficient_scope", 403)
-        result = self.input_filter.analyze(text, use_ml=use_ml, roles=list(identity.roles))
+        conversation = None
+        evidence = messages
+        try:
+            if messages is not None:
+                validated = validate_messages(messages)
+                evidence = [{"role": item.role, "content": item.content,
+                             **({"tool_name": item.tool_name} if item.tool_name else {})}
+                            for item in validated]
+                if not evidence or evidence[-1]["role"] != "user" or evidence[-1]["content"] != text:
+                    evidence.append({"role": "user", "content": text})
+                conversation = ConversationGuard(self.input_filter).analyze(
+                    evidence, roles=list(identity.roles), use_ml=use_ml)
+            result = self.input_filter.analyze(text, use_ml=use_ml, roles=list(identity.roles))
+        except ConversationLimitError:
+            return GuardDecision(False, "", "BLOCK", "conversation_limit", 413)
+        except (TypeError, ValueError):
+            return GuardDecision(False, "", "BLOCK", "invalid_input", 400)
+        except Exception:
+            return GuardDecision(False, "", "BLOCK", "guard_unavailable", 503)
+        decision = input_guard_decision(text, {
+            "blocked": _field(result, "blocked"), "decision": _field(result, "decision"),
+            "requires_output_guard": _field(result, "requires_output_guard", False),
+            "layers": {"conversation": conversation.metadata()} if conversation is not None else {},
+        }, message_count=len(evidence or []), output_enabled=output_enabled)
+        if not decision.allowed:
+            return decision
         scope = None
-        if not result.blocked and self.scope_guard:
-            scope = self.scope_guard.check(text, system_prompt=system_prompt, identity=identity, messages=messages)
+        if self.scope_guard:
+            try:
+                scope = self.scope_guard.check(text, system_prompt=system_prompt, identity=identity, messages=evidence)
+            except Exception:
+                return GuardDecision(False, "", "BLOCK", "scope_unavailable", 503)
             if not scope.allowed:
                 return GuardDecision(False, "", "BLOCK", "out_of_scope" if scope.classification == "OUT_OF_SCOPE"
                                      else scope.reason, scope.status, scope=scope.to_dict())
-        return GuardDecision(not result.blocked, text if not result.blocked else "",
-                             result.decision, result.blocking_reason,
-                             403 if result.blocked else 200, result.requires_output_guard,
-                             scope=scope.to_dict() if scope else None)
+        return replace(decision, action="GUARDED" if decision.requires_output_guard else "ALLOWED",
+                       scope=scope.to_dict() if scope else None)
 
     def check_conversation(self, messages: list, identity: Identity | None = None,
-                           *, use_ml: bool = True) -> GuardDecision:
+                           *, use_ml: bool = True, output_enabled: bool = False) -> GuardDecision:
         from .conversation_guard import ConversationGuard, ConversationLimitError
         identity = identity or Identity("anonymous")
         try:
             result = ConversationGuard(self.input_filter).analyze(messages, roles=list(identity.roles), use_ml=use_ml)
         except ConversationLimitError:
             return GuardDecision(False, "", "BLOCK", "conversation_limit", 413)
-        return GuardDecision(not result.blocked, "", "BLOCK" if result.blocked else "PASS",
-                             result.reason, 403 if result.blocked else 200, result.requires_output_guard)
+        except (TypeError, ValueError):
+            return GuardDecision(False, "", "BLOCK", "invalid_input", 400)
+        except Exception:
+            return GuardDecision(False, "", "BLOCK", "guard_unavailable", 503)
+        return input_guard_decision("", {"blocked": result.blocked,
+            "requires_output_guard": result.requires_output_guard,
+            "layers": {"conversation": result.metadata()}},
+            message_count=result.message_count, output_enabled=output_enabled)
 
     def check_output(self, text: str, identity: Identity | None = None) -> GuardDecision:
         from .output_guard import guard_response

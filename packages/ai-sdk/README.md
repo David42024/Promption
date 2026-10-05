@@ -28,6 +28,9 @@ con `streamText`; el middleware retiene la salida hasta que se aprueba completa.
 Usa siempre credenciales y roles resueltos en el servidor. `protectTool` envuelve
 el método `execute` de tools de AI SDK o MCP. Los usuarios sin sesión no ejecutan
 herramientas y una herramienta no incluida en `toolPolicies` se deniega.
+Si se omite `toolPolicies`, se deniegan todas las herramientas. `protectTool`
+también requiere `policy`: usa `{}` para permitir a usuarios autenticados o
+`{ roles: ['admin'] }` para restringirla por rol.
 
 Puedes usar `createGuardEndpointTransport({ url, token })` con un backend que
 responda `{ allowed: boolean, text: string, action?: string }`, o pasar un

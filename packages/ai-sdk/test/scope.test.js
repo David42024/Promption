@@ -119,14 +119,14 @@ test('a generated tool outside system limits is stopped before execution', async
   const sdk = createPromption({ transport: pass, scopeEvaluator: async request => request.tool
     ? { classification: 'OUT_OF_SCOPE', reason: 'system_limit' } : inScope() });
   const protectedTool = sdk.protectTool({ execute: async () => { executions++; return 'sent'; } }, {
-    name: 'email', identity, systemPrompt: system, originalText: 'Show me shop products',
+    name: 'email', identity, policy: {}, systemPrompt: system, originalText: 'Show me shop products',
   });
   await assert.rejects(protectedTool.execute({ recipient: 'someone@example.com' }, {}), error => error.code === 'OUT_OF_SCOPE');
   assert.equal(executions, 0);
   const provider = new MockLanguageModelV3({ doGenerate: { content: [{ type: 'tool-call',
     toolCallId: 'call1', toolName: 'email', input: '{}' }], usage, warnings: [],
     finishReason: { unified: 'tool-calls', raw: 'tool_calls' } } });
-  const model = wrapLanguageModel({ model: provider, middleware: sdk.middleware({ identity }) });
+  const model = wrapLanguageModel({ model: provider, middleware: sdk.middleware({ identity, toolPolicies: { email: {} } }) });
   await assert.rejects(generateText({ model, system, prompt: 'Show me shop products', tools: {
     email: { inputSchema: (await import('ai')).jsonSchema({ type: 'object' }),
       execute: async () => { executions++; return 'sent'; } },

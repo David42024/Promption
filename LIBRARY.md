@@ -63,7 +63,10 @@ const middleware = promption.middleware({
 });
 ```
 
-Cuando proporcionas `toolPolicies`, una herramienta ausente del mapa se deniega.
+Las herramientas requieren `toolPolicies`: sin mapa, o si una herramienta no está
+incluida, se deniega. Una política `{}` permite esa herramienta a usuarios autenticados;
+`{ roles: ['admin'] }` exige uno de los roles indicados. `protectTool` también exige
+una `policy` explícita. Los roles deben proceder de la sesión validada del servidor.
 Sin sesión no hay llamadas a herramientas. Un usuario autenticado sin ese mapa
 puede utilizar las herramientas que tú entregues al modelo; conserva también la
 ACL en el servidor que ejecuta la operación. Para herramientas de AI SDK o de un
@@ -182,7 +185,7 @@ mismos valores que el SDK:
 from promption import Promption, ScopeGuard
 
 protection = Promption(scope_guard=ScopeGuard(my_semantic_evaluator))
-decision = protection.check_input(text, identity, system_prompt=system, messages=history)
+decision = protection.check_input(text, identity, system_prompt=system, messages=history, output_enabled=True)
 ```
 
 `AsyncGuardPipeline` acepta `scope_guard=AsyncScopeGuard(...)` y `system_prompt`
@@ -227,7 +230,7 @@ from promption import Promption, Identity
 
 protection = Promption()
 identity = Identity('user-123', ('customer',), authenticated=True)
-input_decision = protection.check_input('Consulta el catálogo', identity)
+input_decision = protection.check_input('Consulta el catálogo', identity, output_enabled=True)
 if input_decision.allowed:
     output_decision = protection.check_output(model_response, identity)
     if output_decision.allowed:
@@ -272,6 +275,33 @@ reglas y asignaciones de roles de tu negocio. Cada `ResourcePolicy` puede defini
 detectar una divulgación en la respuesta. Si se omite, se reutilizan `patterns`.
 El executor MCP recibe tus handlers y sus `ToolPolicy`, y usa el SDK oficial MCP
 para esquemas, registro y ejecución.
+
+`PolicyEngine` evalúa todas las políticas coincidentes y exige permiso para cada
+recurso, tanto en entrada como en salida. `matched_policy_ids` conserva las
+coincidencias; los campos singulares describen la política denegada o la más
+restrictiva. Por defecto se deniega el contenido sin coincidencias. Una aplicación
+con asistencia general puede activar `allow_unmatched=True`; el resultado queda
+`matched=False`, `policy_id='unclassified'` y no autoriza ninguna herramienta.
+La Shop usa esa opción y mantiene las comprobaciones de cada herramienta.
+
+En Python, `check_input(..., messages=history)` revisa automáticamente el historial
+junto con el mensaje actual, incluidos resultados de herramientas. El historial
+inválido o demasiado grande bloquea la petición. `check_input` y `check_conversation`
+deniegan `GUARDED` por defecto: establece `output_enabled=True` solo si tu aplicación
+llamará a `check_output` y entregará exclusivamente su texto aprobado. El uso directo
+de Python exige que la aplicación ejecute ambos pasos.
+
+El benchmark selecciona el backend de `config/config.yaml`; actualmente es TF-IDF
+con regresión logística. `python scripts/run_benchmark.py --no-llm` entrena ese modelo
+y lo evalúa. `--no-train` reutiliza su artefacto si existe. Los modelos y resultados
+anteriores se copian a `data/results/backups/pre_run_*` antes de sustituir archivos,
+también al entrenar directamente cualquiera de los dos modelos.
+Random Forest conserva su propio `.pkl`; sus registros archivados no se convierten
+en métricas de TF-IDF. Los JSON del benchmark incluyen backend y SHA-256 del modelo,
+y cada ejecución conserva CSV y JSON. `model_metrics_tfidf.csv` contiene métricas
+del conjunto reservado de evaluación; el benchmark general usa el corpus completo
+(incluye datos de entrenamiento) y `--no-llm` calcula un ASR proxy, no ataques reales
+contra un modelo de lenguaje.
 
 ## Construcción, distribución y comprobación
 

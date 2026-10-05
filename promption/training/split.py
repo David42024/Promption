@@ -17,9 +17,10 @@ def stratified_split(df: pd.DataFrame, seed: int = 42, test_frac: float = 0.2) -
         ~df["source"].astype(str).isin(SYNTH_SOURCES)
         if "source" in df.columns else pd.Series(True, index=df.index)
     )
-    groups = df[public].groupby(["label", "lang"]).indices
+    public_positions = np.flatnonzero(public.to_numpy())
+    groups = df.iloc[public_positions].groupby(["label", "lang"]).indices
     for _, indices in sorted(groups.items()):
-        indices = np.asarray(indices)
+        indices = public_positions[np.asarray(indices)].copy()
         rng.shuffle(indices)
         count = max(1, int(len(indices) * test_frac)) if len(indices) > 1 else 1
         parts.append(indices[:count])

@@ -2,6 +2,18 @@ import { createPromption, createGuardEndpointTransport, createScopeEvaluator } f
 
 const CHAT_API_URL = (process.env.CHAT_API_URL || process.env.NEXT_PUBLIC_CHAT_API_URL || "").replace(/\/$/, "");
 
+const toolPolicies = {
+  make_document: {}, getBrandInfo: {}, getShippingPolicy: {}, getCatalogSummary: {},
+  getPromotions: { roles: ["ventas", "admin"] },
+  getStockInfo: { roles: ["ventas", "admin"] },
+  getMarketingCampaigns: { roles: ["ventas", "admin"] },
+  getEmployees: { roles: ["admin"] }, getVIPClients: { roles: ["admin"] },
+  getKPIStats: { roles: ["admin"] }, getRevenueReport: { roles: ["admin"] },
+  getTopProducts: { roles: ["admin"] },
+  ask_user: {}, attach_existing_document: {},
+  web_search: { roles: ["ventas", "admin"] }, web_open: { roles: ["ventas", "admin"] },
+};
+
 function promption(scopeModel) {
   return createPromption({
     transport: createGuardEndpointTransport({
@@ -13,7 +25,7 @@ function promption(scopeModel) {
 }
 
 export function promptionMiddleware(identity, originalText, signal, securityMessages, scopeModel) {
-  return promption(scopeModel).middleware({ identity, originalText, signal, securityMessages });
+  return promption(scopeModel).middleware({ identity, originalText, signal, securityMessages, toolPolicies });
 }
 
 export function checkPromption(text, identity, direction, signal) {

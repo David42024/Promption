@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from promption.training.artifacts import model_provenance
 
 import numpy as np
 import pandas as pd
@@ -291,6 +292,11 @@ class BenchmarkRunner:
         metrics = all_metrics(out_df)
         metrics["timestamp"] = datetime.now(timezone.utc).isoformat()
         metrics["options"] = {"use_llm": llm_ok, "n_rows": int(len(out_df))}
+        ml_filter = getattr(self.filters, "ml", None)
+        model_path = getattr(ml_filter, "model_path", None)
+        if model_path is not None:
+            backend = "tfidf_logistic_regression" if type(ml_filter).__name__ == "LightMLFilter" else "embeddings_random_forest"
+            metrics["options"]["model"] = model_provenance(Path(model_path), backend)
         metrics["options"]["use_output_guard"] = bool(self.opts.use_output_guard)
         metrics["input_decisions"] = decision_counts
         metrics["input_decisions_by_label"] = decisions_by_label
@@ -329,6 +335,7 @@ class BenchmarkRunner:
             ts = datetime.strptime(metrics["timestamp"], "%Y-%m-%dT%H:%M:%S.%f%z").strftime("%Y%m%d_%H%M%S")
             hist.mkdir(parents=True, exist_ok=True)
             df.to_csv(hist / f"run_{ts}.csv", index=False, encoding="utf-8")
+            (hist / f"run_{ts}.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
         logger.info("Results saved: %s / %s", csv_path, json_path)
         return csv_path

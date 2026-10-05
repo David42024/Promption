@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 from promption.benchmark.runner import BenchmarkRunner, RunnerOptions  # noqa: E402
 from promption.filter.ensemble_filter import build_default  # noqa: E402
-from promption.training import train as train_mod  # noqa: E402
+from promption.training.artifacts import selected_backend, preserve_records
 from promption.training import dataset as dataset_mod  # noqa: E402
 from promption.utils.config import load_config  # noqa: E402
 from promption.utils.logger import logger  # noqa: E402
@@ -124,18 +124,27 @@ def main() -> None:
     else:
         dataset_mod.prepare_training_data()
         if args.prepare_only:
-            logger.info("Dataset built. Run `python src/training/train.py` to train.")
+            logger.info("Dataset built. Run `python scripts/run_benchmark.py --train-only` to train the selected backend.")
             return
 
-    model_path = Path(load_config()["paths"]["classifier"])
+    backend, model_path = selected_backend()
+    backup = preserve_records()
+    logger.info("Previous models and results preserved in %s", backup)
     if args.train_only or not model_path.exists() or not args.no_train:
-        train_mod.main()
+        if backend == "tfidf_logistic_regression":
+            from promption.training.train_lightweight import train
+            train(out_path=model_path, preserve=False)
+        else:
+            from promption.training.train import main as train
+            train(out_path=str(model_path), preserve=False)
 
     if args.train_only:
         return
 
+    ensemble = build_default()
+    ensemble.ml._ensure_loaded()
     runner = BenchmarkRunner(
-        filter=build_default(),
+        filter=ensemble,
         opts=RunnerOptions(data=pdf_df, sample_size=args.sample, use_llm=not args.no_llm),
     )
     df, metrics = runner.run()
