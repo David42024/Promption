@@ -46,7 +46,7 @@ export function validateScopeRequest(request) {
   if (total > 100000) throw new PromptionError('CONVERSATION_TOO_LARGE');
 }
 
-export function createScopeEvaluator({ model, timeoutMs = 30000, maxOutputTokens = 1024 }) {
+export function createScopeEvaluator({ model, timeoutMs = 30000, maxOutputTokens = 4096 }) {
   if (!model || !Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError('A model and positive timeout are required');
   return async request => {
     validateScopeRequest(request);
