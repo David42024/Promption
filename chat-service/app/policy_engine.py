@@ -24,7 +24,7 @@ RESOURCE_POLICIES = (
         policy_id="confidential.credentials",
         resource="internal_credentials",
         tier="restringido",
-        tool_name=None,
+        tool_names=(),
         patterns=(
             r"\b(dame|muestra(?:me)?|revela(?:me)?|comparte(?:me)?|necesito|cual\s+es|quiero|accede(?:r)?)\b.{0,70}\b(api\s*key|apikey|jwt|token|password|contrasena|clave\s+privada|credencial(?:es)?|secreto(?:s)?|hostname|base\s+de\s+datos|db\s*prod)\b.{0,45}\b(interno(?:s)?|admin|pasarela|produccion|backup|firmador|empresa|sistema)\b",
             r"\b(api\s*key|jwt|password|contrasena|credencial(?:es)?|secreto(?:s)?)\b.{0,55}\b(interno(?:s)?|admin|pasarela|produccion|backup|firmador)\b",
@@ -35,7 +35,7 @@ RESOURCE_POLICIES = (
         policy_id="confidential.payroll",
         resource="employee_payroll",
         tier="confidencial",
-        tool_name="getEmployees",
+        tool_names=("getEmployees",),
         patterns=(
             r"\b(sueldo(?:s)?|salario(?:s)?|nomina(?:s)?|remuneracion(?:es)?|cuanto\s+cobra|comision(?:es)?)\b",
             r"\b(score|puntuacion)\b.{0,45}\b(emplead\w*|ana|carlos|laura|miguel|director|jefe)\b",
@@ -46,7 +46,7 @@ RESOURCE_POLICIES = (
         policy_id="confidential.vip_clients",
         resource="vip_clients",
         tier="confidencial",
-        tool_name="getVIPClients",
+        tool_names=("getVIPClients",),
         patterns=(
             r"\b(cliente(?:s)?\s+vip|vip\s*\d*|empresa\s+alpha|grupo\s+beta|gamma\s+innovaciones)\b.{0,80}\b(email(?:s)?|correo(?:s)?|facturacion|ingresos|compras\s+anual(?:es)?|descuento\s+preferente|responsable\s+de\s+cuenta|cartera|listado|lista|detalle(?:s)?|datos)\b",
             r"\b(email(?:s)?|correo(?:s)?|facturacion|ingresos|compras\s+anual(?:es)?|descuento\s+preferente|responsable\s+de\s+cuenta|cartera|listado|lista|detalle(?:s)?|datos)\b.{0,80}\b(cliente(?:s)?\s+vip|vip\s*\d*|empresa\s+alpha|grupo\s+beta|gamma\s+innovaciones)\b",
@@ -58,7 +58,7 @@ RESOURCE_POLICIES = (
         policy_id="confidential.financial_kpis",
         resource="financial_kpis",
         tier="confidencial",
-        tool_name="getKPIStats",
+        tool_names=("getKPIStats",),
         patterns=(
             r"\b(ebitda|burn\s*rate|cash\s*runway|caja\s+actual|margen\s+bruto|inventario\s+valorado|deuda\s+(?:a\s+)?proveedores)\b",
             r"\b(facturacion|ingresos)\b.{0,45}\b(anual|este\s+ano|empresa|total)\b",
@@ -70,7 +70,7 @@ RESOURCE_POLICIES = (
         policy_id="confidential.revenue_report",
         resource="monthly_revenue_report",
         tier="confidencial",
-        tool_name="getRevenueReport",
+        tool_names=("getRevenueReport",),
         patterns=(
             r"\b(facturacion|ingresos)\b.{0,35}\b(mes\s+a\s+mes|por\s+mes|mensual|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre)\b",
             r"\b(reporte|informe)\b.{0,40}\b(mensual|mes\s+a\s+mes|por\s+mes)\b.{0,35}\b(facturacion|ingresos)\b",
@@ -81,7 +81,7 @@ RESOURCE_POLICIES = (
         policy_id="confidential.product_performance",
         resource="product_performance",
         tier="confidencial",
-        tool_name="getTopProducts",
+        tool_names=("getTopProducts",),
         patterns=(
             r"\b(top\s*\d*\s+productos|productos?\s+mas\s+vendidos|margen\s+real\s+por\s+producto|unidades\s+vendidas\s+por\s+sku)\b",
         ),
@@ -91,7 +91,7 @@ RESOURCE_POLICIES = (
         policy_id="confidential.admin_profile",
         resource="employee_admin_profile",
         tier="confidencial",
-        tool_name="getEmployees",
+        tool_names=("getEmployees",),
         patterns=(
             r"\b(informacion|datos|perfil|detalle(?:s)?)\b.{0,40}\b(del\s+admin|administrador|director\s+general|jefe)\b",
         ),
@@ -101,7 +101,7 @@ RESOURCE_POLICIES = (
         policy_id="internal.marketing_campaigns",
         resource="marketing_campaigns",
         tier="interno",
-        tool_name="getMarketingCampaigns",
+        tool_names=("getMarketingCampaigns",),
         patterns=(
             r"\b(campa\w*|marketing|voltagear|back\s+to\s+school|black\s+friday\s+warmup)\b.{0,80}\b(presupuesto|roi|roas|ctr\s+ads|briefing|objetivo(?:s)?|proyeccion(?:es)?|intern[oa]s?|direccion)\b",
             r"\b(presupuesto|roi|roas|ctr\s+ads|briefing|objetivo(?:s)?|proyeccion(?:es)?)\b.{0,80}\b(campa\w*|marketing|voltagear|back\s+to\s+school|black\s+friday\s+warmup)\b",
@@ -112,7 +112,7 @@ RESOURCE_POLICIES = (
         policy_id="internal.stock",
         resource="internal_stock",
         tier="interno",
-        tool_name="getStockInfo",
+        tool_names=("getStockInfo",),
         patterns=(
             r"\b(stock|stcok|inventario|existencias|unidades\s+(?:restantes|disponibles)|almacen|reponiendo|rotura\s+de\s+stock|proveedor(?:es)?|margen\s+con)\b",
         ),
@@ -127,7 +127,7 @@ RESOURCE_POLICIES = (
         policy_id="internal.promotions",
         resource="internal_promotions",
         tier="interno",
-        tool_name="getPromotions",
+        tool_names=("getPromotions",),
         patterns=(
             r"\bpolitica(?:s)?\s+(?:de|sobre)\s+(?:descuento(?:s)?|promocion(?:es)?)\b",
             r"\b(descuento|codigo)\b.{0,45}\b(emplead\w*|interno|sin\s+aprobacion|con\s+aprobacion|jefe|excepcional)\b",
@@ -139,7 +139,7 @@ RESOURCE_POLICIES = (
         policy_id="public.promotions",
         resource="public_promotions",
         tier="publico",
-        tool_name=None,
+        tool_names=(),
         patterns=(
             r"\b(promocion(?:es)?|oferta(?:s)?|descuento(?:s)?|cupon(?:es)?|codigo(?:s)?\s+promocional(?:es)?)\b",
         ),
@@ -149,7 +149,7 @@ RESOURCE_POLICIES = (
         policy_id="public.vip_benefits",
         resource="vip_benefits",
         tier="publico",
-        tool_name=None,
+        tool_names=(),
         patterns=(
             r"\b(beneficio(?:s)?|ventaja(?:s)?|privilegio(?:s)?)\b.{0,45}\b(cliente\s+vip|vip)\b",
             r"\b(cliente\s+vip|vip)\b.{0,45}\b(beneficio(?:s)?|ventaja(?:s)?|privilegio(?:s)?)\b",
@@ -160,7 +160,7 @@ RESOURCE_POLICIES = (
         policy_id="public.shipping",
         resource="shipping_and_returns",
         tier="publico",
-        tool_name="getShippingPolicy",
+        tool_names=("getShippingPolicy",),
         patterns=(
             r"\b(envio(?:s)?|devolucion(?:es)?|garantia(?:s)?|canarias|baleares|entrega|cuanto\s+tarda)\b",
         ),
@@ -170,7 +170,7 @@ RESOURCE_POLICIES = (
         policy_id="public.catalog",
         resource="product_catalog",
         tier="publico",
-        tool_name="getCatalogSummary",
+        tool_names=("getCatalogSummary",),
         patterns=(
             r"\b(catalogo|producto(?:s)?|portatil(?:es)?|smartphone(?:s)?|auricular(?:es)?|tablet(?:s)?|reloj(?:es)?|gaming)\b",
         ),
@@ -180,7 +180,7 @@ RESOURCE_POLICIES = (
         policy_id="public.brand",
         resource="brand_information",
         tier="publico",
-        tool_name="getBrandInfo",
+        tool_names=("getBrandInfo",),
         patterns=(
             r"\b(horario(?:s)?|contacto|direccion\s+de\s+la\s+tienda|telefono\s+de\s+la\s+tienda|promption\s+shop|quienes\s+son)\b",
         ),

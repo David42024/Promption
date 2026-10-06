@@ -105,6 +105,31 @@ test("blocked streaming output emits no chunks", async () => {
   assert.deepEqual(delivered, []);
 });
 
+test("early output finding cancels generation before the model finishes", async () => {
+  let upstreamCancelled = false;
+  let outputChecks = 0;
+  const sdk = createPromption({ earlyOutputCheckChars: 8, transport: async ({ text, direction }) => {
+    if (direction === "output") outputChecks++;
+    return { allowed: !text.includes("secret"), text };
+  } });
+  const { stream } = await sdk.middleware({ identity }).wrapStream({ params: params(), doStream: async () => ({
+    stream: new ReadableStream({
+      start(controller) {
+        controller.enqueue({ type: "text-start", id: "t" });
+        controller.enqueue({ type: "text-delta", id: "t", delta: "prefix se" });
+        controller.enqueue({ type: "text-delta", id: "t", delta: "cret tail" });
+      },
+      cancel() { upstreamCancelled = true; },
+    }),
+  }) });
+  const delivered = [];
+  await assert.rejects((async () => { for await (const chunk of stream) delivered.push(chunk); })(),
+    error => error.code === "CONTENT_BLOCKED");
+  assert.deepEqual(delivered, []);
+  assert.equal(upstreamCancelled, true);
+  assert.equal(outputChecks, 2);
+});
+
 test("streamText output is checked in full before redacted chunks are released", async () => {
   const sdk = createPromption({ transport: async ({ text }) => ({ allowed: true, text: text.replace("secret", "safe") }) });
   const { stream } = await sdk.middleware({ identity }).wrapStream({ params: params(), doStream: async () => ({

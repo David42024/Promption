@@ -147,14 +147,15 @@ def test_policy_catalog_matches_tool_tiers_and_roles():
     executor = MCPToolExecutor()
     tools = {tool.name: tool for tool in executor.tools}
     for policy in RESOURCE_POLICIES:
-        if policy.tool_name is None:
+        if not policy.tool_names:
             assert policy.tier in {"publico", "restringido"}
             continue
-        tool = tools[policy.tool_name]
-        assert tool.tier.value == policy.tier
-        if policy.tier == "publico":
-            assert tool.requires_roles == []
-        else:
-            assert set(tool.requires_roles) == (
-                {"ventas", "admin"} if policy.tier == "interno" else {"admin"}
-            )
+        for tool_name in policy.tool_names:
+            tool = tools[tool_name]
+            assert tool.tier.value == policy.tier
+            if policy.tier == "publico":
+                assert tool.requires_roles == []
+            else:
+                assert set(tool.requires_roles) == (
+                    {"ventas", "admin"} if policy.tier == "interno" else {"admin"}
+                )

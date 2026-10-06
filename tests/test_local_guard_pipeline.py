@@ -54,3 +54,9 @@ def test_local_filter_failure_never_returns_input():
             raise RuntimeError("unavailable")
     decision = Promption(input_filter=Filter()).check_input("private input", output_enabled=True)
     assert not decision.allowed and decision.status == 503 and decision.text == ""
+
+
+def test_local_output_guard_blocks_known_value_split_across_words():
+    result = Promption().check_output("El valor es Z Q 7 m - B 2 r Y 9 v.",
+                                     protected_values=["ZQ7mB2rY9v"])
+    assert not result.allowed and result.reason == "sensitive_output"

@@ -103,7 +103,7 @@ class PolicyInfo(BaseModel):
     policy_id: str
     resource: str
     tier: str
-    tool_name: Optional[str] = None
+    tool_names: List[str] = Field(default_factory=list)
     required_roles: List[str] = Field(default_factory=list)
     confidence: float
     reason: str

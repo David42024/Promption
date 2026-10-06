@@ -19,7 +19,7 @@ Guía para trabajar en este repositorio (Proyecto académico: detección de Prom
 - No añadir dependencias sin justificarlas en `requirements.txt` (backend) o `requirements-dashboard.txt` (Streamlit).
 - **Modelo completo tabulado en CSV** con estas columnas fijas (no renombrar en `runner.py`): `id, prompt, dataset, attack_type, source, label, heuristic_score, heuristic_blocked, ml_probability, ml_blocked, ensemble_score, filter_blocked, filter_latency_ms, heuristic_latency_ms, ml_latency_ms, matched_rules, llm_success_no_filter, llm_success_with_filter, llm_latency_ms, response_no_filter, response_filtered`.
 - `dataset` en los CSV raw vale `OWASP | BIANCA | Jailbreak | GitHub | Custom | NEPI` (malicioso) o `Benigno` (legítimo). `scripts/download_datasets.py` mapea NEPI→`NEPI`, verazuo/jailbreak_llms→`Jailbreak`, Shomi28/deepset→`Custom`, payloads built-in→`OWASP`.
-- El ensemble usa lógica **OR** (cualquier capa bloquea → bloqueado). Mantener esa propiedad de fail-safe.
+- El ensemble usa lógica **OR entre las capas ejecutadas** (cualquier capa que bloquee → bloqueado). Una coincidencia benigna completa y sin reglas maliciosas toma la ruta rápida antes de ejecutar ML; las entradas inciertas consultan ML y requieren Output Guard si ninguna capa las resuelve. La aplicación revisa toda respuesta generada con Output Guard.
 - El ML está **optimizado para fallar solo** (`is_trained()` falso → no lanza).
 - Streamlit: usar `@st.cache_data(ttl=…)` para datos y `@st.cache_resource` para modelos pesados. `st.cache_data.clear()` + `st.rerun()` para refrescar.
 

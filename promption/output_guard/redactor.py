@@ -19,8 +19,6 @@ def _action_for(findings: list[Finding], admin_mode: bool = False) -> str:
             return Action.REDACT
         return Action.REDACT if len(findings) == 1 else Action.BLOCK
     if any(f.severity == Severity.MEDIUM for f in findings):
-        if any(f.category == "refusal" for f in findings):
-            return Action.BLOCK
         return Action.REDACT
     return Action.PASS
 

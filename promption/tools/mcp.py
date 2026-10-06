@@ -37,39 +37,28 @@ class MCPToolExecutor:
     """Keep role policy outside the SDK and delegate tool mechanics to MCPServer."""
 
     def __init__(self, policies: List[ToolPolicy], *, roles=("admin", "ventas", "customer", "guest"),
-                 name: str = "Promption"):
+                 name: str = "Promption", require_authentication: bool = True):
         self.tools = list(policies)
         self.roles = roles
+        self.require_authentication = require_authentication
         self._policies = {tool.name: tool for tool in self.tools}
-        self.servers = {}
-        for role in self.roles:
-            server = MCPServer(f"{name} {role}", version="1.0.0")
-            for policy in self.tools:
-                if not self._permitted(policy, [role], True):
-                    continue
-                server.add_tool(policy.handler, name=policy.name,
-                                description=policy.description,
-                                structured_output=True)
-            self.servers[role] = server
+        
+        # We use a single server for all tools to dynamically compute the union of available tools
+        self.server = MCPServer(name, version="1.0.0")
+        for policy in self.tools:
+            self.server.add_tool(policy.handler, name=policy.name,
+                                 description=policy.description,
+                                 structured_output=True)
 
     async def available(self, roles: List[str], authenticated: bool):
-        if not authenticated or "guest" in roles:
+        if self.require_authentication and not authenticated and "guest" not in roles:
             return []
-        server = self._server_for(roles, authenticated)
-        return await server.list_tools() if server else []
-
-    def _server_for(self, roles: List[str], authenticated: bool):
-        if "guest" in roles:
-            return self.servers.get("guest")
-        if not authenticated:
-            return None
-        for role in self.roles:
-            if role in roles:
-                return self.servers[role]
-        return None
+            
+        all_tools = await self.server.list_tools()
+        return [tool for tool in all_tools if self._permitted(self._policies[tool.name], roles, authenticated)]
 
     def _permitted(self, policy: ToolPolicy, roles: List[str], authenticated: bool) -> bool:
-        if "guest" in roles:
+        if "guest" in roles or (not authenticated and not self.require_authentication):
             return (policy.guest_read and policy.tier == Tier.PUBLICO
                     and not policy.requires_roles)
         return (authenticated and (not policy.requires_roles
@@ -84,12 +73,13 @@ class MCPToolExecutor:
         if policy is None:
             audit["reason"] = "tool desconocida"
             return {"result": {"error": "Tool desconocida"}, "audit": audit}
-        server = self._server_for(user_roles, authenticated)
-        if server is None or not self._permitted(policy, user_roles, authenticated):
+        
+        if not self._permitted(policy, user_roles, authenticated):
             audit["reason"] = "sesión o rol insuficiente"
             return {"result": {"error": "Permiso denegado"}, "audit": audit}
+            
         try:
-            result = await server.call_tool(tool_name, args or {})
+            result = await self.server.call_tool(tool_name, args or {})
             if result.is_error or result.structured_content is None:
                 raise ValueError("La herramienta no devolvió un resultado válido")
         except Exception:

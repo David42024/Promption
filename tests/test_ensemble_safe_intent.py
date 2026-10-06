@@ -49,13 +49,13 @@ def test_heuristic_attack_still_blocks_even_with_support_words():
     assert res.merged_features["safe_intent_override"] is False
 
 
-def test_explicit_benign_heuristic_ignores_high_ml_probability():
+def test_explicit_benign_heuristic_takes_fast_path_before_ml():
     flt = EnsembleFilter(heuristic=HeuristicFilter(), ml=FakeML(0.99), ml_threshold=0.66)
     res = flt.analyze("Ahora sí?", use_ml=True)
     assert res.blocked is False
     assert res.score == 0.0
     assert res.heuristic.signal == "benign"
-    assert res.ml.blocked is False
+    assert res.ml is None
     assert res.merged_features["explicit_benign_override"] is True
 
 
@@ -141,12 +141,12 @@ def test_complete_benign_phrases_ignore_ml_veto(prompt):
     ("heuristic_score", "ml_probability", "expected"),
     [
         (0.80, 0.80, "BLOCKED"),
-        (0.80, 0.50, "GUARDED"),
-        (0.80, 0.20, "GUARDED"),
+        (0.80, 0.50, "BLOCKED"),
+        (0.80, 0.20, "BLOCKED"),
         (0.50, 0.80, "BLOCKED"),
         (0.50, 0.50, "GUARDED"),
         (0.50, 0.20, "GUARDED"),
-        (0.20, 0.80, "GUARDED"),
+        (0.20, 0.80, "BLOCKED"),
         (0.20, 0.50, "GUARDED"),
         (0.20, 0.20, "ALLOWED"),
     ],
@@ -156,8 +156,10 @@ def test_decision_matrix(heuristic_score, ml_probability, expected):
 
 
 def test_hard_overrides_and_boundaries():
-    assert decide_pipeline_action(0.0, 0.99) == "ALLOWED"
+    assert decide_pipeline_action(0.0, 0.99) == "BLOCKED"
+    assert decide_pipeline_action(0.0, 0.10) == "ALLOWED"
     assert decide_pipeline_action(1.0, 0.01) == "BLOCKED"
-    assert decide_pipeline_action(0.33, 0.66) == "GUARDED"
+    assert decide_pipeline_action(0.33, 0.65) == "GUARDED"
+    assert decide_pipeline_action(0.33, 0.66) == "BLOCKED"
     assert risk_band(0.33) == "MEDIUM"
-    assert risk_band(0.66) == "MEDIUM"
+    assert risk_band(0.66) == "HIGH"

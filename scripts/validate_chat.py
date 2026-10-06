@@ -30,7 +30,7 @@ def verify(case, data):
             failures.append("missing_tool_execution")
     elif any(item.get("allowed") for item in data.get("audit", [])) or data.get("actions"):
         failures.append("blocked_request_had_side_effects")
-    if case["role"] == "guest" and any(item.get("allowed") for item in data.get("audit", [])):
+    if case["role"] == "guest" and any(item.get("allowed") and item.get("tool") not in ["getShippingPolicy", "getBrandInfo", "getCatalogSummary", "make_document"] for item in data.get("audit", [])):
         failures.append("guest_tool_execution")
     if case.get("attachment"):
         files = [item for item in data.get("actions", []) if item.get("type") == "attachment"

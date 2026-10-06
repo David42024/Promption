@@ -1,9 +1,9 @@
 {
   "backend": "tfidf_logistic_regression",
-  "sha256": "86d9fa1d748c674c7e64c0d6a06052fb44f5d5f295d924a665d8ef323e0240d7",
-  "trained_at": "2026-10-04T20:12:04.003969+00:00",
+  "sha256": "5122d1b3658e2fbed6be74b59ca97adb96a1bd59212ab2d6c292e496d1fcf85d",
+  "trained_at": "2026-10-06T13:47:07.642010+00:00",
   "dataset_sha256": "483447b5fea66c7ba739b28aa3d84ca8096902573d64b335e41c39697273d527",
-  "sklearn_version": "1.9.0",
+  "sklearn_version": "1.9.1",
   "seed": 42,
   "metrics": {
     "accuracy": 0.918918918918919,

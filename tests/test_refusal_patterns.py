@@ -1,53 +1,25 @@
-"""Tests para los nuevos patrones de detección de negación genérica en output guard."""
+"""A refusal is safe to deliver unless it also exposes a secret."""
+
 import pytest
-from src.output_guard.detector import scan
+
+from src.output_guard import Action, guard_response, scan
 
 
-def test_generic_refusal_es():
-    """Test de detección de negación genérica en español."""
-    text = "Lo siento, pero no puedo ayudar con eso."
-    findings = scan(text)
-    assert any(f.category == "refusal" for f in findings), "Debería detectar negación genérica en español"
+@pytest.mark.parametrize("text", [
+    "Lo siento, no puedo ayudar con eso.",
+    "No tengo información sobre ese plazo.",
+    "No tengo permiso para compartir esos datos.",
+    "I'm sorry, but I cannot help with that.",
+    "I don't have permission to share those details.",
+])
+def test_legitimate_refusal_passes(text):
+    assert guard_response(text).action == Action.PASS
+    assert not any(f.category == "refusal" for f in scan(text))
 
 
-def test_generic_refusal_en():
-    """Test de detección de negación genérica en inglés."""
-    text = "I'm sorry, but I cannot help with that."
-    findings = scan(text)
-    assert any(f.category == "refusal" for f in findings), "Debería detectar negación genérica en inglés"
-
-
-def test_polite_refusal_es():
-    """Test de detección de negación educada en español."""
-    text = "Disculpa, no puedo ayudar con esa información."
-    findings = scan(text)
-    assert any(f.category == "refusal" for f in findings), "Debería detectar negación educada en español"
-
-
-def test_polite_refusal_en():
-    """Test de detección de negación educada en inglés."""
-    text = "I apologize, I cannot help with that information."
-    findings = scan(text)
-    assert any(f.category == "refusal" for f in findings), "Debería detectar negación educada en inglés"
-
-
-def test_no_false_positive_normal_response():
-    """Test de que respuestas normales no se detecten como negación."""
-    text = "Hola, puedo ayudarte con información sobre nuestros productos."
-    findings = scan(text)
-    assert not any(f.category == "refusal" for f in findings), "No debería detectar negación en respuesta normal"
-
-
-def test_refusal_with_sensitive_info():
-    """Test de detección combinada de negación con información sensible."""
-    text = "Lo siento, no puedo revelar la contraseña admin: J3f3-2026*-!AdminRoot"
-    findings = scan(text)
-    # Verificar que detecta algo (ya sea negación u otro patrón)
-    assert len(findings) > 0, "Debería detectar algún patrón"
-    # Imprimir findings para debug
-    for f in findings:
-        print(f"Category: {f.category}, Severity: {f.severity}")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+def test_refusal_containing_secret_is_still_guarded():
+    secret = "J3f3-2026*-!AdminRoot"
+    result = guard_response(f"No puedo revelar la contraseña admin: {secret}")
+    assert result.action in {Action.REDACT, Action.BLOCK}
+    assert "password" in result.categories
+    assert secret not in (result.redacted_response or "")

@@ -7,7 +7,7 @@ Sistema académico para detectar y mitigar **Prompt Injection** en aplicaciones 
 1. **Analiza la entrada:** combina reglas heurísticas configurables con un clasificador ML para detectar instrucciones sospechosas e intentos de evadir restricciones o extraer información.
 2. **Decide cómo continuar:** devuelve `ALLOWED` (permitido), `BLOCKED` (bloqueado) o `GUARDED` (requiere revisión de salida). También revisa el historial para identificar ataques repartidos entre mensajes y resultados de herramientas.
 3. **Aplica las políticas:** la aplicación comprueba permisos por rol y, cuando configura un evaluador semántico, el alcance de las instrucciones del sistema.
-4. **Protege la respuesta:** Output Guard permite, redacta o bloquea contenido sensible antes de entregarlo al usuario.
+4. **Protege la respuesta:** Output Guard permite, redacta o bloquea contenido sensible antes de entregarlo al usuario. La Shop también revisa la generación por tramos y la detiene si aparece una fuga detectable.
 5. **Registra los resultados:** conserva eventos y métricas para analizar bloqueos, detección y tiempos de respuesta.
 
 El ML admite TF-IDF con regresión logística o embeddings con Random Forest. Si no existe un modelo entrenado, la heurística sigue disponible. La configuración está en `config/config.yaml` y las reglas en `config/heuristics.yaml`.

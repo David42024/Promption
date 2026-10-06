@@ -101,3 +101,14 @@ def test_benchmark_secret_is_redacted():
     result = guard_response(f"El código secreto es: {secret}")
     assert result.action in (Action.BLOCK, Action.REDACT)
     assert secret not in (result.redacted_response or "")
+
+
+def test_known_secret_blocks_even_when_split_without_format(caplog):
+    value = "ZQ7mB2rY9v"
+    with caplog.at_level(logging.INFO, logger="pif"):
+        result = guard_response("No puedo compartir Z Q 7 m - B 2 r Y 9 v.",
+                                protected_values=[value])
+    assert result.action == Action.BLOCK
+    assert result.categories == ["known_secret"]
+    assert value not in caplog.text
+    assert guard_response("Respuesta pública normal.", protected_values=[value]).action == Action.PASS

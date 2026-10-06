@@ -90,6 +90,11 @@ class StructuredLogger:
         logger = logging.getLogger("pif")
         log_level = getattr(logging, level.upper(), logging.INFO)
         logger.log(log_level, f"[{category}] {message}")
+        
+        # Stream structured JSON to stdout for centralized logging / event aggregators
+        if os.environ.get("PROMPTION_LOG_JSON_STDOUT", "1") == "1":
+            import sys
+            print(json.dumps(entry.to_dict(), ensure_ascii=False), file=sys.stdout, flush=True)
 
     def _write_to_file(self, entry: LogEntry) -> None:
         """Write log entry to file (JSONL format)."""

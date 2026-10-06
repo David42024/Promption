@@ -69,7 +69,7 @@ async def _review_conversation(messages, request, client, enabled):
             if local.blocked:
                 raise ConversationBlocked("conversation_injection")
             text = next((message["content"] for message in reversed(messages) if message["role"] == "user"), " ")
-            result = await client.filter_prompt(text=text, user_id=request.user.id, roles=roles,
+            result = await client.filter_prompt(text=text, identity=Identity(request.user.id, tuple(roles), request.user.authenticated),
                                                 use_ml=True, messages=messages)
             decision = input_guard_decision(text, result, message_count=len(messages),
                                            output_enabled=get_security_state()["output_guard_enabled"])
@@ -424,8 +424,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     filter_layers={"conversation": contextual.metadata()})
             filter_result = await filter_client.filter_prompt(
                 text=request.text,
-                user_id=request.user.id,
-                roles=user_roles,
+                identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
                 use_ml=True, messages=security_messages
             )
             security_classification = filter_result.classification
@@ -532,41 +531,43 @@ async def chat(request: ChatRequest) -> ChatResponse:
         return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
                             reason="conversation_limit", block_type="conversation", role=primary_role)
     audit: List[MCPToolCall] = []
-    authorized_context = None
-    if policy_decision.tool_name and (
+    authorized_contexts = []
+    if policy_decision.tool_names and (
         request.user.authenticated or policy_decision.tier == "publico"
     ):
-        tool_response = await mcp_executor.execute(policy_decision.tool_name, {}, user_roles,
-                                             authenticated=request.user.authenticated)
-        tool_audit = tool_response.get("audit", {})
-        audit.append(MCPToolCall(
-            tool=tool_audit.get("tool", policy_decision.tool_name),
-            allowed=bool(tool_audit.get("allowed", False)),
-            reason=tool_audit.get("reason"),
-            tier=tool_audit.get("tier", policy_decision.tier),
-        ))
-        if not tool_audit.get("allowed", False):
-            logger.error(
-                "Retrieval ACL denied after policy allow user=%s tool=%s roles=%s",
-                request.user.id,
-                policy_decision.tool_name,
-                user_roles,
-            )
-            return ChatResponse(
-                blocked=True,
-                reply=authorization_message(policy_decision),
-                audit=audit,
-                filter_enabled=filter_enabled,
-                filter_skipped=filter_skipped,
-                role=primary_role,
-                filter_layers=filter_result.layers if filter_result else None,
-                reason="retrieval_acl_denied",
-                confidence=1.0,
-                block_type="authorization",
-                policy=policy_info,
-                security_classification=security_classification,
-            )
-        authorized_context = tool_response.get("result")
+        for tool_name in policy_decision.tool_names:
+            tool_response = await mcp_executor.execute(tool_name, {}, user_roles,
+                                                 authenticated=request.user.authenticated)
+            tool_audit = tool_response.get("audit", {})
+            audit.append(MCPToolCall(
+                tool=tool_audit.get("tool", tool_name),
+                allowed=bool(tool_audit.get("allowed", False)),
+                reason=tool_audit.get("reason"),
+                tier=tool_audit.get("tier", policy_decision.tier),
+            ))
+            if not tool_audit.get("allowed", False):
+                logger.error(
+                    "Retrieval ACL denied after policy allow user=%s tool=%s roles=%s",
+                    request.user.id,
+                    tool_name,
+                    user_roles,
+                )
+                return ChatResponse(
+                    blocked=True,
+                    reply=authorization_message(policy_decision),
+                    audit=audit,
+                    filter_enabled=filter_enabled,
+                    filter_skipped=filter_skipped,
+                    role=primary_role,
+                    filter_layers=filter_result.layers if filter_result else None,
+                    reason="retrieval_acl_denied",
+                    confidence=1.0,
+                    block_type="authorization",
+                    policy=policy_info,
+                    security_classification=security_classification,
+                )
+            if tool_response.get("result") is not None:
+                authorized_contexts.append((tool_name, tool_response.get("result")))
 
     conversation_id = (request.context or {}).get("conversation_id")
     history_messages, history_protected = store.snapshot(conversation_id, request.user)
@@ -585,23 +586,24 @@ async def chat(request: ChatRequest) -> ChatResponse:
     ]
     messages.extend(history_messages)
     messages.append({"role": "user", "content": request.text})
-    if authorized_context is not None:
-        content = json.dumps(authorized_context, ensure_ascii=False)
-        evidence = {"role": "tool", "tool_name": policy_decision.tool_name, "content": content}
-        try:
-            await _review_conversation(security_messages + [evidence], request, filter_client, filter_enabled)
-            store.append_security(conversation_id, request.user, [evidence])
-        except (ConversationBlocked, ConversationLimitError) as exc:
-            return ChatResponse(blocked=True,
-                reply="Promption bloqueó el contexto recibido de una herramienta.",
-                reason=getattr(exc, "reason", "conversation_limit"), block_type="conversation",
-                role=primary_role, audit=audit)
-        security_messages.append(evidence)
-        retrieval_id = "retrieval_" + uuid.uuid4().hex
-        messages.append({"role": "assistant", "content": None, "tool_calls": [
-            {"id": retrieval_id, "type": "function", "function": {
-                "name": policy_decision.tool_name, "arguments": "{}"}}]})
-        messages.append({"role": "tool", "tool_call_id": retrieval_id, "content": content})
+    if authorized_contexts:
+        for tool_name, tool_result in authorized_contexts:
+            content = json.dumps(tool_result, ensure_ascii=False)
+            evidence = {"role": "tool", "tool_name": tool_name, "content": content}
+            try:
+                await _review_conversation(security_messages + [evidence], request, filter_client, filter_enabled)
+                store.append_security(conversation_id, request.user, [evidence])
+            except (ConversationBlocked, ConversationLimitError) as exc:
+                return ChatResponse(blocked=True,
+                    reply="Promption bloqueó el contexto recibido de una herramienta.",
+                    reason=getattr(exc, "reason", "conversation_limit"), block_type="conversation",
+                    role=primary_role, audit=audit)
+            security_messages.append(evidence)
+            retrieval_id = "retrieval_" + uuid.uuid4().hex
+            messages.append({"role": "assistant", "content": None, "tool_calls": [
+                {"id": retrieval_id, "type": "function", "function": {
+                    "name": tool_name, "arguments": "{}"}}]})
+            messages.append({"role": "tool", "tool_call_id": retrieval_id, "content": content})
 
     actions = []
     model_name = ""
@@ -751,8 +753,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"] == "web_open"]
                             if name == "web_open":
                                 inspection = await filter_client.filter_prompt(
-                                    text=result["content"], user_id=request.user.id,
-                                    roles=user_roles, use_ml=True)
+                                    text=result["content"], identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+                                    use_ml=True)
                                 if inspection.blocked or inspection.classification == "MALICIOUS":
                                     raise ValueError("Contenido web bloqueado por el filtro")
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"] == "make_document"]
