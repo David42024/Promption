@@ -255,7 +255,7 @@ def audit_chat_endpoint(handler):
             }
             await get_filter_client().audit_event(
                 event_type="chat_completed",
-                identity=Identity(id=request.user.id, roles=roles),
+                identity=Identity(user_id=request.user.id, roles=roles),
                 details=details,
                 level="WARNING" if response.blocked else "INFO",
             )
@@ -359,7 +359,7 @@ async def ai_guard(request: AIGuardRequest):
     if not decision.allowed:
         code = "CONTENT_BLOCKED" if decision.status == 403 else "GUARD_UNAVAILABLE"
         await client.audit_event(event_type="ai_guard_denied",
-            identity=Identity(id=request.user_id, roles=[role.value for role in request.roles]), level="WARNING",
+            identity=Identity(user_id=request.user_id, roles=[role.value for role in request.roles]), level="WARNING",
             details={"direction": request.direction, "reason": decision.reason, "code": code,
                      "policy_id": (get_policy_engine().evaluate_output(request.text,
                          [role.value for role in request.roles]).policy_id
@@ -643,7 +643,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             if not scope.allowed:
                 raise ValueError("El catálogo de permisos no superó la validación de alcance")
             checked = await filter_client.output_guard(
-                text=content, identity=Identity(id=request.user.id, roles=user_roles))
+                text=content, identity=Identity(user_id=request.user.id, roles=user_roles))
             checked_content = output_guard_decision(content, checked)
             if not checked_content.allowed:
                 raise ValueError("El catálogo de permisos fue bloqueado por Output Guard")
@@ -790,7 +790,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                             if not policy_engine.evaluate_output(content, user_roles).allowed:
                                 raise ValueError("Documento fuera del nivel autorizado")
                             checked = await filter_client.output_guard(
-                                text=content, identity=Identity(id=request.user.id, roles=user_roles))
+                                text=content, identity=Identity(user_id=request.user.id, roles=user_roles))
                             checked_content = output_guard_decision(content, checked)
                             if not checked_content.allowed:
                                 raise ValueError("Documento bloqueado por Output Guard")
@@ -909,7 +909,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         try:
             guard_result = await filter_client.output_guard(
                 text=reply,
-                identity=Identity(id=request.user.id, roles=user_roles)
+                identity=Identity(user_id=request.user.id, roles=user_roles)
             )
             
             checked_reply = output_guard_decision(reply, guard_result)
