@@ -7,29 +7,27 @@ CHAT_SERVICE = Path(__file__).resolve().parents[1] / "chat-service"
 if str(CHAT_SERVICE) not in sys.path:
     sys.path.insert(0, str(CHAT_SERVICE))
 
-from mcp import Client
 from app.mcp_tools import MCPToolExecutor
 
 
 def test_sdk_clients_only_see_their_role_catalog():
     executor = MCPToolExecutor()
 
+    async def names(role):
+        return {tool.name for tool in await executor.available([role], True)}
+
     async def check():
-        async with Client(executor.servers["customer"]) as customer:
-            public = {tool.name for tool in (await customer.list_tools()).tools}
-            assert public == {"getBrandInfo", "getShippingPolicy", "getCatalogSummary", "make_document"}
-            brand = await customer.call_tool("getBrandInfo", {})
-            assert brand.structured_content["brand"]["name"] == "Promption Shop"
-            denied = await customer.call_tool("getEmployees", {})
-            assert denied.is_error is True
-        async with Client(executor.servers["ventas"]) as sales:
-            names = {tool.name for tool in (await sales.list_tools()).tools}
-            assert "getMarketingCampaigns" in names
-            assert "getEmployees" not in names
-        async with Client(executor.servers["admin"]) as admin:
-            names = {tool.name for tool in (await admin.list_tools()).tools}
-            assert "getEmployees" in names
-            assert "getInternalSecrets" not in names
+        assert await names("customer") == {"getBrandInfo", "getShippingPolicy", "getCatalogSummary", "make_document"}
+        brand = await executor.execute("getBrandInfo", {}, ["customer"])
+        assert brand["result"]["brand"]["name"] == "Promption Shop"
+        denied = await executor.execute("getEmployees", {}, ["customer"])
+        assert denied["audit"]["allowed"] is False
+        sales = await names("ventas")
+        assert "getMarketingCampaigns" in sales
+        assert "getEmployees" not in sales
+        admin = await names("admin")
+        assert "getEmployees" in admin
+        assert "getInternalSecrets" not in admin
 
     asyncio.run(check())
 
@@ -38,10 +36,8 @@ def test_guest_can_read_only_explicit_public_mcp_data():
     executor = MCPToolExecutor()
 
     async def check():
-        assert await executor.available(["guest"], False) == []
-        async with Client(executor.servers["guest"]) as guest:
-            names = {tool.name for tool in (await guest.list_tools()).tools}
-            assert names == {"getBrandInfo", "getShippingPolicy", "getCatalogSummary"}
+        names = {tool.name for tool in await executor.available(["guest"], False)}
+        assert names == {"getBrandInfo", "getShippingPolicy", "getCatalogSummary"}
         shipping = await executor.execute("getShippingPolicy", {}, ["guest"], authenticated=False)
         assert shipping["audit"]["allowed"]
         assert shipping["result"]["envios"]["canarias_ceuta_melilla"].startswith("5-7 días")

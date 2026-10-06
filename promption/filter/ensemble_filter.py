@@ -15,30 +15,31 @@ logger.info("ML backend: %s", "lightweight" if _USE_LIGHTWEIGHT else "embeddings
 
 def risk_band(score: float, low_threshold: float = 0.33,
               high_threshold: float = 0.66) -> str:
-    """Return LOW, MEDIUM or HIGH using inclusive middle-band boundaries."""
+    """Return LOW, MEDIUM or HIGH with the blocking boundary in HIGH."""
     if score < low_threshold:
         return "LOW"
-    if score <= high_threshold:
+    if score < high_threshold:
         return "MEDIUM"
     return "HIGH"
 
 
 def decide_pipeline_action(heuristic_score: float, ml_probability: float | None,
                            low_threshold: float = 0.33,
-                           high_threshold: float = 0.66) -> str:
-    """Apply the explicit ALLOWED/GUARDED/BLOCKED decision matrix."""
+                           high_threshold: float = 0.66,
+                           heuristic_blocked: bool | None = None) -> str:
+    """Block any evaluated veto and guard uncertain inputs."""
+    if heuristic_blocked is None:
+        heuristic_blocked = heuristic_score >= high_threshold
+    if heuristic_blocked or (ml_probability is not None and ml_probability >= high_threshold):
+        return "BLOCKED"
     if heuristic_score <= 0.0:
         return "ALLOWED"
-    if heuristic_score >= 1.0:
-        return "BLOCKED"
     if ml_probability is None:
         return "GUARDED"
     heuristic_band = risk_band(heuristic_score, low_threshold, high_threshold)
     ml_band = risk_band(ml_probability, low_threshold, high_threshold)
     if heuristic_band == "LOW" and ml_band == "LOW":
         return "ALLOWED"
-    if heuristic_band in {"MEDIUM", "HIGH"} and ml_band == "HIGH":
-        return "BLOCKED"
     return "GUARDED"
 
 # Import lightweight ML filter if enabled
@@ -113,34 +114,32 @@ class EnsembleFilter:
 
         ml_res: MLResult | None = None
         ml_latency = 0.0
-        use_ml = use_ml and self.ml.is_trained()
+        explicit_benign_fast_path = heur.signal == "benign" and not heur.blocked
+        use_ml = use_ml and not heur.blocked and not explicit_benign_fast_path and self.ml.is_trained()
         if use_ml:
             t_ml0 = time.perf_counter()
             try:
                 ml_res = self.ml.analyze(text)
                 ml_res.threshold = self.high_threshold
-                ml_res.blocked = ml_res.probability > self.high_threshold
+                ml_res.blocked = ml_res.probability >= self.high_threshold
             except Exception:
                 ml_res = None
             ml_latency = (time.perf_counter() - t_ml0) * 1000
 
         heuristic_risk = heur.score if heur.signal == "malicious" else 0.0
         ml_probability = ml_res.probability if ml_res is not None else None
-        score = (
+        weighted_score = (
             self.heuristic_weight * heuristic_risk + self.ml_weight * ml_probability
             if ml_probability is not None else heuristic_risk
         )
-        explicit_benign_override = heur.signal == "benign"
+        score = max(heuristic_risk, ml_probability or 0.0)
         decision = decide_pipeline_action(
             heur.score,
             ml_probability,
             self.low_threshold,
             self.high_threshold,
+            heuristic_blocked=heur.blocked,
         )
-        if explicit_benign_override:
-            score = 0.0
-            if ml_res is not None:
-                ml_res.blocked = False
         blocked = decision == "BLOCKED"
         safe_intent_override = False
 
@@ -151,10 +150,12 @@ class EnsembleFilter:
             "ml_probability": ml_res.probability if ml_res else None,
             "benign_matched": list(heur.benign_matched),
             "ensemble_score": score,
+            "weighted_score": weighted_score,
             "matched_rules": [r["name"] for r in heur.matched_rules],
             "ml_available": ml_res is not None,
             "safe_intent_override": safe_intent_override,
-            "explicit_benign_override": explicit_benign_override,
+            "explicit_benign_override": explicit_benign_fast_path,
+            "benign_fast_path": explicit_benign_fast_path,
             "requires_output_guard": decision == "GUARDED",
             "heuristic_band": risk_band(heur.score, self.low_threshold, self.high_threshold),
             "ml_band": (

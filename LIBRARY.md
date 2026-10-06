@@ -125,6 +125,24 @@ Esta capa detecta los patrones y reconstrucciones cubiertos por sus reglas y el
 modelo disponible; no garantiza detectar cualquier estrategia semántica nueva. La
 ACL y Output Guard se mantienen como controles independientes.
 
+En el filtro de entrada, una regla maliciosa bloquea antes de ejecutar ML. Una
+coincidencia benigna completa, sin reglas maliciosas, pasa directamente a la
+aplicación sin coste ML; la revisión del historial y la autorización siguen
+aplicándose. Las entradas inciertas consultan el ML disponible: un veto de
+cualquier capa ejecutada bloquea y la incertidumbre restante devuelve `GUARDED`.
+`ensemble_score` refleja la mayor señal de ataque observada; la mezcla ponderada
+permanece en `merged_features.weighted_score` para análisis histórico.
+La Shop revisa toda respuesta generada con Output Guard, incluso si la entrada
+fue benigna. Su puente de generación usa `streamText` y verifica el texto
+acumulado durante la generación; ante un bloqueo cancela el flujo del proveedor
+antes de entregar contenido. La verificación final de la respuesta sigue siendo
+obligatoria. En el SDK, `earlyOutputCheckChars` controla el intervalo de revisión
+(256 caracteres por defecto); reducirlo aumenta las consultas al guard.
+Para valores confidenciales conocidos en una integración local, `guard_response`
+y `Promption.check_output` aceptan `protected_values` por solicitud. Comparan el
+valor completo tras normalizar separadores sencillos y bloquean sin registrarlo.
+No envíes secretos en el contexto del modelo si el usuario no está autorizado.
+
 ### Alcance y límites del prompt del sistema
 
 Activa la evaluación semántica con `scopeEvaluator`. El middleware toma como

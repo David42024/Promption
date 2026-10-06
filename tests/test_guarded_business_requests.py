@@ -285,7 +285,7 @@ def test_invalid_document_output_guard_prevents_mcp_file_creation(monkeypatch, i
 def test_roles_without_an_authenticated_session_do_not_grant_internal_access(monkeypatch, roles):
     class Filter:
         async def filter_prompt(self, **kwargs):
-            assert kwargs["roles"] == ["guest"]
+            assert kwargs["identity"].roles == ("guest",) and not kwargs["identity"].authenticated
             return SimpleNamespace(blocked=False, classification="UNCERTAIN", confidence=.2,
                 layers={"conversation": {"message_count": len(kwargs["messages"]), "blocked": False}})
 

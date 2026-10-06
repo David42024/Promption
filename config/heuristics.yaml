@@ -396,7 +396,7 @@ scores:
 scoring:
   # Combined heuristic score for a prompt = max severity found.
   # A prompt is heuristically blocked when score >= heuristic_threshold.
-  heuristic_threshold: 0.66
+  heuristic_threshold: 0.8
   unknown_score: 0.5
   max_matches: 5
 

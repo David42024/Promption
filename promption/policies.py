@@ -10,7 +10,7 @@ class ResourcePolicy:
     policy_id: str
     resource: str
     tier: str
-    tool_name: Optional[str]
+    tool_names: tuple[str, ...]
     patterns: tuple[str, ...]
     confidence: float = 0.95
     output_patterns: Optional[tuple[str, ...]] = None
@@ -23,11 +23,15 @@ class PolicyDecision:
     policy_id: str
     resource: str
     tier: str
-    tool_name: Optional[str]
+    tool_names: tuple[str, ...]
     required_roles: tuple[str, ...]
     confidence: float
     reason: str
     matched_policy_ids: tuple[str, ...] = ()
+
+    @property
+    def tool_name(self) -> Optional[str]:
+        return self.tool_names[0] if self.tool_names else None
 
     def to_dict(self) -> dict:
         return {
@@ -36,7 +40,7 @@ class PolicyDecision:
             "policy_id": self.policy_id,
             "resource": self.resource,
             "tier": self.tier,
-            "tool_name": self.tool_name,
+            "tool_names": list(self.tool_names),
             "required_roles": list(self.required_roles),
             "confidence": self.confidence,
             "reason": self.reason,
@@ -100,7 +104,7 @@ class PolicyEngine:
                 policy_id="unclassified",
                 resource="general_assistance",
                 tier="unclassified",
-                tool_name=None,
+                tool_names=(),
                 required_roles=(),
                 confidence=0.5,
                 reason="No resource identified; application unmatched policy applied",
@@ -122,7 +126,7 @@ class PolicyEngine:
             policy_id=policy.policy_id,
             resource=policy.resource,
             tier=policy.tier,
-            tool_name=policy.tool_name,
+            tool_names=tuple(sorted({t for m in matches for t in m.tool_names})),
             required_roles=required_roles,
             confidence=policy.confidence,
             reason=reason,

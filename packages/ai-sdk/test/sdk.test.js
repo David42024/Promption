@@ -37,6 +37,20 @@ test('streamText receives only inspected, redacted tokens', async () => {
   assert.equal(await result.text, 'safe');
 });
 
+test('streamText text promise rejects when an early output check blocks', async () => {
+  const provider = new MockLanguageModelV3({ doStream: { stream: from([
+    { type: 'stream-start', warnings: [] }, { type: 'text-start', id: 't' },
+    { type: 'text-delta', id: 't', delta: 'prefix se' },
+    { type: 'text-delta', id: 't', delta: 'cret tail' },
+    { type: 'text-end', id: 't' }, { type: 'finish', finishReason, usage },
+  ]) } });
+  const protection = createPromption({ earlyOutputCheckChars: 8,
+    transport: async ({ text, direction }) => ({ allowed: direction !== 'output' || !text.includes('secret'), text }) });
+  const model = wrapLanguageModel({ model: provider, middleware: protection.middleware({ identity }) });
+  const result = streamText({ model, prompt: 'Hola' });
+  await assert.rejects(result.text, error => error.code === 'CONTENT_BLOCKED');
+});
+
 test('generateText tool loop validates results before the second provider call', async () => {
   const provider = new MockLanguageModelV3({ doGenerate: [
     { content: [{ type: 'tool-call', toolCallId: 'call1', toolName: 'catalog', input: '{}' }], finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage, warnings: [] },

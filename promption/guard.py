@@ -37,20 +37,24 @@ def input_guard_decision(text: str, result: Any, *, message_count: int = 0,
     blocked = _field(result, "blocked")
     classification = _field(result, "classification")
     if not isinstance(blocked, bool) or classification not in (None, "BENIGN", "UNCERTAIN", "MALICIOUS"):
+        print(f"DEBUG input_guard_decision: invalid_filter_response 1")
         return GuardDecision(False, "", "BLOCK", "invalid_filter_response", 503)
     layers = _field(result, "layers", {})
     if not isinstance(layers, dict) or not isinstance(layers.get("conversation", {}), dict):
+        print(f"DEBUG input_guard_decision: invalid_conversation_response")
         return GuardDecision(False, "", "BLOCK", "invalid_conversation_response", 503)
     conversation = layers.get("conversation", {})
     if message_count and (type(conversation.get("message_count")) is not int
                           or conversation.get("message_count") != message_count
                           or not isinstance(conversation.get("blocked"), bool)):
+        print(f"DEBUG input_guard_decision: invalid_conversation_response")
         return GuardDecision(False, "", "BLOCK", "invalid_conversation_response", 503)
     if blocked or classification == "MALICIOUS" or conversation.get("blocked") is True:
         return GuardDecision(False, "", "BLOCK", "malicious_input", 403)
     decision = _field(result, "decision")
     requires_output_guard = _field(result, "requires_output_guard", False)
     if decision not in (None, "ALLOWED", "GUARDED", "BLOCKED") or not isinstance(requires_output_guard, bool):
+        print(f"DEBUG input_guard_decision: invalid_filter_response 2: decision={decision}, req_out={requires_output_guard}")
         return GuardDecision(False, "", "BLOCK", "invalid_filter_response", 503)
     if decision == "BLOCKED":
         return GuardDecision(False, "", "BLOCK", "malicious_input", 403)
@@ -101,7 +105,9 @@ class Promption:
             return GuardDecision(False, "", "BLOCK", "conversation_limit", 413)
         except (TypeError, ValueError):
             return GuardDecision(False, "", "BLOCK", "invalid_input", 400)
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             return GuardDecision(False, "", "BLOCK", "guard_unavailable", 503)
         decision = input_guard_decision(text, {
             "blocked": _field(result, "blocked"), "decision": _field(result, "decision"),
@@ -132,19 +138,23 @@ class Promption:
             return GuardDecision(False, "", "BLOCK", "conversation_limit", 413)
         except (TypeError, ValueError):
             return GuardDecision(False, "", "BLOCK", "invalid_input", 400)
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             return GuardDecision(False, "", "BLOCK", "guard_unavailable", 503)
         return input_guard_decision("", {"blocked": result.blocked,
             "requires_output_guard": result.requires_output_guard,
             "layers": {"conversation": result.metadata()}},
             message_count=result.message_count, output_enabled=output_enabled)
 
-    def check_output(self, text: str, identity: Identity | None = None) -> GuardDecision:
+    def check_output(self, text: str, identity: Identity | None = None,
+                     *, protected_values=()) -> GuardDecision:
         from .output_guard import guard_response
         identity = identity or Identity("anonymous")
         if self.policy and not self.policy.evaluate_output(text, identity.roles).allowed:
             return GuardDecision(False, "", "BLOCK", "insufficient_scope", 403)
-        result = guard_response(text, admin_mode=self.admin_role in identity.roles)
+        result = guard_response(text, admin_mode=self.admin_role in identity.roles,
+                                protected_values=protected_values)
         return output_guard_decision(text, result)
 
 
@@ -195,15 +205,17 @@ class AsyncGuardPipeline:
                                              else scope.reason, scope.status, scope=scope.to_dict())
                 if not enabled:
                     return GuardDecision(True, text, "SKIPPED", scope=scope.to_dict() if scope else None)
-                result = await self.filter_input(text=text, user_id=identity.user_id,
-                                                 roles=list(identity.roles), use_ml=True,
+                result = await self.filter_input(text=text, identity=identity, use_ml=True,
                                                  **({"messages": messages} if messages else {}))
+                print(f"DEBUG FilterResponse: {result}")
                 decision = input_guard_decision(text, result, message_count=len(messages or []),
                                                 output_enabled=output_enabled)
                 if scope:
                     decision = replace(decision, scope=scope.to_dict())
                 return decision
-            result = await self.guard_output(text=text, user_id=identity.user_id, roles=list(identity.roles))
+            result = await self.guard_output(text=text, identity=identity)
             return output_guard_decision(text, result)
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             return GuardDecision(False, "", "BLOCK", "guard_unavailable", 503)

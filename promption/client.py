@@ -4,6 +4,7 @@ import logging
 import httpx
 from typing import Optional, Dict, Any
 from .api.models import FilterResponse
+from .guard import Identity
 
 
 logger = logging.getLogger(__name__)
@@ -79,8 +80,7 @@ class FilterClient:
     async def filter_prompt(
         self, 
         text: str, 
-        user_id: str, 
-        roles: list[str],
+        identity: 'Identity',
         use_ml: bool = True,
         messages: list[dict] | None = None
     ) -> FilterResponse:
@@ -94,9 +94,9 @@ class FilterClient:
                         "text": text,
                         "use_ml": use_ml,
                         "messages": messages or [],
-                        "user_id": user_id,
-                        "roles": roles,
-                        "context": {**self.context, "roles": roles}
+                        "user_id": identity.user_id,
+                        "roles": list(identity.roles),
+                        "context": {**self.context, "roles": list(identity.roles)}
                     }
                 )
                 
@@ -128,8 +128,7 @@ class FilterClient:
     async def output_guard(
         self,
         text: str,
-        user_id: str,
-        roles: list[str]
+        identity: Identity
     ) -> Dict[str, Any]:
         """Check output through Output Guard"""
         try:
@@ -139,9 +138,9 @@ class FilterClient:
                     headers=self.headers,
                     json={
                         "text": text,
-                        "user_id": user_id,
-                        "roles": roles,
-                        "context": {**self.context, "roles": roles}
+                        "user_id": identity.user_id,
+                        "roles": list(identity.roles),
+                        "context": {**self.context, "roles": list(identity.roles)}
                     }
                 )
                 
@@ -165,8 +164,7 @@ class FilterClient:
         self,
         *,
         event_type: str,
-        user_id: str,
-        roles: list[str],
+        identity: Identity,
         details: Dict[str, Any],
         level: str = "INFO",
     ) -> None:
@@ -181,8 +179,8 @@ class FilterClient:
                         "event_type": event_type,
                         "level": level,
                         "message": f"Chat request completed: {details.get('decision', 'UNKNOWN')}",
-                        "user_id": user_id,
-                        "roles": roles,
+                        "user_id": identity.user_id,
+                        "roles": list(identity.roles),
                         "details": details,
                     },
                 )

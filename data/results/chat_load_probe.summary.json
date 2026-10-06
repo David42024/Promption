@@ -1,0 +1,17 @@
+{
+  "total": 1,
+  "passed": 1,
+  "by_role": {
+    "guest": {
+      "total": 1,
+      "passed": 1
+    }
+  },
+  "by_category": {
+    "attachment": {
+      "total": 1,
+      "passed": 1
+    }
+  },
+  "failures": {}
+}

@@ -33,6 +33,8 @@ El sistema de seguridad de Demo Shop implementa múltiples capas de protección 
 
 **Mitigación actual**:
 - Patrón de "proximidad" que detecta palabras clave cerca de valores de alta entropía
+- En uso local, `protected_values` bloquea valores completos conocidos aunque aparezcan con separadores sencillos
+- La Shop revisa la generación por tramos y cancela el flujo cuando detecta una fuga; no entrega texto antes de la revisión final
 - Bloqueo de endpoints sensibles en la capa de autorización (previene acceso a la fuente)
 - Logging de todos los intentos bloqueados para auditoría
 

@@ -78,8 +78,10 @@ export function createPromption(config) {
   }
   const maxTextChars = config.maxTextChars ?? 100000;
   const maxStreamBytes = config.maxStreamBytes ?? 1048576;
+  const earlyOutputCheckChars = config.earlyOutputCheckChars ?? 256;
   if (typeof transport !== "function" || !Number.isFinite(maxTextChars) || maxTextChars < 1
-      || !Number.isFinite(maxStreamBytes) || maxStreamBytes < 1) {
+      || !Number.isFinite(maxStreamBytes) || maxStreamBytes < 1
+      || !Number.isSafeInteger(earlyOutputCheckChars) || earlyOutputCheckChars < 1) {
     throw new TypeError("A guard transport and positive buffer limits are required");
   }
 
@@ -210,6 +212,8 @@ export function createPromption(config) {
             void (async () => {
               const chunks = [];
               let bytes = 0;
+              let generatedText = "";
+              let nextOutputCheck = earlyOutputCheckChars;
               while (!cancelled) {
                 signal?.throwIfAborted();
                 const { value, done } = await reader.read();
@@ -218,11 +222,20 @@ export function createPromption(config) {
                 if (bytes > maxStreamBytes) throw new PromptionError("STREAM_TOO_LARGE");
                 if (value.type === "error") throw new PromptionError("MODEL_STREAM_FAILED", { status: 503 });
                 chunks.push(value);
+                if (value.type === "text-delta") {
+                  generatedText += value.delta;
+                  if (generatedText.length >= nextOutputCheck) {
+                    const checked = await guard(generatedText, "output", params);
+                    if (checked !== generatedText) {
+                      throw new PromptionError("CONTENT_BLOCKED", { direction: "output" });
+                    }
+                    nextOutputCheck = generatedText.length + earlyOutputCheckChars;
+                  }
+                }
               }
               signal?.throwIfAborted();
               if (cancelled) return;
-              const texts = chunks.filter(chunk => chunk.type === "text-delta");
-              const safe = await guard(texts.map(chunk => chunk.delta).join(""), "output", params);
+              const safe = await guard(generatedText, "output", params);
               const complete = chunks.filter(chunk => ["tool-call", "tool-result", "source", "file", "tool-approval-request"].includes(chunk.type));
               await content(complete, params);
               const reasoning = chunks.filter(chunk => chunk.type === "reasoning-delta");

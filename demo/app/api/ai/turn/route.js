@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateText, jsonSchema, tool, wrapLanguageModel } from "ai";
+import { streamText, jsonSchema, tool, wrapLanguageModel } from "ai";
 import { promptionMiddleware } from "../../../../lib/ai/promptionMiddleware.js";
 import { trustedAIRequest } from "../../../../lib/ai/trusted.js";
 import { aiFailure } from "../../../../lib/ai/errors.mjs";
@@ -76,7 +76,7 @@ export async function POST(request) {
       .filter(message => message.role === "system")
       .map(message => String(message.content || ""))
       .join("\n\n");
-    const result = await generateText({
+    const result = streamText({
       model,
       system,
       messages: transcript(body.messages.filter(message => message.role !== "system")),
@@ -87,13 +87,16 @@ export async function POST(request) {
       maxOutputTokens: Math.min(Math.max(Number(body.max_tokens) || 1200, 100), 6000),
       abortSignal: request.signal,
     });
-    if (!result.text.trim() && !result.toolCalls.length) {
-      console.warn("AI turn returned no usable output", { model: body.model, finishReason: result.finishReason });
+    const [text, toolCalls, finishReason] = await Promise.all([
+      result.text, result.toolCalls, result.finishReason,
+    ]);
+    if (!text.trim() && !toolCalls.length) {
+      console.warn("AI turn returned no usable output", { model: body.model, finishReason });
       return Response.json({ error: "El modelo no produjo una respuesta", code: "MODEL_EMPTY_RESPONSE" }, { status: 503 });
     }
     return Response.json({
-      text: result.text,
-      calls: result.toolCalls.map(call => ({
+      text,
+      calls: toolCalls.map(call => ({
         id: call.toolCallId,
         name: call.toolName,
         arguments: JSON.stringify(call.input),
