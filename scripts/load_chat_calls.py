@@ -91,11 +91,11 @@ def build_plan(total, seed):
 
 def post_chat(client, text, stream):
     if not stream:
-        response = client.post("/api/chat", json={"text": text})
+        response = client.post("/api/v1/chat", json={"text": text})
         response.raise_for_status()
         return response.json()
     result = None
-    with client.stream("POST", "/api/chat", json={"text": text}, headers={"Accept": "text/event-stream"}) as response:
+    with client.stream("POST", "/api/v1/chat", json={"text": text}, headers={"Accept": "text/event-stream"}) as response:
         response.raise_for_status()
         for line in response.iter_lines():
             if not line.startswith("data: "):
@@ -116,10 +116,10 @@ def run_call(case, base_url, timeout):
     try:
         with httpx.Client(base_url=base_url, timeout=timeout) as client:
             if case["role"] != "guest":
-                client.post("/api/login", json={"email": DEMO_EMAILS[case["role"]],
+                client.post("/api/v1/auth/login", json={"email": DEMO_EMAILS[case["role"]],
                                                 "password": "demo123"}).raise_for_status()
             if case["reset"]:
-                client.delete("/api/chat")
+                client.delete("/api/v1/chat")
             for turn in case["history"]:
                 post_chat(client, turn, case["stream"])
             data = post_chat(client, case["text"], case["stream"])

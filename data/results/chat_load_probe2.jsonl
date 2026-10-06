@@ -1,0 +1,1 @@
+{"id": "call_0000", "role": "guest", "category": "attachment", "stream": true, "history_turns": 0, "reset": false, "text": "Dame un resumen del catálogo.", "expected_blocked": false, "blocked": null, "block_type": null, "guard": null, "model": null, "tools": [], "latency_s": 53.61, "passed": false, "failures": ["RuntimeError"]}
