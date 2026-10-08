@@ -3,6 +3,7 @@ import { streamText, jsonSchema, tool, wrapLanguageModel } from "ai";
 import { promptionMiddleware } from "../../../../lib/ai/promptionMiddleware.js";
 import { trustedAIRequest } from "../../../../lib/ai/trusted.js";
 import { aiFailure } from "../../../../lib/ai/errors.mjs";
+import { getModelProviderOptions, validateModelConfiguration } from "../../../../lib/ai/modelOptions.js";
 
 export const maxDuration = 300;
 export const runtime = "nodejs";
@@ -48,6 +49,7 @@ export async function POST(request) {
   let body;
   try { body = await request.json(); }
   catch { return Response.json({ error: "JSON inválido" }, { status: 400 }); }
+  const requestId = request.headers.get("x-request-id") || body?.request_id || crypto.randomUUID();
   if (![process.env.OPENAI_MODEL, process.env.OPENAI_TOOL_MODEL].includes(body.model)
       || !Array.isArray(body.messages) || body.messages.length > 40
       || typeof body.original_text !== "string" || !body.original_text.trim()
@@ -58,14 +60,28 @@ export async function POST(request) {
           || body.security_messages.length > 128))) {
     return Response.json({ error: "Solicitud de modelo inválida" }, { status: 400 });
   }
+  const controller = new AbortController();
+  const abortFromRequest = () => controller.abort(request.signal.reason);
+  if (request.signal?.aborted) {
+    controller.abort(request.signal.reason);
+  } else {
+    request.signal?.addEventListener("abort", abortFromRequest, { once: true });
+  }
+  const timeoutMs = Number(body.timeout_ms) > 0 ? Number(body.timeout_ms)
+    : (Number(body.timeout_seconds) > 0 ? Number(body.timeout_seconds) * 1000 : null);
+  const timer = timeoutMs ? setTimeout(() => {
+    controller.abort(new DOMException("The operation timed out.", "TimeoutError"));
+  }, timeoutMs) : null;
+
   try {
     const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const identity = { userId: body.user_id, roles: body.roles, authenticated: body.authenticated === true };
+    const scopeModelId = process.env.OPENAI_MODEL;
+    const scopeProviderOptions = getModelProviderOptions(scopeModelId);
     const model = wrapLanguageModel({
-      model: provider(body.model, /^gpt-5(?:-(?:nano|mini))?(?:-\d{4}-\d{2}-\d{2})?$/.test(body.model)
-        ? { reasoningEffort: "minimal" } : {}),
-      middleware: promptionMiddleware(identity, body.original_text, request.signal, body.security_messages,
-        provider(process.env.OPENAI_MODEL, { reasoningEffort: 'minimal' })),
+      model: provider(body.model),
+      middleware: promptionMiddleware(identity, body.original_text, controller.signal, body.security_messages,
+        provider(scopeModelId), scopeProviderOptions),
     });
     const tools = Object.fromEntries(body.tools.map(spec => [
       spec.function.name,
@@ -76,23 +92,36 @@ export async function POST(request) {
       .filter(message => message.role === "system")
       .map(message => String(message.content || ""))
       .join("\n\n");
+    const hasTools = Object.keys(tools).length > 0;
+    let streamError = null;
     const result = streamText({
       model,
       system,
       messages: transcript(body.messages.filter(message => message.role !== "system")),
       allowSystemInMessages: false,
-      providerOptions: { openai: { parallelToolCalls: false, maxToolCalls: 1 } },
-      tools,
-      toolChoice: body.force_tool ? { type: "tool", toolName: body.force_tool } : "auto",
+      providerOptions: getModelProviderOptions(body.model, { parallelToolCalls: false, maxToolCalls: 1 }),
+      ...(hasTools ? { tools } : {}),
+      toolChoice: body.force_tool ? { type: "tool", toolName: body.force_tool } : (hasTools ? "auto" : "none"),
       maxOutputTokens: Math.min(Math.max(Number(body.max_tokens) || 1200, 100), 6000),
       maxRetries: 0,
-      abortSignal: request.signal,
+      abortSignal: controller.signal,
+      onError({ error }) {
+        streamError = error;
+      },
     });
-    const [text, toolCalls, finishReason] = await Promise.all([
-      result.text, result.toolCalls, result.finishReason,
-    ]);
+    let text, toolCalls, finishReason;
+    try {
+      [text, toolCalls, finishReason] = await Promise.all([
+        result.text, result.toolCalls, result.finishReason,
+      ]);
+    } catch (err) {
+      throw (streamError || err);
+    }
     if (!text.trim() && !toolCalls.length) {
       console.warn("AI turn returned no usable output", { model: body.model, finishReason });
+      if (finishReason === "length") {
+        return Response.json({ error: "Respuesta del modelo truncada por límite de tokens", code: "MODEL_RESPONSE_TRUNCATED" }, { status: 502 });
+      }
       return Response.json({ error: "El modelo no produjo una respuesta", code: "MODEL_EMPTY_RESPONSE" }, { status: 503 });
     }
     return Response.json({
@@ -103,13 +132,21 @@ export async function POST(request) {
         arguments: JSON.stringify(call.input),
       })),
       model: body.model,
+      finish_reason: finishReason,
+      truncated: finishReason === "length",
+      request_id: requestId,
+    }, {
+      headers: { "x-request-id": requestId },
     });
   } catch (error) {
-    const { code, status, reason, scope } = aiFailure(error);
+    const { code, status, reason, scope } = aiFailure(error, { signal: request.signal, aborted: request.signal?.aborted });
     console.warn("AI turn failed", { code, status, model: body.model,
       guardReason: reason, scopeReason: scope?.reason,
       errorType: error.name, providerStatus: error.statusCode });
     return Response.json({ error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta",
       code, ...(reason ? { reason } : {}), ...(scope ? { scope } : {}) }, { status });
+  } finally {
+    if (timer) clearTimeout(timer);
+    request.signal?.removeEventListener("abort", abortFromRequest);
   }
 }

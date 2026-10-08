@@ -14,8 +14,8 @@ const toolPolicies = {
   web_search: { roles: ["ventas", "admin"] }, web_open: { roles: ["ventas", "admin"] },
 };
 
-function promption(scopeModel) {
-  const evaluateScope = scopeModel ? createScopeEvaluator({ model: scopeModel }) : null;
+function promption(scopeModel, scopeProviderOptions) {
+  const evaluateScope = scopeModel ? createScopeEvaluator({ model: scopeModel, providerOptions: scopeProviderOptions }) : null;
   return createPromption({
     transport: createGuardEndpointTransport({
       url: `${CHAT_API_URL}/api/v1/ai/guard`, token: process.env.CHAT_SERVICE_TOKEN,
@@ -36,8 +36,8 @@ function promption(scopeModel) {
   });
 }
 
-export function promptionMiddleware(identity, originalText, signal, securityMessages, scopeModel) {
-  return promption(scopeModel).middleware({ identity, originalText, signal, securityMessages, toolPolicies });
+export function promptionMiddleware(identity, originalText, signal, securityMessages, scopeModel, scopeProviderOptions) {
+  return promption(scopeModel, scopeProviderOptions).middleware({ identity, originalText, signal, securityMessages, toolPolicies });
 }
 
 export function checkPromption(text, identity, direction, signal) {

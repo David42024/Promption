@@ -103,3 +103,110 @@ async def test_llm_client_does_not_start_when_budget_exhausted():
     with pytest.raises(LLMTimeoutError) as exc_info:
         await client.generate([{"role": "user", "content": "hi"}], deadline=budget)
     assert "deadline exceeded" in exc_info.value.message.lower()
+
+
+@pytest.mark.asyncio
+async def test_tool_turn_vercel_ai_slow_response_exceeding_budget():
+    import httpx
+    budget = RequestDeadline(total_seconds=0.1)
+
+    class SlowTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            await asyncio.sleep(0.3)
+            return httpx.Response(200, json={"text": "tardio", "calls": []}, request=request)
+
+    custom_client = httpx.AsyncClient(transport=SlowTransport())
+    client = LLMClient(client=custom_client)
+    client.models = [{
+        "id": "vercel-tools", "label": "Vercel Tools", "provider": "openai", "api": "vercel_ai",
+        "model": "gpt-4o", "api_key": "k", "base_url": "https://example.com/api/turn",
+        "temperature": 0.2, "max_tokens": 100
+    }]
+
+    with pytest.raises(LLMTimeoutError) as exc_info:
+        await client.generate_tool_turn([], [], deadline=budget)
+    assert "timeout" in exc_info.value.message.lower()
+    await custom_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_response_received_after_deadline_expired_is_rejected():
+    import httpx
+    budget = RequestDeadline(total_seconds=5.0)
+
+    class ExpiringTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            # Simulate clock advancing / deadline expiring before result is accepted
+            budget.deadline = budget.start_time - 1.0
+            return httpx.Response(200, json={"choices": [{"message": {"content": "respuesta tardia"}}]}, request=request)
+
+    custom_client = httpx.AsyncClient(transport=ExpiringTransport())
+    client = LLMClient(client=custom_client)
+    client.models = [{
+        "id": "m1", "label": "M1", "provider": "openai", "api": "openai",
+        "model": "gpt-4o", "api_key": "k", "base_url": "https://api.openai.com/v1",
+        "temperature": 0.2, "max_tokens": 100
+    }]
+
+    with pytest.raises(LLMTimeoutError) as exc_info:
+        await client.generate([{"role": "user", "content": "hi"}], deadline=budget)
+    assert "deadline exceeded" in exc_info.value.message.lower()
+    await custom_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_shared_budget_stops_fallback_when_exhausted():
+    import httpx
+    budget = RequestDeadline(total_seconds=0.1)
+    call_counts = {"p1": 0, "p2": 0}
+
+    class FallbackTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            if "p1" in str(request.url):
+                call_counts["p1"] += 1
+                await asyncio.sleep(0.15)
+                return httpx.Response(500, request=request)
+            call_counts["p2"] += 1
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]}, request=request)
+
+    custom_client = httpx.AsyncClient(transport=FallbackTransport())
+    client = LLMClient(client=custom_client)
+    client.models = [
+        {"id": "p1", "label": "P1", "provider": "openai", "api": "openai",
+         "model": "m1", "api_key": "k", "base_url": "https://p1.example.com", "temperature": 0.2, "max_tokens": 100},
+        {"id": "p2", "label": "P2", "provider": "groq", "api": "openai",
+         "model": "m2", "api_key": "k", "base_url": "https://p2.example.com", "temperature": 0.2, "max_tokens": 100},
+    ]
+
+    with pytest.raises(LLMTimeoutError):
+        await client.generate([{"role": "user", "content": "hi"}], deadline=budget)
+    assert call_counts["p1"] == 1
+    assert call_counts["p2"] == 0  # Provider 2 was not called because budget was exhausted
+    await custom_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_generation_preserves_cancelled_error():
+    import httpx
+
+    class HangTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            await asyncio.sleep(5.0)
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]}, request=request)
+
+    custom_client = httpx.AsyncClient(transport=HangTransport())
+    client = LLMClient(client=custom_client)
+    client.models = [{
+        "id": "m1", "label": "M1", "provider": "openai", "api": "openai",
+        "model": "gpt-4", "api_key": "k", "base_url": "https://api.openai.com/v1",
+        "temperature": 0.2, "max_tokens": 100
+    }]
+
+    task = asyncio.create_task(client.generate([{"role": "user", "content": "hi"}], deadline=RequestDeadline(5.0)))
+    await asyncio.sleep(0.05)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    await custom_client.aclose()
+

@@ -53,10 +53,51 @@ from .capabilities import (
     CAPABILITY_LABELS as _CAPABILITY_LABELS,
     describe_capabilities,
     is_capabilities_question,
+    is_simple_greeting,
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+import inspect
+
+def _call_generate_tool_turn(client, messages, tools, model_id=None, force_tool=None, deadline=None):
+    sig = inspect.signature(client.generate_tool_turn)
+    kwargs = {}
+    if "model_id" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        kwargs["model_id"] = model_id
+    if "force_tool" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        kwargs["force_tool"] = force_tool
+    if "deadline" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        kwargs["deadline"] = deadline
+    return client.generate_tool_turn(messages, tools, **kwargs)
+
+def _call_generate(client, messages, deadline=None):
+    sig = inspect.signature(client.generate)
+    if "deadline" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        return client.generate(messages, deadline=deadline)
+    return client.generate(messages)
+
+def _call_filter_prompt(client, text, identity, use_ml=True, messages=None, timeout=None):
+    sig = inspect.signature(client.filter_prompt)
+    kwargs = {"use_ml": use_ml, "messages": messages}
+    if "timeout" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        kwargs["timeout"] = timeout
+    return client.filter_prompt(text=text, identity=identity, **kwargs)
+
+def _call_output_guard(client, text, identity, timeout=None):
+    sig = inspect.signature(client.output_guard)
+    kwargs = {}
+    if "timeout" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        kwargs["timeout"] = timeout
+    return client.output_guard(text=text, identity=identity, **kwargs)
+
+def _call_get_scope_guard(timeout_seconds=30.0):
+    sig = inspect.signature(get_scope_guard)
+    if "timeout_seconds" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        return get_scope_guard(timeout_seconds=timeout_seconds)
+    return get_scope_guard()
+
 _conversation_guard = ConversationGuard()
 
 
@@ -72,9 +113,35 @@ class ScopeBlocked(Exception):
         super().__init__("tool_out_of_scope")
 
 
+_request_review_cache: ContextVar[dict | None] = ContextVar("request_review_cache", default=None)
+_request_eval_counts: ContextVar[dict | None] = ContextVar("request_eval_counts", default=None)
+
+
 async def _review_conversation(messages, request, client, enabled, timeout: float | None = None):
     roles = _user_roles(request.user)
     if enabled:
+        import hashlib
+        messages_serialized = json.dumps(messages, sort_keys=True, ensure_ascii=False)
+        messages_hash = hashlib.sha256(messages_serialized.encode("utf-8")).hexdigest()
+        cache_key = (
+            messages_hash,
+            request.user.id,
+            tuple(roles),
+            request.user.authenticated,
+            get_security_state().get("version", 1),
+        )
+        cache = _request_review_cache.get()
+        counts = _request_eval_counts.get()
+
+        if cache is not None and cache_key in cache:
+            if counts is not None:
+                counts["deduplicated"] += 1
+            set_guard_identity(request.user.id, roles, request.text, request.user.authenticated, messages)
+            return
+
+        if counts is not None:
+            counts["conversation"] += 1
+
         try:
             local = _conversation_guard.analyze(messages, roles=roles, use_ml=False)
             if local.blocked:
@@ -92,6 +159,8 @@ async def _review_conversation(messages, request, client, enabled, timeout: floa
             if not decision.allowed:
                 raise ConversationBlocked("conversation_injection" if decision.reason == "malicious_input"
                                           else decision.reason)
+            if cache is not None:
+                cache[cache_key] = True
         except ConversationBlocked:
             raise
         except ConversationLimitError as exc:
@@ -203,21 +272,27 @@ def _allowed_confidential_reply(
     *,
     roles: List[str],
     audit: List[MCPToolCall],
-    policy: PolicyInfo,
+    policy: PolicyInfo | None,
 ) -> bool:
     """Return true when sensitive business data was explicitly authorized."""
+    if policy is None or not getattr(policy, "allowed", False):
+        return False
     if "admin" not in roles:
         return False
-    if policy.tier != "confidencial":
+    if getattr(policy, "tier", "") != "confidencial":
         return False
-    if policy.policy_id == "confidential.credentials":
+    if getattr(policy, "policy_id", "") == "confidential.credentials":
         return False
-    if policy.tool_name:
-        return any(
-            item.allowed and item.tool == policy.tool_name and item.tier == "confidencial"
-            for item in audit
-        )
-    return True
+    tool_names = set(getattr(policy, "tool_names", None) or [])
+    legacy_tool = getattr(policy, "tool_name", None)
+    if legacy_tool:
+        tool_names.add(legacy_tool)
+    if not tool_names:
+        return False
+    return any(
+        item.allowed and item.tool in tool_names and item.tier == "confidencial"
+        for item in audit
+    )
 
 
 def audit_chat_endpoint(handler):
@@ -423,6 +498,14 @@ async def chat(request: ChatRequest, deadline: RequestDeadline | None = Depends(
     user_roles = _user_roles(request.user)
     primary_role = _primary_role(user_roles)
     conversation_id = (request.context or {}).get("conversation_id")
+    request_id = None
+    if isinstance(request.context, dict):
+        raw_rid = str(request.context.get("request_id", "")).strip()
+        if raw_rid and re.match(r"^[a-zA-Z0-9_\-\.]{1,128}$", raw_rid):
+            request_id = raw_rid
+    if not request_id:
+        request_id = uuid.uuid4().hex
+
     key = store._key(conversation_id, request.user)
     current_task = asyncio.current_task()
     if key is not None:
@@ -436,7 +519,7 @@ async def chat(request: ChatRequest, deadline: RequestDeadline | None = Depends(
             }
     try:
         async with asyncio.timeout(max(0.001, budget.remaining)):
-            return await _chat_internal(request, user_roles, primary_role, conversation_id, budget)
+            return await _chat_internal(request, user_roles, primary_role, conversation_id, budget, request_id=request_id)
     except TimeoutError as exc:
         raise HTTPException(
             status_code=504,
@@ -462,14 +545,37 @@ async def _chat_internal(
     primary_role: str,
     conversation_id: str | None,
     budget: RequestDeadline,
+    request_id: str | None = None,
 ) -> ChatResponse:
+    if not request_id:
+        request_id = uuid.uuid4().hex
+    t_start = time.perf_counter()
+    stage_latencies = {}
     try:
         security_messages = store.security_snapshot(conversation_id, request.user)
     except ConversationLimitError:
         return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
                             reason="conversation_limit", block_type="conversation")
     security_messages.append({"role": "user", "content": request.text})
-    set_guard_identity(request.user.id, user_roles, request.text, request.user.authenticated, security_messages)
+    set_guard_identity(request.user.id, user_roles, request.text, request.user.authenticated, security_messages, request_id=request_id)
+    total_context_chars = sum(len(m.get("content", "") or "") for m in security_messages)
+    if total_context_chars > settings.max_context_chars:
+        return ChatResponse(
+            blocked=True,
+            reply="El contexto de la conversación excede el límite permitido. Inicia una nueva conversación para continuar.",
+            reason="context_too_large",
+            block_type="conversation_limit",
+            role=primary_role,
+        )
+    _request_review_cache.set({})
+    _request_eval_counts.set({
+        "input": 0,
+        "conversation": 0,
+        "scope": 0,
+        "tool": 0,
+        "output": 0,
+        "deduplicated": 0,
+    })
 
     
     # Initialize clients
@@ -495,19 +601,13 @@ async def _chat_internal(
                     security_classification="MALICIOUS",
                     filter_layers={"conversation": contextual.metadata()})
             step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "filter_prompt")
-            try:
-                filter_result = await filter_client.filter_prompt(
-                    text=request.text,
-                    identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-                    use_ml=True, messages=security_messages,
-                    timeout=step_timeout
-                )
-            except TypeError:
-                filter_result = await filter_client.filter_prompt(
-                    text=request.text,
-                    identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-                    use_ml=True, messages=security_messages
-                )
+            filter_result = await _call_filter_prompt(
+                filter_client,
+                text=request.text,
+                identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+                use_ml=True, messages=security_messages,
+                timeout=step_timeout
+            )
             security_classification = filter_result.classification
             input_check = input_guard_decision(request.text, filter_result,
                 message_count=len(security_messages), output_enabled=security_state["output_guard_enabled"])
@@ -532,6 +632,19 @@ async def _chat_internal(
                     block_type="attack",
                     security_classification="MALICIOUS",
                 )
+            import hashlib
+            m_serialized = json.dumps(security_messages, sort_keys=True, ensure_ascii=False)
+            m_hash = hashlib.sha256(m_serialized.encode("utf-8")).hexdigest()
+            init_key = (
+                m_hash,
+                request.user.id,
+                tuple(user_roles),
+                request.user.authenticated,
+                security_state.get("version", 1),
+            )
+            c = _request_review_cache.get()
+            if c is not None:
+                c[init_key] = True
         except ConversationLimitError:
             return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
                                 reason="conversation_limit", block_type="conversation", role=primary_role)
@@ -591,16 +704,11 @@ async def _chat_internal(
                                          "roles": user_roles, "authenticated": request.user.authenticated})
     _report_progress("Revisando alcance de la solicitud…")
     scope_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "scope_guard")
-    try:
-        scope = await get_scope_guard(timeout_seconds=scope_timeout).check(
-            request.text, system_prompt=system_prompt,
-            identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-            messages=security_messages)
-    except TypeError:
-        scope = await get_scope_guard().check(
-            request.text, system_prompt=system_prompt,
-            identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-            messages=security_messages)
+    sg = _call_get_scope_guard(timeout_seconds=scope_timeout)
+    scope = await sg.check(
+        request.text, system_prompt=system_prompt,
+        identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+        messages=security_messages)
     _scope_decision.set(scope)
     if not scope.allowed:
         reply = ("Esta solicitud está fuera del alcance de este asistente. Puedo ayudarte con "
@@ -733,13 +841,10 @@ async def _chat_internal(
             if not scope.allowed:
                 raise ValueError("El catálogo de permisos no superó la validación de alcance")
             out_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "output_guard")
-            try:
-                checked = await filter_client.output_guard(
-                    text=content, identity=Identity(user_id=request.user.id, roles=user_roles),
-                    timeout=out_timeout)
-            except TypeError:
-                checked = await filter_client.output_guard(
-                    text=content, identity=Identity(user_id=request.user.id, roles=user_roles))
+            checked = await _call_output_guard(
+                filter_client,
+                text=content, identity=Identity(user_id=request.user.id, roles=user_roles),
+                timeout=out_timeout)
             checked_content = output_guard_decision(content, checked)
             if not checked_content.allowed:
                 raise ValueError("El catálogo de permisos fue bloqueado por Output Guard")
@@ -758,29 +863,42 @@ async def _chat_internal(
             audit.append(MCPToolCall(tool="make_document", allowed=True, tier=highest_tier))
             model_name = "MCP"
             reply = f"Estoy bien, {request.user.name}. Te adjunté tus capacidades disponibles en Excel."
-        elif not tool_specs:
+        elif (not tool_specs or is_simple_greeting(request.text)) and hasattr(llm_client, 'generate'):
             _report_progress("Generando respuesta…")
+            guard_reserve = 0.5 if security_state["output_guard_enabled"] else 0.0
+            if budget.remaining <= guard_reserve:
+                raise LLMTimeoutError("Presupuesto insuficiente para reservar tiempo de inspección en Output Guard")
             step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "review_conversation")
             await _review_conversation(security_messages, request, filter_client, filter_enabled, timeout=step_timeout)
-            try:
-                llm_response = await llm_client.generate(messages, deadline=budget)
-            except TypeError:
-                llm_response = await llm_client.generate(messages)
+            llm_response = await _call_generate(llm_client, messages, deadline=budget)
             reply = llm_response.text
             model_name = llm_response.model
         else:
+            executed_signatures: set[str] = set()
+            last_turn_signatures: list[str] = []
             executed_tool_cache: dict[str, Any] = {}
             executed_actions_cache: dict[str, Any] = {}
-            for _ in range(5):
+            guard_reserve = 0.5 if security_state["output_guard_enabled"] else 0.0
+            max_turns = max(1, settings.max_tool_turns)
+            max_calls_per_turn = max(1, settings.max_tool_calls_per_turn)
+            requested_model = None
+            fallback_count = 0
+            fallback_reason = None
+            for _ in range(max_turns):
                 _report_progress("Generando respuesta…")
+                budget.check_expired("tool_loop_entry")
+                if budget.remaining <= guard_reserve:
+                    raise LLMTimeoutError("Presupuesto insuficiente para continuar el ciclo de herramientas y validar salida")
                 step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "review_conversation")
                 await _review_conversation(security_messages, request, filter_client, filter_enabled, timeout=step_timeout)
-                try:
-                    turn = await llm_client.generate_tool_turn(messages, tool_specs, model_id=model_id, deadline=budget)
-                except TypeError:
-                    turn = await llm_client.generate_tool_turn(messages, tool_specs, model_id=model_id)
+                turn = await _call_generate_tool_turn(llm_client, messages, tool_specs, model_id=model_id, deadline=budget)
                 model_id = turn["model_id"]
                 model_name = turn["model"]
+                if requested_model is None:
+                    requested_model = turn.get("requested_model", model_name)
+                if turn.get("fallback_count", 0) > fallback_count:
+                    fallback_count = turn["fallback_count"]
+                    fallback_reason = turn.get("fallback_reason")
                 attached = any(action["type"] in {"attachment", "existing_document"}
                                for action in actions)
                 document_spec = next((spec for spec in tool_specs
@@ -790,22 +908,14 @@ async def _chat_internal(
                     forced_document = True
                     _report_progress("Generando archivo…")
                     try:
-                        try:
-                            turn = await llm_client.generate_tool_turn(
-                                messages + [{"role": "system", "content": (
-                                    "El usuario pidió un archivo descargable en este chat. "
-                                    "Llama ahora a make_document con contenido autorizado; "
-                                    "no afirmes que existe un archivo sin ejecutar la herramienta.")}],
-                                [document_spec], model_id=("openai-tools" if model_id == "openai-primary" else model_id),
-                                force_tool="make_document", deadline=budget)
-                        except TypeError:
-                            turn = await llm_client.generate_tool_turn(
-                                messages + [{"role": "system", "content": (
-                                    "El usuario pidió un archivo descargable en este chat. "
-                                    "Llama ahora a make_document con contenido autorizado; "
-                                    "no afirmes que existe un archivo sin ejecutar la herramienta.")}],
-                                [document_spec], model_id=("openai-tools" if model_id == "openai-primary" else model_id),
-                                force_tool="make_document")
+                        turn = await _call_generate_tool_turn(
+                            llm_client,
+                            messages + [{"role": "system", "content": (
+                                "El usuario pidió un archivo descargable en este chat. "
+                                "Llama ahora a make_document con contenido autorizado; "
+                                "no afirmes que existe un archivo sin ejecutar la herramienta.")}],
+                            [document_spec], model_id=("openai-tools" if model_id == "openai-primary" else model_id),
+                            force_tool="make_document", deadline=budget)
                     except AIGuardBlocked:
                         raise
                     except Exception:
@@ -815,9 +925,29 @@ async def _chat_internal(
                 if not turn["calls"]:
                     reply = turn["text"]
                     break
-                if len(turn["calls"]) > 8:
-                    logger.warning("Modelo solicitó %d herramientas; se procesarán las primeras 8", len(turn["calls"]))
-                calls = turn["calls"][:8]
+                if len(turn["calls"]) > max_calls_per_turn:
+                    logger.warning("Modelo solicitó %d herramientas; se procesarán las primeras %d", len(turn["calls"]), max_calls_per_turn)
+                def _sig_for_call(c: dict) -> str:
+                    c_name = c.get("name", "")
+                    c_raw = c.get("arguments", "")
+                    try:
+                        if isinstance(c_raw, str) and len(c_raw) <= 12000:
+                            c_args = json.loads(c_raw)
+                            if isinstance(c_args, dict):
+                                return f"{c_name}:{json.dumps(c_args, sort_keys=True)}"
+                        elif isinstance(c_raw, dict):
+                            return f"{c_name}:{json.dumps(c_raw, sort_keys=True)}"
+                    except Exception:
+                        pass
+                    return f"{c_name}:{c_raw}"
+
+                calls = turn["calls"][:max_calls_per_turn]
+                current_turn_signatures = [_sig_for_call(c) for c in calls]
+                if current_turn_signatures and current_turn_signatures == last_turn_signatures:
+                    logger.warning("Tool loop without progress detected: %s", current_turn_signatures)
+                    reply = turn["text"] or "No se pudieron obtener resultados adicionales con las herramientas solicitadas."
+                    break
+                last_turn_signatures = current_turn_signatures
                 if turn["provider"] == "gemini":
                     messages.append(turn["assistant"])
                 else:
@@ -836,11 +966,13 @@ async def _chat_internal(
                         args = json.loads(raw) if isinstance(raw, str) else raw
                         if not isinstance(args, dict) or name not in allowed_names:
                             raise ValueError("Herramienta o argumentos no permitidos")
+                        tool_sig = f"{name}:{json.dumps(args, sort_keys=True)}"
+                        call_id = call.get("id") or f"{name}:{hash(str(args))}"
                         proposed = {"role": "tool", "tool_name": name,
                                     "content": json.dumps(args, ensure_ascii=False)}
                         await _review_conversation(security_messages + [proposed], request, filter_client, filter_enabled)
                         _report_progress("Verificando alcance de la herramienta…")
-                        operation_scope = await get_scope_guard().check(request.text,
+                        operation_scope = await _call_get_scope_guard().check(request.text,
                             system_prompt=system_prompt,
                             identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
                             messages=security_messages, tool={"name": name, "input": args,
@@ -849,11 +981,10 @@ async def _chat_internal(
                         if not operation_scope.allowed:
                             _scope_decision.set(operation_scope)
                             raise ScopeBlocked(operation_scope)
-                        call_id = call.get("id") or f"{name}:{hash(str(args))}"
-                        if call_id in executed_tool_cache:
+                        if tool_sig in executed_signatures and name in {"make_document", "attach_existing_document"}:
+                            result = executed_tool_cache[tool_sig]
+                        elif call_id in executed_tool_cache:
                             result = executed_tool_cache[call_id]
-                            if call_id in executed_actions_cache:
-                                actions.append(executed_actions_cache[call_id])
                         elif name in {"web_search", "web_open"}:
                             _report_progress("Consultando internet…")
                             outbound = str(args.get("query" if name == "web_search" else "url", ""))
@@ -872,18 +1003,16 @@ async def _chat_internal(
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"] == "web_open"]
                             if name == "web_open":
                                 step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "web_open_filter")
-                                try:
-                                    inspection = await filter_client.filter_prompt(
-                                        text=result["content"], identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-                                        use_ml=True, timeout=step_timeout)
-                                except TypeError:
-                                    inspection = await filter_client.filter_prompt(
-                                        text=result["content"], identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-                                        use_ml=True)
+                                inspection = await _call_filter_prompt(
+                                    filter_client,
+                                    text=result["content"], identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+                                    use_ml=True, timeout=step_timeout)
                                 if inspection.blocked or inspection.classification == "MALICIOUS":
                                     raise ValueError("Contenido web bloqueado por el filtro")
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"] == "make_document"]
                             executed_tool_cache[call_id] = result
+                            executed_tool_cache[tool_sig] = result
+                            executed_signatures.add(tool_sig)
                         elif name == "ask_user":
                             _report_progress("Preparando pregunta…")
                             question = str(args.get("question", ""))[:300].strip()
@@ -941,7 +1070,10 @@ async def _chat_internal(
                             actions.append(document)
                             result = {"status": "attached", "name": document["name"]}
                             executed_tool_cache[call_id] = result
+                            executed_tool_cache[tool_sig] = result
                             executed_actions_cache[call_id] = document
+                            executed_actions_cache[tool_sig] = document
+                            executed_signatures.add(tool_sig)
                         else:
                             _report_progress(f"Ejecutando herramienta MCP: {name}…")
                             executed = await mcp_executor.execute(name, args, user_roles,
@@ -955,6 +1087,8 @@ async def _chat_internal(
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"]
                                               not in {"web_search", "web_open"}]
                             executed_tool_cache[call_id] = result
+                            executed_tool_cache[tool_sig] = result
+                            executed_signatures.add(tool_sig)
                         audited_tier = (tool_tier if name not in {"web_search", "web_open", "ask_user",
                                                                  "make_document", "attach_existing_document"}
                                         else highest_tier if name in {"make_document", "attach_existing_document"}
@@ -1072,18 +1206,14 @@ async def _chat_internal(
     
     if output_guard_enabled:
         try:
+            budget.check_expired("output_guard")
             out_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "output_guard")
-            try:
-                guard_result = await filter_client.output_guard(
-                    text=reply,
-                    identity=Identity(user_id=request.user.id, roles=user_roles),
-                    timeout=out_timeout
-                )
-            except TypeError:
-                guard_result = await filter_client.output_guard(
-                    text=reply,
-                    identity=Identity(user_id=request.user.id, roles=user_roles)
-                )
+            guard_result = await _call_output_guard(
+                filter_client,
+                text=reply,
+                identity=Identity(user_id=request.user.id, roles=user_roles),
+                timeout=out_timeout
+            )
             
             checked_reply = output_guard_decision(reply, guard_result)
             if checked_reply.status == 503:
@@ -1167,6 +1297,27 @@ async def _chat_internal(
     if not filter_enabled:
         reply += "\n\n⚠️ (Nota del sistema: esta respuesta ha sido generada SIN filtro de entrada ni output guard. En producción, el filtro está activado y este contenido habría sido bloqueado.)"
     
+    req_m = requested_model if 'requested_model' in locals() and requested_model else model_name
+    fb_c = fallback_count if 'fallback_count' in locals() else 0
+    fb_r = fallback_reason if 'fallback_reason' in locals() else None
+    total_lat = (time.perf_counter() - t_start) * 1000
+    p_tok = getattr(locals().get('llm_response'), 'prompt_tokens', None) if 'llm_response' in locals() else locals().get('turn', {}).get('prompt_tokens')
+    c_tok = getattr(locals().get('llm_response'), 'completion_tokens', None) if 'llm_response' in locals() else locals().get('turn', {}).get('completion_tokens')
+    t_tok = getattr(locals().get('llm_response'), 'total_tokens', None) if 'llm_response' in locals() else locals().get('turn', {}).get('total_tokens')
+    metrics = {
+        "request_id": request_id,
+        "requested_model": req_m,
+        "effective_model": model_name,
+        "call_type": "tool" if actions else "chat",
+        "fallback_count": fb_c,
+        "fallback_reason": fb_r,
+        "prompt_tokens": p_tok,
+        "completion_tokens": c_tok,
+        "total_tokens": t_tok,
+        "filter_status": "executed" if filter_enabled else "skipped",
+        "output_guard_status": "executed" if output_guard_enabled else "skipped",
+        "total_latency_ms": round(total_lat, 2),
+    }
     response = ChatResponse(
         blocked=False,
         reply=reply,
@@ -1178,6 +1329,12 @@ async def _chat_internal(
         output_guard_skipped=output_guard_skipped,
         role=primary_role,
         model=model_name,
+        requested_model=req_m,
+        fallback_count=fb_c,
+        fallback_reason=fb_r,
+        eval_counts=_request_eval_counts.get(),
+        request_id=request_id,
+        execution_metrics=metrics,
         actions=actions,
         filter_layers=filter_result.layers if filter_result else None,
         audit=audit,

@@ -1,6 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createScopeEvaluator } from '@promption/ai-sdk';
 import { trustedAIRequest } from '../../../../lib/ai/trusted.js';
+import { getModelProviderOptions, validateModelConfiguration } from '../../../../lib/ai/modelOptions.js';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -13,16 +14,19 @@ export async function POST(request) {
   let body;
   try { body = await request.json(); }
   catch { return Response.json({ error: 'JSON inválido' }, { status: 400 }); }
+  const requestId = request.headers.get('x-request-id') || body?.request_id || crypto.randomUUID();
   try {
     const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const modelId = process.env.OPENAI_MODEL;
     const evaluate = createScopeEvaluator({
-      model: provider(process.env.OPENAI_MODEL, { reasoningEffort: 'minimal' }),
+      model: provider(modelId),
+      providerOptions: getModelProviderOptions(modelId),
     });
     const decision = await evaluate({ text: body.text, systemPrompt: body.system_prompt,
       messages: body.messages, tool: body.tool, signal: request.signal,
       identity: { userId: body.identity?.user_id || 'anonymous', roles: body.identity?.roles || [],
         authenticated: body.identity?.authenticated === true } });
-    return Response.json(decision);
+    return Response.json(decision, { headers: { 'x-request-id': requestId } });
   } catch (error) {
     console.error('[ai/scope] evaluation failed', {
       name: typeof error?.name === 'string' ? error.name : 'UnknownError',

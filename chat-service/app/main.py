@@ -5,6 +5,8 @@ from .config import settings, validate_chat_service_configuration
 from .routes import router
 import time
 
+from .http_client import close_shared_http_client
+
 app = FastAPI(
     title="Promption Chat Service",
     description="Backend Demo para Promption Shop - Manejo de chat con integración Filter API",
@@ -15,6 +17,11 @@ app = FastAPI(
 @app.on_event("startup")
 def _startup_chat_service_validation() -> None:
     validate_chat_service_configuration()
+
+
+@app.on_event("shutdown")
+async def _shutdown_chat_service() -> None:
+    await close_shared_http_client()
 
 
 # CORS middleware - AÑADIDO A LA APP, NO AL ROUTER

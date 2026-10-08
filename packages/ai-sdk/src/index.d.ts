@@ -24,6 +24,7 @@ export interface ScopeRequest {
   messages?: ConversationMessage[];
   tool?: { name: string; input: unknown; description?: string };
   signal?: AbortSignal;
+  providerOptions?: Record<string, unknown>;
 }
 export type ScopeEvaluator = (request: ScopeRequest) => Promise<Pick<ScopeDecision, "classification" | "reason">>;
 export interface GuardRequest {
@@ -87,7 +88,7 @@ export class PromptionError extends Error {
 }
 export function createFilterApiTransport(options: FilterApiOptions): GuardTransport;
 export function createGuardEndpointTransport(options: GuardEndpointOptions): GuardTransport;
-export function createScopeEvaluator(options: { model: LanguageModel; timeoutMs?: number; maxOutputTokens?: number }): ScopeEvaluator;
+export function createScopeEvaluator(options: { model: LanguageModel; timeoutMs?: number; maxOutputTokens?: number; providerOptions?: Record<string, unknown> }): ScopeEvaluator;
 export function createPromption(options: PromptionOptions): {
   check(text: string, options: Omit<GuardRequest, "text">): Promise<string>;
   checkScope(text: string, options: Omit<ScopeRequest, "text">): Promise<ScopeDecision>;
