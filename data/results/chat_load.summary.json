@@ -1,19 +1,52 @@
 {
-  "total": 1,
-  "passed": 0,
+  "total": 30,
+  "passed": 3,
   "by_role": {
-    "guest": {
-      "total": 1,
+    "admin": {
+      "total": 6,
       "passed": 0
+    },
+    "ventas": {
+      "total": 8,
+      "passed": 1
+    },
+    "guest": {
+      "total": 9,
+      "passed": 0
+    },
+    "customer": {
+      "total": 7,
+      "passed": 2
     }
   },
   "by_category": {
+    "fixture": {
+      "total": 5,
+      "passed": 0
+    },
     "attachment": {
-      "total": 1,
+      "total": 3,
+      "passed": 0
+    },
+    "tool": {
+      "total": 4,
+      "passed": 0
+    },
+    "benign": {
+      "total": 7,
+      "passed": 0
+    },
+    "malicious": {
+      "total": 9,
+      "passed": 3
+    },
+    "mixed": {
+      "total": 2,
       "passed": 0
     }
   },
   "failures": {
-    "HTTPStatusError": 1
+    "RuntimeError": 16,
+    "infrastructure_filter_unavailable": 11
   }
 }

@@ -27,7 +27,6 @@ model:
 ensemble:
   heuristic_weight: 0.4
   ml_weight: 0.6
-  final_threshold: 0.5
   decision_low_threshold: 0.33
   decision_high_threshold: 0.66
   require_llm_veto: false
@@ -67,3 +66,23 @@ logging:
 conversation_guard:
   max_messages: 128
   max_chars: 100000
+
+limits:
+  max_text_chars: 100000
+  max_history_messages: 128
+  max_history_chars: 100000
+  max_body_bytes: 2097152       # 2 MiB
+  max_roles: 32
+  max_role_name_chars: 64
+  max_user_id_chars: 128
+  max_context_keys: 64
+  max_context_bytes: 65536      # 64 KiB
+  max_benchmark_sample_size: 5000
+  protection_concurrency: 4
+  protection_max_queue: 8
+  benchmark_concurrency: 1
+  benchmark_max_queue: 2
+  concurrency_queue_timeout_seconds: 5.0
+  rate_limit:
+    protection_rpm: 60          # 60 solicitudes/minuto por endpoint de protección
+    benchmark_rph: 1            # 1 benchmark/hora por tenant

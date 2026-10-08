@@ -43,6 +43,42 @@ app.add_middleware(
     ],
 )
 
+from promption.api.auth import is_demo_mode, is_production_environment, validate_auth_configuration
+from promption.limiter import BodySizeLimitMiddleware, init_rate_limiter_from_config
+
+# Initialize shared rate limiter backend according to config or environment
+init_rate_limiter_from_config()
+
+@app.on_event("startup")
+def _startup_rate_limiter() -> None:
+    init_rate_limiter_from_config()
+
+@app.on_event("startup")
+def _startup_auth_validation() -> None:
+    has_any_registry = bool(
+        os.environ.get("PIF_API_KEYS", "").strip()
+        or os.environ.get("PROMPTION_API_KEYS", "").strip()
+        or os.environ.get("PROMPTION_ADMIN_API_KEYS", "").strip()
+        or os.environ.get("PROMPTION_API_KEY", "").strip()
+        or os.environ.get("PROMPTION_TENANT_ID", "").strip()
+    )
+    if (
+        is_production_environment()
+        or is_demo_mode()
+        or has_any_registry
+        or os.environ.get("PROMPTION_ENFORCE_AUTH_ON_STARTUP", "").lower() in ("1", "true", "yes")
+    ):
+        validate_auth_configuration()
+    else:
+        logger.warning(
+            "No API credentials configured and PROMPTION_DEMO_MODE is disabled. Protected API requests will be rejected (401). "
+            "Set PROMPTION_API_KEYS='tenant:key' or PROMPTION_DEMO_MODE=true for local demo."
+        )
+
+_limits_conf = _CONF.get("limits", {})
+_max_body = int(_limits_conf.get("max_body_bytes", 2097152))
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=_max_body)
+
 app.include_router(router, prefix="/api/v1")
 
 

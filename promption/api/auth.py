@@ -7,8 +7,16 @@ payload data, determines the tenant and its filtering thresholds.
 Production consumer keys are registered with
 ``PROMPTION_API_KEYS="tenant:key,other:key2"``. Administrative keys use the
 separate ``PROMPTION_ADMIN_API_KEYS`` registry. The legacy ``PIF_API_KEYS``
-name is accepted during migration. When an environment registry exists, the
-public local-demo keys from ``config/tenants.yaml`` are not loaded.
+name is accepted during migration.
+
+DEMO MODE:
+Public local-demo keys from ``config/tenants.yaml`` are ONLY loaded if
+``PROMPTION_DEMO_MODE=true`` (or 1, yes) is explicitly enabled.
+Demo mode is disabled by default. In production environments (indicated by
+``ENVIRONMENT=production``, ``PROMPTION_ENV=production``, etc.), demo mode is
+strictly forbidden and rejected.
+When an environment registry exists, public demo keys are never loaded,
+preserving credential precedence.
 """
 from __future__ import annotations
 
@@ -40,6 +48,29 @@ class TenantContext:
     thresholds: dict = field(default_factory=dict)
     roles: list = field(default_factory=list)
     scopes: list[str] = field(default_factory=lambda: ["filter", "output_guard"])
+    quotas: dict = field(default_factory=dict)
+
+
+def is_production_environment() -> bool:
+    """Return True if any standard environment variable declares a production environment."""
+    for var in ("PROMPTION_ENV", "ENVIRONMENT", "ENV", "NODE_ENV"):
+        val = os.environ.get(var, "").strip().lower()
+        if val in ("production", "prod"):
+            return True
+    return False
+
+
+def is_demo_mode() -> bool:
+    """Return True if demo mode is explicitly enabled.
+
+    Demo mode is disabled by default. In declared production environments,
+    activating demo mode raises a RuntimeError to prevent running with public keys.
+    """
+    raw = os.environ.get("PROMPTION_DEMO_MODE", "").strip().lower()
+    enabled = raw in ("true", "1", "yes", "t", "on")
+    if enabled and is_production_environment():
+        raise RuntimeError("PROMPTION_DEMO_MODE cannot be enabled in a production environment.")
+    return enabled
 
 
 def _read_tenants_file() -> dict:
@@ -52,35 +83,54 @@ def _read_tenants_file() -> dict:
 def _parse_registry(
     raw: str,
     scopes: list[str] | None = None,
-) -> dict[str, "TenantContext"]:
+) -> dict[str, TenantContext]:
     tenants: dict[str, TenantContext] = {}
+    if not raw or not raw.strip():
+        return tenants
     for pair in raw.split(","):
-        if ":" not in pair:
+        pair = pair.strip()
+        if not pair:
             continue
+        if ":" not in pair:
+            raise ValueError("Malformed API key registry: entries must follow 'tenant_id:key' format")
         tenant_id, api_key = pair.split(":", 1)
         tenant_id = tenant_id.strip()
         api_key = api_key.strip()
-        if tenant_id and api_key:
-            tenants[api_key] = TenantContext(
-                tenant_id=tenant_id,
-                scopes=list(scopes or ["filter", "output_guard"]),
-            )
+        if not tenant_id or not api_key:
+            raise ValueError("Malformed API key registry: tenant_id and key must not be empty")
+        tenants[api_key] = TenantContext(
+            tenant_id=tenant_id,
+            scopes=list(scopes or ["filter", "output_guard"]),
+        )
     return tenants
 
 
-def load_tenants() -> dict[str, TenantContext]:
-    """Load the tenant registry without exposing or inferring API keys."""
+def load_tenants(allow_demo: bool | None = None) -> dict[str, TenantContext]:
+    """Load the tenant registry without exposing or inferring API keys.
+
+    Public demo keys from config/tenants.yaml are ONLY loaded if allow_demo=True
+    or PROMPTION_DEMO_MODE=true, and no environment credentials are configured.
+    Demo mode is strictly rejected in production environments.
+    """
+    demo_active = is_demo_mode() if allow_demo is None else bool(allow_demo)
+    if demo_active and is_production_environment():
+        raise RuntimeError("PROMPTION_DEMO_MODE cannot be enabled in a production environment.")
+
     tenants: dict[str, TenantContext] = {}
     legacy_registry = os.environ.get("PIF_API_KEYS", "").strip()
     registry = os.environ.get("PROMPTION_API_KEYS", "").strip()
     admin_registry = os.environ.get("PROMPTION_ADMIN_API_KEYS", "").strip()
     single_key = os.environ.get("PROMPTION_API_KEY", "").strip()
     single_tenant = os.environ.get("PROMPTION_TENANT_ID", "").strip()
+
+    if (single_key and not single_tenant) or (single_tenant and not single_key):
+        raise ValueError("Incomplete single-tenant configuration: both PROMPTION_API_KEY and PROMPTION_TENANT_ID must be set")
+
     has_environment_registry = bool(
         legacy_registry or registry or admin_registry or (single_key and single_tenant)
     )
 
-    if not has_environment_registry:
+    if not has_environment_registry and demo_active and not is_production_environment():
         for entry in _read_tenants_file().get("tenants", []) or []:
             tenant_id = str(entry.get("tenant_id", "")).strip()
             api_key = str(entry.get("api_key", "")).strip()
@@ -91,6 +141,7 @@ def load_tenants() -> dict[str, TenantContext]:
                     thresholds=dict(entry.get("thresholds", {}) or {}),
                     roles=list(entry.get("roles", []) or []),
                     scopes=list(entry.get("scopes", ["filter", "output_guard"]) or []),
+                    quotas=dict(entry.get("quotas", {}) or {}),
                 )
 
     tenants.update(_parse_registry(legacy_registry))
@@ -99,6 +150,29 @@ def load_tenants() -> dict[str, TenantContext]:
     if single_key and single_tenant:
         tenants[single_key] = TenantContext(tenant_id=single_tenant)
     return tenants
+
+
+def validate_auth_configuration() -> None:
+    """Validate that authentication is properly configured at API startup.
+
+    Raises RuntimeError or ValueError if:
+    - Demo mode is attempted in production.
+    - Environment registry is malformed or incomplete (even in demo mode).
+    - Outside of demo mode, no valid credentials exist.
+    """
+    if is_demo_mode() and is_production_environment():
+        raise RuntimeError("PROMPTION_DEMO_MODE cannot be enabled in a production environment.")
+
+    # Always call load_tenants() to validate all environment registries, single-tenant vars,
+    # and demo keys against malformed or incomplete configurations.
+    tenants = load_tenants()
+
+    if not is_demo_mode() and not tenants:
+        raise RuntimeError(
+            "Authentication credentials missing. In non-demo environments, valid API keys "
+            "must be configured via PROMPTION_API_KEYS or PROMPTION_API_KEY. "
+            "To enable local demo keys, set PROMPTION_DEMO_MODE=true (forbidden in production)."
+        )
 
 
 def authenticate(api_key: str | None) -> TenantContext:

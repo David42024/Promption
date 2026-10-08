@@ -148,8 +148,10 @@ def main() -> None:
         opts=RunnerOptions(data=pdf_df, sample_size=args.sample, use_llm=not args.no_llm),
     )
     df, metrics = runner.run()
-    logger.info("ASR sin filtro: %.3f | ASR con filtro: %.3f | Reducción: %.1f%%",
-                metrics["asr_without_filter"], metrics["asr_with_filter"], metrics["asr_reduction"] * 100)
+    asr_no = f"{metrics['asr_without_filter']:.3f}" if metrics.get("asr_without_filter") is not None else "N/A"
+    asr_with = f"{metrics['asr_with_filter']:.3f}" if metrics.get("asr_with_filter") is not None else "N/A"
+    asr_red = f"{metrics['asr_reduction'] * 100:.1f}%" if metrics.get("asr_reduction") is not None else "N/A"
+    logger.info("ASR sin filtro: %s | ASR con filtro: %s | Reducción: %s", asr_no, asr_with, asr_red)
     logger.info("Precisión: %.3f | Recall: %.3f | F1: %.3f",
                 metrics["precision"], metrics["recall"], metrics["f1"])
 

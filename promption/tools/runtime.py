@@ -40,7 +40,7 @@ def capabilities(roles: list[str], authenticated: bool, business_tools: list,
     specs = [
         {"type": "function", "function": {"name": item.name,
             "description": item.description,
-            "parameters": item.input_schema}}
+            "parameters": getattr(item, "inputSchema", getattr(item, "input_schema", {}))}}
         for item in business_tools
     ]
     specs.append({"type": "function", "function": {"name": "ask_user",

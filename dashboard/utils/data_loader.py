@@ -64,11 +64,14 @@ def load_history() -> list[dict]:
     runs = []
     for f in sorted(hist.glob("run_*.csv")):
         df = pd.read_csv(f)
+        mal = df[pd.to_numeric(df.get("label"), errors="coerce").fillna(0).astype(int) == 1] if "label" in df.columns else pd.DataFrame()
+        s0 = pd.to_numeric(mal.get("llm_success_no_filter", pd.Series(dtype=float)), errors="coerce").dropna()
+        s1 = pd.to_numeric(mal.get("llm_success_with_filter", pd.Series(dtype=float)), errors="coerce").dropna()
         runs.append({
             "file": f.name,
             "rows": len(df),
-            "asr_without": pd.to_numeric(df["llm_success_no_filter"], errors="coerce").mean(),
-            "asr_with": pd.to_numeric(df["llm_success_with_filter"], errors="coerce").mean(),
+            "asr_without": float(s0.mean()) if len(s0) else None,
+            "asr_with": float(s1.mean()) if len(s1) else None,
             "timestamp": f.name.removeprefix("run_").removesuffix(".csv").replace("_", " "),
         })
     return runs

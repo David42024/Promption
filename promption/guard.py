@@ -1,6 +1,9 @@
 """Local and asynchronous guard pipelines independent of web frameworks."""
+import logging
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Literal
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -37,24 +40,20 @@ def input_guard_decision(text: str, result: Any, *, message_count: int = 0,
     blocked = _field(result, "blocked")
     classification = _field(result, "classification")
     if not isinstance(blocked, bool) or classification not in (None, "BENIGN", "UNCERTAIN", "MALICIOUS"):
-        print(f"DEBUG input_guard_decision: invalid_filter_response 1")
         return GuardDecision(False, "", "BLOCK", "invalid_filter_response", 503)
     layers = _field(result, "layers", {})
     if not isinstance(layers, dict) or not isinstance(layers.get("conversation", {}), dict):
-        print(f"DEBUG input_guard_decision: invalid_conversation_response")
         return GuardDecision(False, "", "BLOCK", "invalid_conversation_response", 503)
     conversation = layers.get("conversation", {})
     if message_count and (type(conversation.get("message_count")) is not int
                           or conversation.get("message_count") != message_count
                           or not isinstance(conversation.get("blocked"), bool)):
-        print(f"DEBUG input_guard_decision: invalid_conversation_response")
         return GuardDecision(False, "", "BLOCK", "invalid_conversation_response", 503)
     if blocked or classification == "MALICIOUS" or conversation.get("blocked") is True:
         return GuardDecision(False, "", "BLOCK", "malicious_input", 403)
     decision = _field(result, "decision")
     requires_output_guard = _field(result, "requires_output_guard", False)
     if decision not in (None, "ALLOWED", "GUARDED", "BLOCKED") or not isinstance(requires_output_guard, bool):
-        print(f"DEBUG input_guard_decision: invalid_filter_response 2: decision={decision}, req_out={requires_output_guard}")
         return GuardDecision(False, "", "BLOCK", "invalid_filter_response", 503)
     if decision == "BLOCKED":
         return GuardDecision(False, "", "BLOCK", "malicious_input", 403)
@@ -106,8 +105,7 @@ class Promption:
         except (TypeError, ValueError):
             return GuardDecision(False, "", "BLOCK", "invalid_input", 400)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.error("Input guard inspection failed: %s", type(e).__name__)
             return GuardDecision(False, "", "BLOCK", "guard_unavailable", 503)
         decision = input_guard_decision(text, {
             "blocked": _field(result, "blocked"), "decision": _field(result, "decision"),
@@ -139,8 +137,7 @@ class Promption:
         except (TypeError, ValueError):
             return GuardDecision(False, "", "BLOCK", "invalid_input", 400)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.error("Conversation guard inspection failed: %s", type(e).__name__)
             return GuardDecision(False, "", "BLOCK", "guard_unavailable", 503)
         return input_guard_decision("", {"blocked": result.blocked,
             "requires_output_guard": result.requires_output_guard,
@@ -207,7 +204,6 @@ class AsyncGuardPipeline:
                     return GuardDecision(True, text, "SKIPPED", scope=scope.to_dict() if scope else None)
                 result = await self.filter_input(text=text, identity=identity, use_ml=True,
                                                  **({"messages": messages} if messages else {}))
-                print(f"DEBUG FilterResponse: {result}")
                 decision = input_guard_decision(text, result, message_count=len(messages or []),
                                                 output_enabled=output_enabled)
                 if scope:
@@ -215,7 +211,5 @@ class AsyncGuardPipeline:
                 return decision
             result = await self.guard_output(text=text, identity=identity)
             return output_guard_decision(text, result)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+        except Exception:
             return GuardDecision(False, "", "BLOCK", "guard_unavailable", 503)

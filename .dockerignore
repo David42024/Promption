@@ -15,8 +15,11 @@ htmlcov/
 .vscode/
 
 # Datos y modelos que se llevan dentro de la imagen vía git (los que hay que
-# versionar); los pesados/generados que no se deben copiar:
-data/processed/
+data/processed/*
+!data/processed/quarantine.csv
+!data/processed/label_overrides.csv
+!data/processed/split_manifest.json
+!data/processed/translation_links.json
 data/embeddings*.npy
 data/pdf_payloads/
 data/audio_payloads/

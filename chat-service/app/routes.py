@@ -11,7 +11,7 @@ import uuid
 from contextvars import ContextVar
 from functools import wraps
 from typing import List
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status as http_status
 from fastapi.responses import StreamingResponse
 
 from promption import AsyncGuardPipeline, Identity, ScopeDecision, input_guard_decision, output_guard_decision
@@ -157,15 +157,15 @@ def require_trusted_client(
         if settings.debug:
             return
         raise HTTPException(
-            status_code=503,
-            detail="CHAT_SERVICE_TOKEN is not configured",
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="Chat service token is required",
         )
-    if expected and not (
+    if not (
         x_chat_service_token
         and hmac.compare_digest(x_chat_service_token, expected)
     ):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
             detail="Invalid chat service credentials",
         )
 

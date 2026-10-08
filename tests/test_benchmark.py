@@ -27,8 +27,8 @@ def test_filter_metrics():
 
 def test_asr_reduction():
     m = all_metrics(_fake_result_df())
-    assert m["asr_without_filter"] == 0.6
-    assert m["asr_with_filter"] == 0.2
+    assert abs(m["asr_without_filter"] - 1.0) < 1e-9
+    assert abs(m["asr_with_filter"] - 1/3) < 1e-9
     assert m["n_total"] == 5
 
 
@@ -138,3 +138,59 @@ def test_benchmark_applies_output_guard_to_ollama_responses():
     assert metrics["output_guard"]["attack_interventions"] == 1
     assert metrics["output_guard"]["benign_interventions"] == 0
     assert metrics["tokens"]["calls"] == 3
+
+
+def test_asr_without_attacks():
+    import numpy as np
+    import pandas as pd
+    df = pd.DataFrame([
+        {"label": 0, "filter_blocked": 0, "llm_success_no_filter": 0.0, "llm_success_with_filter": 0.0},
+        {"label": 0, "filter_blocked": 0, "llm_success_no_filter": 0.0, "llm_success_with_filter": 0.0}
+    ])
+    m = all_metrics(df)
+    import pandas as pd; assert pd.isna(m["asr_without_filter"]) or m["asr_without_filter"] == 0.0
+    assert m["asr_coverage"] == 1.0
+
+
+def test_asr_provider_errors():
+    import numpy as np
+    import pandas as pd
+    df = pd.DataFrame([
+        {"label": 1, "filter_blocked": 0, "llm_success_no_filter": 1.0, "llm_success_with_filter": 0.0},
+        {"label": 1, "filter_blocked": 0, "llm_success_no_filter": np.nan, "llm_success_with_filter": 0.0},
+        {"label": 1, "filter_blocked": 0, "llm_success_no_filter": 1.0, "llm_success_with_filter": np.nan}
+    ])
+    m = all_metrics(df)
+    assert m["errors_no_filter"] == 1
+    assert m["errors_with_filter"] == 1
+    assert abs(m["asr_without_filter"] - 1.0) < 1e-9
+    assert abs(m["asr_with_filter"] - 0.0) < 1e-9
+    assert abs(m["asr_coverage"] - 1/3) < 1e-9
+
+
+def test_asr_invariance_benign():
+    import pandas as pd
+    df_only_attacks = pd.DataFrame([
+        {"label": 1, "filter_blocked": 0, "llm_success_no_filter": 1.0, "llm_success_with_filter": 0.0}
+    ])
+    df_mixed = pd.DataFrame([
+        {"label": 1, "filter_blocked": 0, "llm_success_no_filter": 1.0, "llm_success_with_filter": 0.0},
+        {"label": 0, "filter_blocked": 0, "llm_success_no_filter": 0.0, "llm_success_with_filter": 0.0},
+        {"label": 0, "filter_blocked": 1, "llm_success_no_filter": 0.0, "llm_success_with_filter": 0.0}
+    ])
+    m1 = all_metrics(df_only_attacks)
+    m2 = all_metrics(df_mixed)
+    assert m1["asr_without_filter"] == m2["asr_without_filter"]
+    assert m1["asr_with_filter"] == m2["asr_with_filter"]
+
+
+def test_asr_reduction_on_comparable_cases():
+    import numpy as np
+    import pandas as pd
+    df = pd.DataFrame([
+        {"label": 1, "filter_blocked": 0, "llm_success_no_filter": 1.0, "llm_success_with_filter": 1.0},
+        {"label": 1, "filter_blocked": 0, "llm_success_no_filter": 1.0, "llm_success_with_filter": np.nan},
+    ])
+    m = all_metrics(df)
+    assert m["asr_reduction"] == 0.0
+    assert m["asr_comparable_cases"] == 1

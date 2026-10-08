@@ -27,7 +27,7 @@ from sklearn.metrics import (
 import joblib
 
 from promption.training.dataset import load_training_data
-from promption.training.split import stratified_split
+from promption.training.split import create_splits, save_manifest
 from promption.training.artifacts import file_sha256, preserve_records
 from promption.utils.config import load_config
 from promption.utils.logger import logger
@@ -153,37 +153,57 @@ def train(data_path: str | None = None, out_path: str | Path | None = None,
             from promption.utils.lang import detect_lang
             df["lang"] = df["prompt"].map(detect_lang)
     logger.info("Loaded %d training samples", len(df))
-    test_indices = stratified_split(df, seed=int(_CONF["model"].get("random_state", 42)))
-    test_set = set(test_indices.tolist())
-    train_indices = np.array([index for index in range(len(df)) if index not in test_set])
-    train_df = df.iloc[train_indices].reset_index(drop=True)
-    test_df = df.iloc[test_indices].reset_index(drop=True)
+    seed = int(_CONF["model"].get("random_state", 42))
+    tr_idx, v_idx, te_idx, ext_idx = create_splits(df, seed=seed)
+
+    out_dir = Path(_CONF["paths"]["processed_data"])
+    manifest = save_manifest(df, tr_idx, v_idx, te_idx, ext_idx, seed=seed, out_dir=out_dir)
+
+    train_df = df.iloc[tr_idx].reset_index(drop=True)
+    val_df = df.iloc[v_idx].reset_index(drop=True)
+    test_df = df.iloc[te_idx].reset_index(drop=True)
     if train_df["label"].nunique() != 2 or test_df["label"].nunique() != 2:
         raise ValueError("Training and evaluation partitions must both contain benign and malicious samples")
+
     vectorizer, classifier, _ = train_lightweight_model(train_df, max_features=max_features)
+
+    # Evaluar en partición de validación
+    val_metrics = evaluate_model(vectorizer, classifier, val_df, val_df["label"].to_numpy(int))
+    val_metrics.update(n_val=len(val_df), backend="tfidf_logistic_regression")
+
+    # Evaluar en partición de test independiente
     metrics = evaluate_model(vectorizer, classifier, test_df, test_df["label"].to_numpy(int))
-    metrics.update(n_train=len(train_df), n_test=len(test_df), n_samples=len(df),
+    metrics.update(n_train=len(train_df), n_val=len(val_df), n_test=len(test_df), n_samples=len(df),
                    n_features=len(vectorizer.get_feature_names_out()),
                    backend="tfidf_logistic_regression", roc_auc=metrics["auc"])
     target = Path(out_path or _CONF["model"]["lightweight_classifier_path"])
     target.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump({'vectorizer': vectorizer, 'classifier': classifier, 'metrics': metrics,
+                 'val_metrics': val_metrics,
                  'model_type': 'tfidf_logistic_regression', 'max_features': max_features,
                  'feature_mode': 'word_and_char_ngrams'}, target)
     import sklearn
     import hashlib
     dataset_hash = hashlib.sha256(df.to_csv(index=False).encode("utf-8")).hexdigest()
-    metadata = {"backend": metrics["backend"], "sha256": file_sha256(target),
-                "trained_at": datetime.now(timezone.utc).isoformat(),
-                "dataset_sha256": dataset_hash, "sklearn_version": sklearn.__version__,
-                "seed": int(_CONF["model"].get("random_state", 42)), "metrics": metrics}
+    metadata = {
+        "backend": metrics["backend"],
+        "sha256": file_sha256(target),
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "dataset_sha256": dataset_hash,
+        "manifest_hash": manifest.get("hash"),
+        "manifest_splits": manifest.get("splits"),
+        "sklearn_version": sklearn.__version__,
+        "seed": int(_CONF["model"].get("random_state", 42)),
+        "metrics": metrics,
+        "val_metrics": val_metrics,
+    }
     target.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     results = Path(_CONF["paths"]["results"])
     results.mkdir(parents=True, exist_ok=True)
     pd.DataFrame([metrics]).to_csv(results / "model_metrics_tfidf.csv", index=False)
     if _CONF["model"].get("use_lightweight_ml", False):
         pd.DataFrame([metrics]).to_csv(results / "model_metrics.csv", index=False)
-    logger.info("TF-IDF model saved: %s (sha256=%s)", target, metadata["sha256"])
+    logger.info("TF-IDF model saved: %s (sha256=%s, manifest_hash=%s)", target, metadata["sha256"], metadata["manifest_hash"][:8] if metadata["manifest_hash"] else "none")
     return metadata
 
 

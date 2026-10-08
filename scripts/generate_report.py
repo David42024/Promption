@@ -25,7 +25,9 @@ HEX_BORDER = "#B9C4E0"
 HEX_LIGHT = "#F2F5FB"
 
 
-def fmt_pct(v: float) -> str:
+def fmt_pct(v: float | None) -> str:
+    if v is None:
+        return "N/A"
     return f"{v * 100:.2f}%"
 
 
@@ -118,9 +120,9 @@ def build_markdown(results_dir: Path, plots_dir: Path) -> str:
         "",
         "| Métrica | Valor |",
         "|---|---|",
-        f"| ASR sin filtro | {fmt_pct(o.get('asr_without_filter', 0))} |",
-        f"| ASR con filtro | {fmt_pct(o.get('asr_with_filter', 0))} |",
-        f"| Reducción de ASR | {fmt_pct(o.get('asr_reduction', 0))} |",
+        f"| ASR sin filtro | {fmt_pct(o.get('asr_without_filter'))} |",
+        f"| ASR con filtro | {fmt_pct(o.get('asr_with_filter'))} |",
+        f"| Reducción de ASR | {fmt_pct(o.get('asr_reduction'))} |",
         f"| Precisión | {fmt_pct(o.get('precision', 0))} |",
         f"| Recall | {fmt_pct(o.get('recall', 0))} |",
         f"| F1-Score | {fmt_pct(o.get('f1', 0))} |",
@@ -135,8 +137,8 @@ def build_markdown(results_dir: Path, plots_dir: Path) -> str:
     ]
     for d in payload.get("by_dataset", []):
         lines.append(
-            f"| {d['dataset']} | {fmt_pct(d.get('asr_without_filter', 0))} | "
-            f"{fmt_pct(d.get('asr_with_filter', 0))} | {fmt_pct(d.get('precision', 0))} | "
+            f"| {d['dataset']} | {fmt_pct(d.get('asr_without_filter'))} | "
+            f"{fmt_pct(d.get('asr_with_filter'))} | {fmt_pct(d.get('precision', 0))} | "
             f"{fmt_pct(d.get('recall', 0))} | {fmt_pct(d.get('f1', 0))} |"
         )
     lines.append("")
@@ -302,9 +304,9 @@ def build_pdf(results_dir: Path, plots_dir: Path, md_path: Path) -> Path | None:
 
     story.append(Paragraph("Métricas globales", s.section))
     metrics = [
-        (Paragraph("ASR sin filtro", s.cell), Paragraph(f"<font color='{HEX_RED}'><b>{fmt_pct(o.get('asr_without_filter', 0))}</b></font>", s.cell_c)),
-        (Paragraph("ASR con filtro", s.cell), Paragraph(f"<font color='{HEX_GREEN}'><b>{fmt_pct(o.get('asr_with_filter', 0))}</b></font>", s.cell_c)),
-        (Paragraph("Reducción de ASR", s.cell), Paragraph(f"<font color='{HEX_GREEN}'><b>{fmt_pct(o.get('asr_reduction', 0))}</b></font>", s.cell_c)),
+        (Paragraph("ASR sin filtro", s.cell), Paragraph(f"<font color='{HEX_RED}'><b>{fmt_pct(o.get('asr_without_filter'))}</b></font>", s.cell_c)),
+        (Paragraph("ASR con filtro", s.cell), Paragraph(f"<font color='{HEX_GREEN}'><b>{fmt_pct(o.get('asr_with_filter'))}</b></font>", s.cell_c)),
+        (Paragraph("Reducción de ASR", s.cell), Paragraph(f"<font color='{HEX_GREEN}'><b>{fmt_pct(o.get('asr_reduction'))}</b></font>", s.cell_c)),
         (Paragraph("Precisión", s.cell), Paragraph(fmt_pct(o.get('precision', 0)), s.cell_c)),
         (Paragraph("Recall", s.cell), Paragraph(fmt_pct(o.get('recall', 0)), s.cell_c)),
         (Paragraph("F1-Score", s.cell), Paragraph(fmt_pct(o.get('f1', 0)), s.cell_c)),
@@ -317,7 +319,7 @@ def build_pdf(results_dir: Path, plots_dir: Path, md_path: Path) -> Path | None:
     story.append(Paragraph("Desglose por dataset", s.section))
     header = ["Dataset", "ASR sin filtro", "ASR con filtro", "Precisión", "Recall", "F1"]
     rows = [
-        [d["dataset"], fmt_pct(d.get("asr_without_filter", 0)), fmt_pct(d.get("asr_with_filter", 0)),
+        [d["dataset"], fmt_pct(d.get("asr_without_filter")), fmt_pct(d.get("asr_with_filter")),
          fmt_pct(d.get("precision", 0)), fmt_pct(d.get("recall", 0)), fmt_pct(d.get("f1", 0))]
         for d in payload.get("by_dataset", [])
     ]

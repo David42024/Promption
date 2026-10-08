@@ -1,3 +1,4 @@
+import json
 """Business tool catalog backed by the official MCP Python SDK."""
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -8,7 +9,10 @@ from anyio import to_process
 
 from .runtime import make_document
 
-from mcp.server import MCPServer
+try:
+    from mcp.server.mcpserver import MCPServer
+except (ImportError, ModuleNotFoundError):
+    from mcp.server.fastmcp import FastMCP as MCPServer
 
 
 class Tier(str, Enum):
@@ -33,6 +37,49 @@ async def mcp_make_document(title: str, content: str,
     return await to_process.run_sync(make_document, title, content, format, cancellable=True)
 
 
+def _extract_tool_result(result: Any) -> Any:
+    """Extrae el resultado estructurado de la llamada a herramienta de MCP (1.x o 2.x)."""
+    if isinstance(result, tuple) and len(result) == 2:
+        return _extract_tool_result(result[1])
+
+    if isinstance(result, dict):
+        return result
+
+    if hasattr(result, "structured_content") and result.structured_content is not None:
+        return result.structured_content
+
+    content_list = getattr(result, "content", None)
+    if content_list is None and isinstance(result, list):
+        content_list = result
+
+    if isinstance(content_list, list) and content_list:
+        first = content_list[0]
+        text_val = getattr(first, "text", None)
+        if text_val is None and isinstance(first, dict):
+            text_val = first.get("text")
+        if text_val is not None:
+            try:
+                return json.loads(text_val)
+            except Exception:
+                return text_val
+        if isinstance(first, dict):
+            return first
+
+    if hasattr(result, "model_dump"):
+        dumped = result.model_dump()
+        if dumped.get("structured_content") is not None:
+            return dumped["structured_content"]
+        if dumped.get("content") and isinstance(dumped["content"], list):
+            f = dumped["content"][0]
+            if isinstance(f, dict) and "text" in f:
+                try:
+                    return json.loads(f["text"])
+                except Exception:
+                    return f["text"]
+
+    return result
+
+
 class MCPToolExecutor:
     """Keep role policy outside the SDK and delegate tool mechanics to MCPServer."""
 
@@ -44,7 +91,7 @@ class MCPToolExecutor:
         self._policies = {tool.name: tool for tool in self.tools}
         
         # We use a single server for all tools to dynamically compute the union of available tools
-        self.server = MCPServer(name, version="1.0.0")
+        self.server = MCPServer(name)
         for policy in self.tools:
             self.server.add_tool(policy.handler, name=policy.name,
                                  description=policy.description,
@@ -80,12 +127,13 @@ class MCPToolExecutor:
             
         try:
             result = await self.server.call_tool(tool_name, args or {})
-            if result.is_error or result.structured_content is None:
+            if result is None:
                 raise ValueError("La herramienta no devolvió un resultado válido")
-        except Exception:
+            structured_content = _extract_tool_result(result)
+        except Exception as e:
             audit["reason"] = "error de ejecución"
-            return {"result": {"error": "La herramienta no pudo ejecutarse"},
-                    "audit": audit}
+            return {"result": {"error": "La herramienta no pudo ejecutarse"}, "audit": audit}
+            
         audit["allowed"] = True
-        return {"result": result.structured_content, "audit": audit}
+        return {"result": structured_content, "audit": audit}
 
