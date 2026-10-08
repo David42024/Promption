@@ -148,12 +148,21 @@ def main() -> None:
         opts=RunnerOptions(data=pdf_df, sample_size=args.sample, use_llm=not args.no_llm),
     )
     df, metrics = runner.run()
-    asr_no = f"{metrics['asr_without_filter']:.3f}" if metrics.get("asr_without_filter") is not None else "N/A"
-    asr_with = f"{metrics['asr_with_filter']:.3f}" if metrics.get("asr_with_filter") is not None else "N/A"
-    asr_red = f"{metrics['asr_reduction'] * 100:.1f}%" if metrics.get("asr_reduction") is not None else "N/A"
+    import math
+    mode_label = "REAL (Ollama/LLM)" if (not args.no_llm) else "PROXY (Heurístico)"
+    logger.info("Modo de benchmark: %s", mode_label)
+
+    def fmt_val(v, pct=False):
+        if v is None or (isinstance(v, float) and math.isnan(v)):
+            return "N/A"
+        return f"{v * 100:.1f}%" if pct else f"{v:.3f}"
+
+    asr_no = fmt_val(metrics.get("asr_without_filter"))
+    asr_with = fmt_val(metrics.get("asr_with_filter"))
+    asr_red = fmt_val(metrics.get("asr_reduction"), pct=True)
     logger.info("ASR sin filtro: %s | ASR con filtro: %s | Reducción: %s", asr_no, asr_with, asr_red)
-    logger.info("Precisión: %.3f | Recall: %.3f | F1: %.3f",
-                metrics["precision"], metrics["recall"], metrics["f1"])
+    logger.info("Precisión: %s | Recall: %s | F1: %s",
+                fmt_val(metrics.get("precision")), fmt_val(metrics.get("recall")), fmt_val(metrics.get("f1")))
 
 
 if __name__ == "__main__":

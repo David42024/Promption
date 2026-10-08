@@ -106,9 +106,15 @@ export async function POST(req) {
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      const headers = {};
+      const retryAfter = response.headers.get("retry-after");
+      if (retryAfter) headers["Retry-After"] = retryAfter;
       return Response.json(
-        { error: errorData.error || "Error del backend de chat" },
-        { status: response.status }
+        {
+          error: errorData.detail?.error || errorData.error || "Error del backend de chat",
+          code: errorData.detail?.code || errorData.code || "MODEL_UNAVAILABLE",
+        },
+        { status: response.status, headers }
       );
     }
     if (streaming) {
@@ -122,9 +128,12 @@ export async function POST(req) {
     }
     return Response.json(await response.json());
   } catch (error) {
+    if (error?.name === "AbortError") {
+      return Response.json({ error: "Petición cancelada", code: "CANCELLED" }, { status: 499 });
+    }
     console.error("Error al comunicar con Chat Service:", error);
     return Response.json(
-      { error: "Error de comunicación con el servicio de chat", friendly: true },
+      { error: "Error de comunicación con el servicio de chat", code: "MODEL_UNAVAILABLE", friendly: true },
       { status: 502 }
     );
   }

@@ -209,4 +209,24 @@ class HealthResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """Error response"""
     error: str
+    code: Optional[str] = None
     friendly: bool = False
+
+
+class ChatCancelRequest(BaseModel):
+    """Request to cancel an active chat execution"""
+    conversation_id: str = Field(...)
+    user: User
+
+    @field_validator("conversation_id")
+    @classmethod
+    def validate_conv_id(cls, v: str) -> str:
+        return _validate_user_id(v)
+
+
+class ChatCancelResponse(BaseModel):
+    """Response from cancel request"""
+    ok: bool
+    status: Literal["cancelled", "completed", "not_found"]
+    conversation_id: str
+

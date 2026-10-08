@@ -25,7 +25,12 @@ export async function sendChat(text, onStatus, signal) {
         const event = JSON.parse(line.slice(6));
         if (event.type === "status") onStatus(event.stage);
         if (event.type === "result") result = event.data;
-        if (event.type === "error") throw new Error(event.message || "Error del chat");
+        if (event.type === "error") {
+          const err = new Error(event.message || "Error del chat");
+          err.code = event.code;
+          err.status = event.status;
+          throw err;
+        }
       }
       if (result) break;
       if (done) throw new Error("La respuesta terminó antes de completarse.");

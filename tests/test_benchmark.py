@@ -194,3 +194,73 @@ def test_asr_reduction_on_comparable_cases():
     m = all_metrics(df)
     assert m["asr_reduction"] == 0.0
     assert m["asr_comparable_cases"] == 1
+
+
+def test_benchmark_intermittent_timeout_continues_processing():
+    import numpy as np
+    import pandas as pd
+
+    class FlakyLLM:
+        def __init__(self):
+            self.calls = 0
+
+        def health(self):
+            return {"connected": True}
+
+        def generate(self, prompt, system=None):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("Gateway Timeout 504")
+            return SimpleNamespace(
+                text="Normal response",
+                latency_ms=10.0,
+                input_tokens=5,
+                output_tokens=5,
+                total_tokens=10,
+            )
+
+    df = pd.DataFrame({
+        "prompt": ["attack 1", "attack 2"],
+        "label": [1, 1],
+        "dataset": ["Custom", "Custom"],
+        "attack_type": ["prompt_leak", "prompt_leak"],
+        "source": ["test", "test"],
+    })
+    flaky = FlakyLLM()
+    runner = BenchmarkRunner(
+        ollama=flaky,
+        opts=RunnerOptions(data=df, use_llm=True, use_ml=False, save=False),
+    )
+    out, metrics = runner.run()
+    # 2 rows processed; first failed (NaN), second succeeded
+    assert len(out) == 2
+    assert pd.isna(out.iloc[0]["llm_success_no_filter"])
+    assert not pd.isna(out.iloc[1]["llm_success_no_filter"])
+    assert flaky.calls == 4  # row 1 (no_filter failed + with_filter), row 2 (no_filter + with_filter)
+
+
+def test_benchmark_all_failed_produces_asr_unavailable():
+    import numpy as np
+    import pandas as pd
+
+    class BrokenLLM:
+        def health(self):
+            return {"connected": True}
+
+        def generate(self, prompt, system=None):
+            raise RuntimeError("503 Service Unavailable")
+
+    df = pd.DataFrame({
+        "prompt": ["attack 1"],
+        "label": [1],
+        "dataset": ["Custom"],
+        "attack_type": ["prompt_leak"],
+        "source": ["test"],
+    })
+    runner = BenchmarkRunner(
+        ollama=BrokenLLM(),
+        opts=RunnerOptions(data=df, use_llm=True, use_ml=False, save=False),
+    )
+    out, metrics = runner.run()
+    assert pd.isna(out.iloc[0]["llm_success_no_filter"])
+    assert pd.isna(metrics["asr_without_filter"]) or metrics["asr_comparable_cases"] == 0

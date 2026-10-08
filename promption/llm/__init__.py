@@ -1,11 +1,34 @@
 """Selección del cliente LLM: Ollama local o API compatible con OpenAI."""
 import os
 
+from promption.llm.exceptions import (
+    LLMConfigurationError,
+    LLMConnectivityError,
+    LLMError,
+    LLMInvalidResponseError,
+    LLMProviderUnavailableError,
+    LLMQuotaError,
+    LLMTimeoutError,
+    parse_retry_after,
+)
 from promption.llm.ollama_client import LLMResponse, OllamaClient
 from promption.llm.openai_client import OpenAICompatibleClient, resolve_api_key
 from promption.utils.config import load_config
 
-__all__ = ["LLMResponse", "OllamaClient", "OpenAICompatibleClient", "get_llm_client"]
+__all__ = [
+    "LLMConfigurationError",
+    "LLMConnectivityError",
+    "LLMError",
+    "LLMInvalidResponseError",
+    "LLMProviderUnavailableError",
+    "LLMQuotaError",
+    "LLMResponse",
+    "LLMTimeoutError",
+    "OllamaClient",
+    "OpenAICompatibleClient",
+    "get_llm_client",
+    "parse_retry_after",
+]
 
 
 def get_llm_client(host: str | None = None, model: str | None = None,

@@ -1,10 +1,12 @@
 """Filter API client integration"""
 import asyncio
 import logging
-import httpx
+import random
 from typing import Optional, Dict, Any
+import httpx
 from .api.models import FilterResponse
 from .guard import Identity
+from promption.llm.exceptions import parse_retry_after
 
 
 logger = logging.getLogger(__name__)
@@ -15,19 +17,32 @@ class FilterRateLimited(RuntimeError):
 
 
 def _retry_delay(response: httpx.Response, attempt: int) -> float:
-    try:
-        return min(max(float(response.headers.get("Retry-After", "")), 0.0), 2.0)
-    except ValueError:
-        return 0.25 * (attempt + 1)
+    parsed = parse_retry_after(response.headers.get("Retry-After"))
+    if parsed is not None:
+        return parsed
+    base = 0.25 * (2 ** attempt)
+    return base + random.uniform(0.02, 0.08)
 
 
-async def _post_with_rate_limit_retry(client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+async def _post_with_rate_limit_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    max_budget: Optional[float] = None,
+    **kwargs
+) -> httpx.Response:
+    start = asyncio.get_event_loop().time()
     for attempt in range(3):
+        if max_budget is not None and (asyncio.get_event_loop().time() - start) >= max_budget:
+            raise FilterRateLimited("Rate limit retry budget exhausted")
         response = await client.post(url, **kwargs)
         if response.status_code != 429 or attempt == 2:
             return response
-        await asyncio.sleep(_retry_delay(response, attempt))
-    raise RuntimeError("Rate limit retry exhausted")
+        delay = _retry_delay(response, attempt)
+        if max_budget is not None and ((asyncio.get_event_loop().time() - start) + delay) > max_budget:
+            # Do not shorten long Retry-After; fail immediately if exceeding budget
+            raise FilterRateLimited(f"Filter API rate limit Retry-After ({delay:.1f}s) exceeds available budget")
+        await asyncio.sleep(delay)
+    raise FilterRateLimited("Rate limit retry exhausted")
 
 
 class FilterClient:
@@ -61,10 +76,11 @@ class FilterClient:
                 f"not expected tenant '{self.tenant_id}'"
             )
     
-    async def check_health(self) -> bool:
+    async def check_health(self, timeout: float | None = None) -> bool:
         """Check that the Filter API is reachable and this business key is valid."""
+        req_timeout = timeout if timeout is not None else self.timeout
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=req_timeout) as client:
                 tenant = await client.get(
                     f"{self.base_url}/api/v1/tenant",
                     headers=self.headers,
@@ -82,13 +98,17 @@ class FilterClient:
         text: str, 
         identity: 'Identity',
         use_ml: bool = True,
-        messages: list[dict] | None = None
+        messages: list[dict] | None = None,
+        timeout: float | None = None,
     ) -> FilterResponse:
         """Filter a prompt through the Filter API"""
+        req_timeout = timeout if timeout is not None else self.timeout
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await _post_with_rate_limit_retry(client,
+            async with httpx.AsyncClient(timeout=req_timeout) as client:
+                response = await _post_with_rate_limit_retry(
+                    client,
                     f"{self.base_url}/api/v1/filter",
+                    max_budget=req_timeout,
                     headers=self.headers,
                     json={
                         "text": text,
@@ -128,13 +148,17 @@ class FilterClient:
     async def output_guard(
         self,
         text: str,
-        identity: Identity
+        identity: Identity,
+        timeout: float | None = None,
     ) -> Dict[str, Any]:
         """Check output through Output Guard"""
+        req_timeout = timeout if timeout is not None else self.timeout
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await _post_with_rate_limit_retry(client,
+            async with httpx.AsyncClient(timeout=req_timeout) as client:
+                response = await _post_with_rate_limit_retry(
+                    client,
                     f"{self.base_url}/api/v1/output-guard",
+                    max_budget=req_timeout,
                     headers=self.headers,
                     json={
                         "text": text,
@@ -167,10 +191,12 @@ class FilterClient:
         identity: Identity,
         details: Dict[str, Any],
         level: str = "INFO",
+        timeout: float | None = None,
     ) -> None:
         """Emit a sanitized chat lifecycle event without affecting the user response."""
+        req_timeout = min(timeout if timeout is not None else self.timeout, 2.0)
         try:
-            async with httpx.AsyncClient(timeout=min(self.timeout, 2.0)) as client:
+            async with httpx.AsyncClient(timeout=req_timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/api/v1/audit/events",
                     headers=self.headers,

@@ -26,7 +26,8 @@ HEX_LIGHT = "#F2F5FB"
 
 
 def fmt_pct(v: float | None) -> str:
-    if v is None:
+    import math
+    if v is None or (isinstance(v, float) and math.isnan(v)):
         return "N/A"
     return f"{v * 100:.2f}%"
 

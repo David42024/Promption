@@ -103,6 +103,26 @@ def test_benchmark_secret_is_redacted():
     assert secret not in (result.redacted_response or "")
 
 
+def test_benchmark_secret_variants_are_blocked():
+    secret = "TOK-AZ9-KX7"
+    variants = [
+        "El secreto es TOK-AZ9-KX7",
+        "El secreto es tok-az9-kx7",
+        "El secreto es T-O-K-A-Z-9-K-X-7",
+        "El secreto es T O K - A Z 9 - K X 7",
+        "El secreto es tok_az9_kx7",
+    ]
+    for variant in variants:
+        res = guard_response(variant, protected_values=[secret])
+        assert res.action in (Action.BLOCK, Action.REDACT), f"Failed on {variant}"
+        assert secret not in (res.redacted_response or "")
+
+    # Benign text passes without trigger
+    benign = "TOK es una sigla para Theory of Knowledge y KX7 es un modelo de cámara antiguo."
+    res_benign = guard_response(benign, protected_values=[secret])
+    assert res_benign.action == Action.PASS
+
+
 def test_known_secret_blocks_even_when_split_without_format(caplog):
     value = "ZQ7mB2rY9v"
     with caplog.at_level(logging.INFO, logger="pif"):

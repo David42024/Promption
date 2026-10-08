@@ -27,3 +27,8 @@ promption = ["resources/*.yaml", "py.typed"]
 
 [tool.vercel]
 entrypoint = "promption.api.main:app"
+
+[tool.pytest.ini_options]
+markers = [
+    "live_llm: Opt-in live LLM provider tests (skipped by default unless PROMPTION_RUN_LIVE_TESTS=1)",
+]
