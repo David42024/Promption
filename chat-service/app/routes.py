@@ -17,10 +17,21 @@ from fastapi.responses import StreamingResponse
 from promption import AsyncGuardPipeline, Identity, ScopeDecision, input_guard_decision, output_guard_decision
 from promption.conversation_guard import ConversationGuard, ConversationLimitError
 from promption.client import FilterRateLimited
+from promption.llm.exceptions import (
+    LLMConfigurationError,
+    LLMConnectivityError,
+    LLMError,
+    LLMInvalidResponseError,
+    LLMProviderUnavailableError,
+    LLMQuotaError,
+    LLMTimeoutError,
+)
 
 from .config import settings
+from .deadline import RequestDeadline
 from .models import (
-    AIGuardRequest, ChatRequest, ChatResponse, ConversationHistoryRequest, HealthResponse, MCPToolCall, PolicyInfo,
+    AIGuardRequest, ChatCancelRequest, ChatCancelResponse, ChatRequest, ChatResponse,
+    ConversationHistoryRequest, HealthResponse, MCPToolCall, PolicyInfo,
     SecurityStateUpdate, ScopeCheckRequest, UserRole
 )
 from .filter_client import get_filter_client
@@ -61,7 +72,7 @@ class ScopeBlocked(Exception):
         super().__init__("tool_out_of_scope")
 
 
-async def _review_conversation(messages, request, client, enabled):
+async def _review_conversation(messages, request, client, enabled, timeout: float | None = None):
     roles = _user_roles(request.user)
     if enabled:
         try:
@@ -69,8 +80,13 @@ async def _review_conversation(messages, request, client, enabled):
             if local.blocked:
                 raise ConversationBlocked("conversation_injection")
             text = next((message["content"] for message in reversed(messages) if message["role"] == "user"), " ")
-            result = await client.filter_prompt(text=text, identity=Identity(request.user.id, tuple(roles), request.user.authenticated),
-                                                use_ml=True, messages=messages)
+            result = await client.filter_prompt(
+                text=text,
+                identity=Identity(request.user.id, tuple(roles), request.user.authenticated),
+                use_ml=True,
+                messages=messages,
+                timeout=timeout,
+            )
             decision = input_guard_decision(text, result, message_count=len(messages),
                                            output_enabled=get_security_state()["output_guard_enabled"])
             if not decision.allowed:
@@ -88,7 +104,8 @@ async def _review_conversation(messages, request, client, enabled):
 _start_time = time.time()
 _progress = ContextVar("chat_progress", default=None)
 _scope_decision = ContextVar("chat_scope_decision", default=None)
-_active_runs = {}
+_active_runs: dict[str, dict] = {}
+_run_history: dict[str, dict] = {}
 _FILE_REQUEST = re.compile(
     r"(?i)\b(?:genera(?:me)?|generar|crea(?:me)?|crear|prepara(?:me)?|preparar|adjunta(?:me)?|adjuntar|"
     r"env[ií]a|enviar|exporta|exportar|descarga|descargar|dame|hazme|p[aá]same)\b"
@@ -206,20 +223,26 @@ def _allowed_confidential_reply(
 def audit_chat_endpoint(handler):
     """Record one sanitized transaction event for every chat response."""
     @wraps(handler)
-    async def wrapped(request: ChatRequest):
+    async def wrapped(request: ChatRequest, *args, **kwargs):
         key = store._key((request.context or {}).get("conversation_id"), request.user)
         current = asyncio.current_task()
-        owner = _active_runs.get(key) if key is not None else None
-        if owner is not None and owner is not current:
+        owner_entry = _active_runs.get(key) if key is not None else None
+        owner_task = owner_entry if isinstance(owner_entry, asyncio.Task) else (owner_entry.get("task") if isinstance(owner_entry, dict) else None)
+        if owner_task is not None and owner_task is not current:
             raise HTTPException(status_code=409, detail="Ya se está procesando un mensaje en esta conversación")
-        registered = key is not None and owner is None
+        registered = key is not None and owner_entry is None
         if registered:
-            _active_runs[key] = current
+            _active_runs[key] = {
+                "task": current,
+                "user_id": request.user.id,
+                "status": "running",
+                "cancelled": False,
+            }
         try:
             scope_token = _scope_decision.set(None)
             started = time.perf_counter()
             request_id = str(uuid.uuid4())
-            response = await handler(request)
+            response = await handler(request, *args, **kwargs)
             scope = _scope_decision.get()
             if scope is not None:
                 response.scope = scope.to_dict()
@@ -262,8 +285,11 @@ def audit_chat_endpoint(handler):
             return response
         finally:
             _scope_decision.reset(scope_token)
-            if registered and _active_runs.get(key) is current:
-                _active_runs.pop(key, None)
+            if registered and key is not None:
+                entry = _active_runs.get(key)
+                task_in_entry = entry if isinstance(entry, asyncio.Task) else (entry.get("task") if isinstance(entry, dict) else None)
+                if task_in_entry is current:
+                    _active_runs.pop(key, None)
 
     return wrapped
 
@@ -381,16 +407,62 @@ async def check_scope(request: ScopeCheckRequest):
     return decision.to_dict()
 
 
+def _get_deadline() -> RequestDeadline | None:
+    return None
+
+
 @router.post("/chat", tags=["chat"], dependencies=[Depends(require_trusted_client)])
 @audit_chat_endpoint
-async def chat(request: ChatRequest) -> ChatResponse:
-    """Main chat endpoint with filtering and LLM integration"""
+async def chat(request: ChatRequest, deadline: RequestDeadline | None = Depends(_get_deadline)) -> ChatResponse:
+    """Main chat endpoint with filtering and LLM integration within a monotonic deadline budget"""
     
+    budget = deadline if isinstance(deadline, RequestDeadline) else RequestDeadline(settings.llm_total_timeout_seconds)
+    budget.check_expired("chat_entry")
     _report_progress("Revisando solicitud…")
     # Convert user roles to strings
     user_roles = _user_roles(request.user)
     primary_role = _primary_role(user_roles)
     conversation_id = (request.context or {}).get("conversation_id")
+    key = store._key(conversation_id, request.user)
+    current_task = asyncio.current_task()
+    if key is not None:
+        entry = _active_runs.get(key)
+        if entry is None or isinstance(entry, asyncio.Task):
+            _active_runs[key] = {
+                "task": current_task,
+                "user_id": request.user.id,
+                "status": "running",
+                "cancelled": False,
+            }
+    try:
+        async with asyncio.timeout(max(0.001, budget.remaining)):
+            return await _chat_internal(request, user_roles, primary_role, conversation_id, budget)
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail={"error": f"Chat request exceeded total deadline budget ({budget.total_seconds:.1f}s)", "code": "GATEWAY_TIMEOUT"},
+        ) from exc
+    finally:
+        if key is not None:
+            entry = _active_runs.get(key)
+            task_in_entry = entry if isinstance(entry, asyncio.Task) else (entry.get("task") if isinstance(entry, dict) else None)
+            if task_in_entry is current_task:
+                run_entry = _active_runs.pop(key, None)
+                was_cancelled = run_entry.get("cancelled", False) if isinstance(run_entry, dict) else False
+                _run_history[key] = {
+                    "user_id": request.user.id,
+                    "status": "cancelled" if was_cancelled else "completed",
+                    "finished_at": time.monotonic(),
+                }
+
+
+async def _chat_internal(
+    request: ChatRequest,
+    user_roles: list[str],
+    primary_role: str,
+    conversation_id: str | None,
+    budget: RequestDeadline,
+) -> ChatResponse:
     try:
         security_messages = store.security_snapshot(conversation_id, request.user)
     except ConversationLimitError:
@@ -398,6 +470,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                             reason="conversation_limit", block_type="conversation")
     security_messages.append({"role": "user", "content": request.text})
     set_guard_identity(request.user.id, user_roles, request.text, request.user.authenticated, security_messages)
+
     
     # Initialize clients
     filter_client = get_filter_client()
@@ -421,11 +494,20 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     reason="conversation_injection", block_type="conversation", role=primary_role,
                     security_classification="MALICIOUS",
                     filter_layers={"conversation": contextual.metadata()})
-            filter_result = await filter_client.filter_prompt(
-                text=request.text,
-                identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-                use_ml=True, messages=security_messages
-            )
+            step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "filter_prompt")
+            try:
+                filter_result = await filter_client.filter_prompt(
+                    text=request.text,
+                    identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+                    use_ml=True, messages=security_messages,
+                    timeout=step_timeout
+                )
+            except TypeError:
+                filter_result = await filter_client.filter_prompt(
+                    text=request.text,
+                    identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+                    use_ml=True, messages=security_messages
+                )
             security_classification = filter_result.classification
             input_check = input_guard_decision(request.text, filter_result,
                 message_count=len(security_messages), output_enabled=security_state["output_guard_enabled"])
@@ -508,9 +590,17 @@ async def chat(request: ChatRequest) -> ChatResponse:
     system_prompt = build_system_prompt({"name": request.user.name, "id": request.user.id,
                                          "roles": user_roles, "authenticated": request.user.authenticated})
     _report_progress("Revisando alcance de la solicitud…")
-    scope = await get_scope_guard().check(request.text, system_prompt=system_prompt,
-        identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-        messages=security_messages)
+    scope_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "scope_guard")
+    try:
+        scope = await get_scope_guard(timeout_seconds=scope_timeout).check(
+            request.text, system_prompt=system_prompt,
+            identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+            messages=security_messages)
+    except TypeError:
+        scope = await get_scope_guard().check(
+            request.text, system_prompt=system_prompt,
+            identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+            messages=security_messages)
     _scope_decision.set(scope)
     if not scope.allowed:
         reply = ("Esta solicitud está fuera del alcance de este asistente. Puedo ayudarte con "
@@ -642,8 +732,14 @@ async def chat(request: ChatRequest) -> ChatResponse:
             scope = policy_engine.evaluate_output(content, user_roles)
             if not scope.allowed:
                 raise ValueError("El catálogo de permisos no superó la validación de alcance")
-            checked = await filter_client.output_guard(
-                text=content, identity=Identity(user_id=request.user.id, roles=user_roles))
+            out_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "output_guard")
+            try:
+                checked = await filter_client.output_guard(
+                    text=content, identity=Identity(user_id=request.user.id, roles=user_roles),
+                    timeout=out_timeout)
+            except TypeError:
+                checked = await filter_client.output_guard(
+                    text=content, identity=Identity(user_id=request.user.id, roles=user_roles))
             checked_content = output_guard_decision(content, checked)
             if not checked_content.allowed:
                 raise ValueError("El catálogo de permisos fue bloqueado por Output Guard")
@@ -664,15 +760,25 @@ async def chat(request: ChatRequest) -> ChatResponse:
             reply = f"Estoy bien, {request.user.name}. Te adjunté tus capacidades disponibles en Excel."
         elif not tool_specs:
             _report_progress("Generando respuesta…")
-            await _review_conversation(security_messages, request, filter_client, filter_enabled)
-            llm_response = await llm_client.generate(messages)
+            step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "review_conversation")
+            await _review_conversation(security_messages, request, filter_client, filter_enabled, timeout=step_timeout)
+            try:
+                llm_response = await llm_client.generate(messages, deadline=budget)
+            except TypeError:
+                llm_response = await llm_client.generate(messages)
             reply = llm_response.text
             model_name = llm_response.model
         else:
+            executed_tool_cache: dict[str, Any] = {}
+            executed_actions_cache: dict[str, Any] = {}
             for _ in range(5):
                 _report_progress("Generando respuesta…")
-                await _review_conversation(security_messages, request, filter_client, filter_enabled)
-                turn = await llm_client.generate_tool_turn(messages, tool_specs, model_id=model_id)
+                step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "review_conversation")
+                await _review_conversation(security_messages, request, filter_client, filter_enabled, timeout=step_timeout)
+                try:
+                    turn = await llm_client.generate_tool_turn(messages, tool_specs, model_id=model_id, deadline=budget)
+                except TypeError:
+                    turn = await llm_client.generate_tool_turn(messages, tool_specs, model_id=model_id)
                 model_id = turn["model_id"]
                 model_name = turn["model"]
                 attached = any(action["type"] in {"attachment", "existing_document"}
@@ -684,13 +790,22 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     forced_document = True
                     _report_progress("Generando archivo…")
                     try:
-                        turn = await llm_client.generate_tool_turn(
-                            messages + [{"role": "system", "content": (
-                                "El usuario pidió un archivo descargable en este chat. "
-                                "Llama ahora a make_document con contenido autorizado; "
-                                "no afirmes que existe un archivo sin ejecutar la herramienta.")}],
-                            [document_spec], model_id=("openai-tools" if model_id == "openai-primary" else model_id),
-                            force_tool="make_document")
+                        try:
+                            turn = await llm_client.generate_tool_turn(
+                                messages + [{"role": "system", "content": (
+                                    "El usuario pidió un archivo descargable en este chat. "
+                                    "Llama ahora a make_document con contenido autorizado; "
+                                    "no afirmes que existe un archivo sin ejecutar la herramienta.")}],
+                                [document_spec], model_id=("openai-tools" if model_id == "openai-primary" else model_id),
+                                force_tool="make_document", deadline=budget)
+                        except TypeError:
+                            turn = await llm_client.generate_tool_turn(
+                                messages + [{"role": "system", "content": (
+                                    "El usuario pidió un archivo descargable en este chat. "
+                                    "Llama ahora a make_document con contenido autorizado; "
+                                    "no afirmes que existe un archivo sin ejecutar la herramienta.")}],
+                                [document_spec], model_id=("openai-tools" if model_id == "openai-primary" else model_id),
+                                force_tool="make_document")
                     except AIGuardBlocked:
                         raise
                     except Exception:
@@ -734,7 +849,12 @@ async def chat(request: ChatRequest) -> ChatResponse:
                         if not operation_scope.allowed:
                             _scope_decision.set(operation_scope)
                             raise ScopeBlocked(operation_scope)
-                        if name in {"web_search", "web_open"}:
+                        call_id = call.get("id") or f"{name}:{hash(str(args))}"
+                        if call_id in executed_tool_cache:
+                            result = executed_tool_cache[call_id]
+                            if call_id in executed_actions_cache:
+                                actions.append(executed_actions_cache[call_id])
+                        elif name in {"web_search", "web_open"}:
                             _report_progress("Consultando internet…")
                             outbound = str(args.get("query" if name == "web_search" else "url", ""))
                             if not WEB_ROLES.intersection(user_roles) or policy_decision.tier not in {"publico", "unclassified"}:
@@ -751,12 +871,19 @@ async def chat(request: ChatRequest) -> ChatResponse:
                                 allowed_urls.update(item["url"] for item in result["results"])
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"] == "web_open"]
                             if name == "web_open":
-                                inspection = await filter_client.filter_prompt(
-                                    text=result["content"], identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
-                                    use_ml=True)
+                                step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "web_open_filter")
+                                try:
+                                    inspection = await filter_client.filter_prompt(
+                                        text=result["content"], identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+                                        use_ml=True, timeout=step_timeout)
+                                except TypeError:
+                                    inspection = await filter_client.filter_prompt(
+                                        text=result["content"], identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
+                                        use_ml=True)
                                 if inspection.blocked or inspection.classification == "MALICIOUS":
                                     raise ValueError("Contenido web bloqueado por el filtro")
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"] == "make_document"]
+                            executed_tool_cache[call_id] = result
                         elif name == "ask_user":
                             _report_progress("Preparando pregunta…")
                             question = str(args.get("question", ""))[:300].strip()
@@ -768,6 +895,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                                 raise ValueError("No se pueden solicitar credenciales por chat")
                             actions.append({"type": "dialog", "question": question, "field_label": label})
                             result = {"status": "waiting_for_user"}
+                            executed_tool_cache[call_id] = result
                         elif name == "attach_existing_document":
                             _report_progress("Adjuntando documento…")
                             document_id = args.get("document_id")
@@ -783,14 +911,21 @@ async def chat(request: ChatRequest) -> ChatResponse:
                                             "title": str(match.get("title", document_id))[:120],
                                             "confirm": match.get("tier") == "confidencial"})
                             result = {"status": "attached", "document_id": document_id}
+                            executed_tool_cache[call_id] = result
                         elif name == "make_document":
                             _report_progress("Generando archivo…")
                             _report_progress("Ejecutando herramienta MCP: make_document…")
                             content = str(args.get("content", ""))
                             if not policy_engine.evaluate_output(content, user_roles).allowed:
                                 raise ValueError("Documento fuera del nivel autorizado")
-                            checked = await filter_client.output_guard(
-                                text=content, identity=Identity(user_id=request.user.id, roles=user_roles))
+                            step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "make_document_guard")
+                            try:
+                                checked = await filter_client.output_guard(
+                                    text=content, identity=Identity(user_id=request.user.id, roles=user_roles),
+                                    timeout=step_timeout)
+                            except TypeError:
+                                checked = await filter_client.output_guard(
+                                    text=content, identity=Identity(user_id=request.user.id, roles=user_roles))
                             checked_content = output_guard_decision(content, checked)
                             if not checked_content.allowed:
                                 raise ValueError("Documento bloqueado por Output Guard")
@@ -798,13 +933,15 @@ async def chat(request: ChatRequest) -> ChatResponse:
                             executed = await mcp_executor.execute(
                                 name, {"title": args.get("title"), "content": content,
                                        "format": args.get("format")}, user_roles,
-                                authenticated=request.user.authenticated)
+                                 authenticated=request.user.authenticated)
                             if not executed["audit"]["allowed"]:
                                 raise ValueError("La herramienta MCP no pudo crear el archivo")
                             document = executed["result"]
                             document["confirm"] = highest_tier == "confidencial"
                             actions.append(document)
                             result = {"status": "attached", "name": document["name"]}
+                            executed_tool_cache[call_id] = result
+                            executed_actions_cache[call_id] = document
                         else:
                             _report_progress(f"Ejecutando herramienta MCP: {name}…")
                             executed = await mcp_executor.execute(name, args, user_roles,
@@ -817,6 +954,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                                 highest_tier = tool_tier
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"]
                                               not in {"web_search", "web_open"}]
+                            executed_tool_cache[call_id] = result
                         audited_tier = (tool_tier if name not in {"web_search", "web_open", "ask_user",
                                                                  "make_document", "attach_existing_document"}
                                         else highest_tier if name in {"make_document", "attach_existing_document"}
@@ -881,19 +1019,46 @@ async def chat(request: ChatRequest) -> ChatResponse:
             reason=getattr(exc, "reason", "conversation_limit"), block_type="conversation",
             role=primary_role, audit=audit, policy=policy_info,
             security_classification="MALICIOUS" if getattr(exc, "reason", "") == "conversation_injection" else "UNCERTAIN")
-    except Exception:
-        logger.exception("All LLM providers failed")
-        return ChatResponse(
-            blocked=False,
-            reply="No pude procesar tu solicitud en este momento. Inténtalo nuevamente en unos segundos.",
-            filter_enabled=filter_enabled,
-            filter_skipped=filter_skipped,
-            role=primary_role,
-            audit=audit,
-            policy=policy_info,
-            reason="llm_unavailable",
-            security_classification=security_classification,
-        )
+    except (AIGuardBlocked, ScopeBlocked, ConversationBlocked, ConversationLimitError):
+        raise
+    except asyncio.CancelledError:
+        logger.info("Chat generation cancelled by client")
+        raise
+    except LLMTimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail={"error": exc.message, "code": "GATEWAY_TIMEOUT"},
+        ) from exc
+    except LLMQuotaError as exc:
+        headers = {}
+        if exc.retry_after is not None:
+            headers["Retry-After"] = str(int(exc.retry_after))
+        raise HTTPException(
+            status_code=429,
+            detail={"error": exc.message, "code": "QUOTA_EXCEEDED"},
+            headers=headers or None,
+        ) from exc
+    except (LLMProviderUnavailableError, LLMConnectivityError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": exc.message, "code": "MODEL_UNAVAILABLE"},
+        ) from exc
+    except LLMInvalidResponseError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": exc.message, "code": "INVALID_MODEL_RESPONSE"},
+        ) from exc
+    except LLMConfigurationError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": exc.message, "code": "CONFIGURATION_ERROR"},
+        ) from exc
+    except Exception as exc:
+        logger.warning("LLM generation failed: %s", exc.__class__.__name__)
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "Error del proveedor LLM", "code": "MODEL_UNAVAILABLE"},
+        ) from exc
 
     if not any(action["type"] in {"attachment", "existing_document"} for action in actions):
         if file_requested or _FILE_CLAIM.search(reply):
@@ -907,10 +1072,18 @@ async def chat(request: ChatRequest) -> ChatResponse:
     
     if output_guard_enabled:
         try:
-            guard_result = await filter_client.output_guard(
-                text=reply,
-                identity=Identity(user_id=request.user.id, roles=user_roles)
-            )
+            out_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "output_guard")
+            try:
+                guard_result = await filter_client.output_guard(
+                    text=reply,
+                    identity=Identity(user_id=request.user.id, roles=user_roles),
+                    timeout=out_timeout
+                )
+            except TypeError:
+                guard_result = await filter_client.output_guard(
+                    text=reply,
+                    identity=Identity(user_id=request.user.id, roles=user_roles)
+                )
             
             checked_reply = output_guard_decision(reply, guard_result)
             if checked_reply.status == 503:
@@ -1029,25 +1202,44 @@ async def chat_stream(request: ChatRequest):
     key = store._key((request.context or {}).get("conversation_id"), request.user)
     if key is not None and key in _active_runs:
         raise HTTPException(status_code=409, detail="Ya se está procesando un mensaje en esta conversación")
+    deadline = RequestDeadline(settings.llm_total_timeout_seconds)
     queue = asyncio.Queue()
 
     async def produce():
         token = _progress.set(queue.put_nowait)
         try:
-            response = await chat(request)
+            response = await chat(request, deadline=deadline)
             queue.put_nowait({"type": "result", "data": response.model_dump()})
         except asyncio.CancelledError:
-            queue.put_nowait({"type": "error", "message": "Ejecución cancelada."})
+            queue.put_nowait({"type": "error", "code": "CANCELLED", "message": "Ejecución cancelada.", "status": 499})
             raise
-        except Exception:
-            logger.exception("Streamed chat failed")
-            queue.put_nowait({"type": "error", "message": "No se pudo completar la respuesta."})
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {"error": str(exc.detail), "code": "ERROR"}
+            queue.put_nowait({
+                "type": "error",
+                "code": detail.get("code", "ERROR"),
+                "message": detail.get("error", str(exc.detail)),
+                "status": exc.status_code,
+            })
+        except Exception as exc:
+            logger.warning("Streamed chat failed: %s", exc.__class__.__name__)
+            queue.put_nowait({
+                "type": "error",
+                "code": "MODEL_UNAVAILABLE",
+                "message": "No se pudo completar la respuesta.",
+                "status": 503,
+            })
         finally:
             _progress.reset(token)
 
     task = asyncio.create_task(produce())
     if key is not None:
-        _active_runs[key] = task
+        _active_runs[key] = {
+            "task": task,
+            "user_id": request.user.id,
+            "status": "running",
+            "cancelled": False,
+        }
 
     async def events():
         try:
@@ -1063,8 +1255,14 @@ async def chat_stream(request: ChatRequest):
         finally:
             if not task.done():
                 task.cancel()
-            if key is not None and _active_runs.get(key) is task:
-                _active_runs.pop(key, None)
+            if key is not None:
+                run_entry = _active_runs.pop(key, None)
+                was_cancelled = run_entry.get("cancelled", False) if run_entry else False
+                _run_history[key] = {
+                    "user_id": request.user.id,
+                    "status": "cancelled" if was_cancelled else "completed",
+                    "finished_at": time.monotonic(),
+                }
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache, no-transform",
@@ -1075,11 +1273,31 @@ async def chat_stream(request: ChatRequest):
              dependencies=[Depends(require_trusted_client)])
 async def cancel_chat(request: ConversationHistoryRequest):
     key = store._key(request.conversation_id, request.user)
-    task = _active_runs.get(key) if key is not None else None
-    if task is None or task.done():
-        return {"cancelled": False}
-    task.cancel()
-    return {"cancelled": True}
+    if key is None:
+        return {"ok": False, "cancelled": False, "status": "not_found", "conversation_id": request.conversation_id}
+
+    run = _active_runs.get(key)
+    if run is not None:
+        if run["user_id"] != request.user.id and "admin" not in _user_roles(request.user):
+            raise HTTPException(status_code=403, detail="No puedes cancelar la conversación de otro usuario")
+        run["cancelled"] = True
+        task = run.get("task")
+        if task and not task.done():
+            task.cancel()
+        _run_history[key] = {
+            "user_id": request.user.id,
+            "status": "cancelled",
+            "finished_at": time.monotonic(),
+        }
+        return {"ok": True, "cancelled": True, "status": "cancelled", "conversation_id": request.conversation_id}
+
+    hist = _run_history.get(key)
+    if hist is not None:
+        if hist["user_id"] != request.user.id and "admin" not in _user_roles(request.user):
+            raise HTTPException(status_code=403, detail="No puedes cancelar la conversación de otro usuario")
+        return {"ok": True, "cancelled": False, "status": hist["status"], "conversation_id": request.conversation_id}
+
+    return {"ok": False, "cancelled": False, "status": "not_found", "conversation_id": request.conversation_id}
 
 
 @router.post("/tools/execute", tags=["tools"], dependencies=[Depends(require_trusted_client)])

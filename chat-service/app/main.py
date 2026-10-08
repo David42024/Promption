@@ -1,7 +1,7 @@
 """FastAPI main application for Chat Service"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .config import settings
+from .config import settings, validate_chat_service_configuration
 from .routes import router
 import time
 
@@ -10,6 +10,12 @@ app = FastAPI(
     description="Backend Demo para Promption Shop - Manejo de chat con integración Filter API",
     version=settings.version,
 )
+
+
+@app.on_event("startup")
+def _startup_chat_service_validation() -> None:
+    validate_chat_service_configuration()
+
 
 # CORS middleware - AÑADIDO A LA APP, NO AL ROUTER
 app.add_middleware(

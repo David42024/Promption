@@ -3,9 +3,19 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import urlsplit
 
 import requests
 
+from promption.llm.exceptions import (
+    LLMConfigurationError,
+    LLMConnectivityError,
+    LLMInvalidResponseError,
+    LLMProviderUnavailableError,
+    LLMQuotaError,
+    LLMTimeoutError,
+    parse_retry_after,
+)
 from promption.llm.ollama_client import LLMResponse
 from promption.utils.config import load_config
 from promption.utils.logger import logger
@@ -33,21 +43,55 @@ def resolve_api_key() -> str | None:
     return None
 
 
-def _format_http_error(r: requests.Response, model: str) -> str:
-    """Resume el error HTTP sin exponer la API key."""
+def _sanitize_url(url: str) -> str:
+    """Strips query parameters and credentials from URLs for logging and exceptions."""
     try:
-        body = r.text[:500]
-    except Exception:  # noqa: BLE001
-        body = "<sin cuerpo>"
-    hint = ""
-    lowered = body.lower()
-    if r.status_code in (400, 404) and ("model" in lowered or "decommission" in lowered):
-        hint = f" Revisa PIF_LLM_MODEL (actual: '{model}'). Groq retiró 'llama-3.3-70b-versatile' en ago-2026; usa 'openai/gpt-oss-120b'."
-    elif r.status_code == 401:
-        hint = " Revisa PIF_LLM_API_KEY (inválida o expirada)."
-    elif r.status_code == 429:
-        hint = " Cuota/límite excedido; reintenta más tarde."
-    return f"LLM {r.status_code} en {r.url}: {body}.{hint}"
+        parts = urlsplit(url)
+        return f"{parts.scheme}://{parts.netloc}{parts.path}"
+    except Exception:
+        return url.split("?")[0]
+
+
+def _raise_for_http_error(r: requests.Response, model: str) -> None:
+    """Translates an HTTP error into a typed LLM exception with sanitized attributes (no raw body)."""
+    status = getattr(r, "status_code", 500)
+    clean_url = _sanitize_url(getattr(r, "url", ""))
+
+    if status in (401, 403):
+        raise LLMConfigurationError(
+            f"Authentication failed (HTTP {status}) at {clean_url}",
+            model=model,
+            provider="openai",
+            status_code=status,
+        )
+    if status == 429:
+        retry_after = parse_retry_after(r.headers.get("Retry-After"))
+        raise LLMQuotaError(
+            f"Rate limit or quota exceeded (HTTP 429) at {clean_url}",
+            model=model,
+            provider="openai",
+            retry_after=retry_after,
+        )
+    if status >= 500:
+        raise LLMProviderUnavailableError(
+            f"Provider unavailable (HTTP {status}) at {clean_url}",
+            model=model,
+            provider="openai",
+            status_code=status,
+        )
+    if status in (400, 404):
+        raise LLMConfigurationError(
+            f"Invalid request or model not found (HTTP {status}) at {clean_url}",
+            model=model,
+            provider="openai",
+            status_code=status,
+        )
+    raise LLMConfigurationError(
+        f"Provider returned HTTP {status} at {clean_url}",
+        model=model,
+        provider="openai",
+        status_code=status,
+    )
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -106,12 +150,31 @@ class OpenAICompatibleClient:
                     "error": str(exc)}
 
     def list_models(self) -> list[str]:
-        r = requests.get(f"{self.host}/models", headers=self._headers(), timeout=self.health_timeout)
         try:
-            r.raise_for_status()
-        except requests.HTTPError as exc:
-            raise RuntimeError(_format_http_error(r, self.model)) from exc
-        return [m.get("id", "") for m in r.json().get("data", []) if m.get("id")]
+            r = requests.get(f"{self.host}/models", headers=self._headers(), timeout=self.health_timeout)
+        except requests.exceptions.Timeout as exc:
+            raise LLMTimeoutError(f"Models request timed out after {self.health_timeout}s",
+                                  model=self.model, provider="openai") from exc
+        except requests.exceptions.ConnectionError as exc:
+            raise LLMConnectivityError("Cannot connect to provider models endpoint",
+                                      model=self.model, provider="openai") from exc
+        except requests.RequestException as exc:
+            raise LLMConnectivityError(f"Models request error: {type(exc).__name__}",
+                                      model=self.model, provider="openai") from exc
+
+        if r.status_code != 200:
+            _raise_for_http_error(r, self.model)
+
+        try:
+            data = r.json()
+        except Exception as exc:
+            raise LLMInvalidResponseError("Invalid JSON in models response",
+                                          model=self.model, provider="openai") from exc
+
+        if not isinstance(data, dict):
+            raise LLMInvalidResponseError("Models response must be a JSON object",
+                                          model=self.model, provider="openai")
+        return [m.get("id", "") for m in data.get("data", []) if isinstance(m, dict) and m.get("id")]
 
     def generate(self, prompt: str, system: str | None = None, temperature: float | None = None,
                  max_tokens: int | None = None) -> LLMResponse:
@@ -138,16 +201,41 @@ class OpenAICompatibleClient:
             payload["temperature"] = (
                 temperature if temperature is not None else float(_CONF.get("temperature", 0.2))
             )
+
         start = time.perf_counter()
-        r = requests.post(f"{self.host}/chat/completions", json=payload,
-                          headers=self._headers(), timeout=self.timeout)
         try:
-            r.raise_for_status()
-        except requests.HTTPError as exc:
-            raise RuntimeError(_format_http_error(r, self.model)) from exc
-        data = _as_dict(r.json())
-        choices = data.get("choices") if isinstance(data.get("choices"), list) else []
-        first_choice = _as_dict(choices[0]) if choices else {}
+            r = requests.post(f"{self.host}/chat/completions", json=payload,
+                              headers=self._headers(), timeout=self.timeout)
+        except requests.exceptions.Timeout as exc:
+            raise LLMTimeoutError(f"Chat completion timed out after {self.timeout}s",
+                                  model=self.model, provider="openai") from exc
+        except requests.exceptions.ConnectionError as exc:
+            raise LLMConnectivityError("Cannot connect to chat completions endpoint",
+                                      model=self.model, provider="openai") from exc
+        except requests.RequestException as exc:
+            raise LLMConnectivityError(f"Chat completion error: {type(exc).__name__}",
+                                      model=self.model, provider="openai") from exc
+
+        status = getattr(r, "status_code", 200)
+        if status != 200:
+            _raise_for_http_error(r, self.model)
+
+        try:
+            data = r.json()
+        except Exception as exc:
+            raise LLMInvalidResponseError("Invalid JSON in completion response",
+                                          model=self.model, provider="openai") from exc
+
+        if not isinstance(data, dict):
+            raise LLMInvalidResponseError("Completion payload must be a JSON object",
+                                          model=self.model, provider="openai")
+
+        choices = data.get("choices")
+        if not isinstance(choices, list) or len(choices) == 0:
+            raise LLMInvalidResponseError("Completion response missing choices",
+                                          model=self.model, provider="openai")
+
+        first_choice = _as_dict(choices[0])
         message = _as_dict(first_choice.get("message"))
         content = message.get("content")
         if isinstance(content, list):
@@ -158,6 +246,15 @@ class OpenAICompatibleClient:
             )
         if not isinstance(content, str):
             content = ""
+
+        finish_reason = first_choice.get("finish_reason")
+        truncated = (finish_reason == "length")
+
+        if not content.strip():
+            raise LLMInvalidResponseError("Completion returned empty content",
+                                          model=self.model, provider="openai",
+                                          truncated=truncated)
+
         usage = _as_dict(data.get("usage"))
         input_details = _as_dict(usage.get("prompt_tokens_details"))
         output_details = _as_dict(usage.get("completion_tokens_details"))
@@ -167,12 +264,16 @@ class OpenAICompatibleClient:
         reasoning_tokens = int(output_details.get("reasoning_tokens") or 0)
         if reasoning_tokens == 0:
             reasoning_tokens = max(0, total_tokens - input_tokens - output_tokens)
+
         latency = (time.perf_counter() - start) * 1000
         logger.debug("LLM call: %s chars in %.1fms", len(content), latency)
         return LLMResponse(
             text=content,
             model=self.model,
             latency_ms=latency,
+            ok=True,
+            truncated=truncated,
+            finish_reason=str(finish_reason) if finish_reason else None,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,

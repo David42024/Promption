@@ -85,6 +85,7 @@ export async function POST(request) {
       tools,
       toolChoice: body.force_tool ? { type: "tool", toolName: body.force_tool } : "auto",
       maxOutputTokens: Math.min(Math.max(Number(body.max_tokens) || 1200, 100), 6000),
+      maxRetries: 0,
       abortSignal: request.signal,
     });
     const [text, toolCalls, finishReason] = await Promise.all([

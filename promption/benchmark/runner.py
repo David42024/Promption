@@ -83,7 +83,7 @@ def apply_output_guard(response: str, enabled: bool = True):
     """Return the deliverable response and the optional guard verdict."""
     if not enabled:
         return response, None
-    verdict = guard_response(response)
+    verdict = guard_response(response, protected_values=[SECRET])
     if verdict.action == Action.PASS:
         return response, verdict
     if verdict.action == Action.REDACT:
@@ -131,6 +131,7 @@ class RunnerOptions:
     min_llm_queries: int = 3
     save: bool = True
     use_output_guard: bool = True
+    results_dir: Path | str | None = None
 
 
 class BenchmarkRunner:
@@ -183,7 +184,8 @@ class BenchmarkRunner:
             "prevented_secret_leaks": 0,
             "benign_non_secret_interventions": 0,
         }
-        token_stats = {"input": 0, "output": 0, "total": 0, "calls": 0}
+        use_llm = bool(self.opts.use_llm)
+        token_stats = {"input": 0, "output": 0, "total": 0, "calls": 0, "attempted_calls": 0}
 
         def record_llm_call(response):
             token_stats["input"] += int(getattr(response, "input_tokens", 0) or 0)
@@ -228,53 +230,72 @@ class BenchmarkRunner:
             resp_raw, resp_filt = "", ""
 
             is_attack = int(row["label"]) == 1
-            if is_attack and llm_ok:
-                # Resultado sin filtro (el prompt llega tal cual al LLM)
-                r0 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
-                record_llm_call(r0)
-                if getattr(r0, "ok", True):
-                    no_filter = float(is_compromised(r0.text))
-                    resp_raw = r0.text[:2000]
-                else:
+            if is_attack and use_llm:
+                # Intento sin filtro (el prompt llega tal cual al LLM)
+                token_stats["attempted_calls"] += 1
+                try:
+                    r0 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
+                    if getattr(r0, "ok", True) and getattr(r0, "text", "").strip():
+                        record_llm_call(r0)
+                        no_filter = float(is_compromised(r0.text))
+                        resp_raw = r0.text[:2000]
+                    else:
+                        no_filter = np.nan
+                        resp_raw = "(Respuesta invalida o vacia)"
+                    llm_lat = getattr(r0, "latency_ms", np.nan)
+                except Exception as exc:
+                    logger.warning("LLM call without filter failed: %s", exc)
                     no_filter = np.nan
-                    resp_raw = "(Error de generacion)"
-                llm_lat = r0.latency_ms
+                    resp_raw = f"(Error de generacion: {exc.__class__.__name__})"
+
                 # Resultado con filtro (solo llega si fue permitido)
                 if res.blocked:
                     with_filter = 0.0
                     resp_filt = "(bloqueado por el filtro)"
                 else:
-                    r1 = self.ollama.generate(clean, system=SYSTEM_PROMPT)
-                    record_llm_call(r1)
-                    if getattr(r1, "ok", True):
-                        delivered, verdict = evaluate_guard(r1.text, is_attack=True)
-                        with_filter = 0.0 if verdict is not None and verdict.action != Action.PASS else float(
-                            is_compromised(delivered)
-                        )
-                        resp_filt = delivered[:2000]
-                    else:
+                    token_stats["attempted_calls"] += 1
+                    try:
+                        r1 = self.ollama.generate(clean, system=SYSTEM_PROMPT)
+                        if getattr(r1, "ok", True) and getattr(r1, "text", "").strip():
+                            record_llm_call(r1)
+                            delivered, verdict = evaluate_guard(r1.text, is_attack=True)
+                            with_filter = 0.0 if verdict is not None and verdict.action != Action.PASS else float(
+                                is_compromised(delivered)
+                            )
+                            resp_filt = delivered[:2000]
+                        else:
+                            with_filter = np.nan
+                            resp_filt = "(Respuesta invalida o vacia)"
+                        r1_lat = getattr(r1, "latency_ms", 0.0)
+                        llm_lat = max(llm_lat or 0.0, r1_lat) if llm_lat == llm_lat else r1_lat
+                    except Exception as exc:
+                        logger.warning("LLM call with filter failed: %s", exc)
                         with_filter = np.nan
-                        resp_filt = "(Error de generacion)"
-                    llm_lat = max(llm_lat, r1.latency_ms)
+                        resp_filt = f"(Error de generacion: {exc.__class__.__name__})"
             elif is_attack:
-                # Sin LLM: proxy determinista
+                # Sin LLM: proxy determinista explícito (solo con use_llm=False)
                 no_filter = 1.0
                 with_filter = 0.0 if res.blocked else 1.0
-                resp_raw = "(LLM no disponible)"
-                resp_filt = "(bloqueado por el filtro)" if res.blocked else "(LLM no disponible)"
-            elif llm_ok and not res.blocked:
+                resp_raw = "(proxy determinista)"
+                resp_filt = "(bloqueado por el filtro)" if res.blocked else "(proxy determinista)"
+            elif use_llm and not res.blocked:
                 no_filter = 0.0
                 with_filter = 0.0
-                r1 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
-                record_llm_call(r1)
-                if getattr(r1, "ok", True):
-                    delivered, _ = evaluate_guard(r1.text, is_attack=False)
-                    resp_raw = r1.text[:2000]
-                    resp_filt = delivered[:2000]
-                else:
-                    resp_raw = resp_filt = "(Error de generacion)"
-                llm_lat = r1.latency_ms
-            elif llm_ok:
+                token_stats["attempted_calls"] += 1
+                try:
+                    r1 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
+                    if getattr(r1, "ok", True) and getattr(r1, "text", "").strip():
+                        record_llm_call(r1)
+                        delivered, _ = evaluate_guard(r1.text, is_attack=False)
+                        resp_raw = r1.text[:2000]
+                        resp_filt = delivered[:2000]
+                    else:
+                        resp_raw = resp_filt = "(Respuesta invalida o vacia)"
+                    llm_lat = getattr(r1, "latency_ms", np.nan)
+                except Exception as exc:
+                    logger.warning("Benign LLM call failed: %s", exc)
+                    resp_raw = resp_filt = f"(Error de generacion: {exc.__class__.__name__})"
+            elif use_llm:
                 no_filter = 0.0
                 with_filter = 0.0
                 resp_raw = "(no consultado: entrada bloqueada)"
@@ -329,7 +350,7 @@ class BenchmarkRunner:
 
     # ------------------------------------------------------------------- save
     def _save(self, df: pd.DataFrame, metrics: dict) -> Path:
-        res_dir = Path(_CONF["paths"]["results"])
+        res_dir = Path(self.opts.results_dir) if self.opts.results_dir else Path(_CONF["paths"]["results"])
         res_dir.mkdir(parents=True, exist_ok=True)
         csv_path = res_dir / "benchmark_results.csv"
         df.to_csv(csv_path, index=False, encoding="utf-8")
@@ -347,7 +368,10 @@ class BenchmarkRunner:
         json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
         if self.opts.save and _CONF["benchmark"].get("save_history", True):
-            hist = Path(_CONF["benchmark"].get("history_dir", "data/results/history"))
+            if self.opts.results_dir:
+                hist = Path(self.opts.results_dir) / "history"
+            else:
+                hist = Path(_CONF["benchmark"].get("history_dir", "data/results/history"))
             ts = datetime.strptime(metrics["timestamp"], "%Y-%m-%dT%H:%M:%S.%f%z").strftime("%Y%m%d_%H%M%S")
             hist.mkdir(parents=True, exist_ok=True)
             df.to_csv(hist / f"run_{ts}.csv", index=False, encoding="utf-8")
