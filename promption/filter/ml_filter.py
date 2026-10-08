@@ -6,6 +6,12 @@ from pathlib import Path
 
 import numpy as np
 
+from promption.filter.exceptions import (
+    MLError,
+    MLInferenceError,
+    MLModelLoadError,
+    MLModelNotFoundError,
+)
 from promption.utils.config import load_config
 from promption.utils.logger import logger
 
@@ -52,14 +58,7 @@ def _char_windows(text: str, size: int, overlap: int) -> list[str]:
 
 
 def chunk_text(text: str, size: int = 250, overlap: int = 100) -> list[str]:
-    """Split long prompts into sentence-aware overlapping windows.
-
-    The embedding model truncates past ~256 tokens, so a single embedding
-    of a long prompt is blind to attacks buried at the end. Windows break
-    at sentence boundaries (never mid-attack-sentence) and carry the last
-    sentence over, so the malicious sentence always lands whole in at least
-    one window. Score each window, keep the worst one. No new deps.
-    """
+    """Split long prompts into sentence-aware overlapping windows."""
     text = text or ""
     if len(text) <= size:
         return [text]
@@ -87,12 +86,7 @@ def chunk_text(text: str, size: int = 250, overlap: int = 100) -> list[str]:
 
 
 class MLFilter:
-    """Random Forest classifier trained on 384-d embedding vectors.
-
-    The SentenceTransformer and the sklearn model are loaded lazily on first
-    use, guarded by a lock so the FastAPI app and the dashboard can share a
-    single worker safely.
-    """
+    """Random Forest classifier trained on 384-d embedding vectors."""
 
     _instance: "MLFilter | None" = None
     _lock = threading.Lock()
@@ -106,8 +100,14 @@ class MLFilter:
 
     def __init__(self, model_path: str | None = None, threshold: float | None = None,
                  chunk_chars: int | None = None, chunk_overlap: int | None = None):
-        # Singleton: __init__ may run multiple times; keep first values.
+        # Singleton: __init__ may run multiple times; keep first values unless overridden.
         if getattr(self, "_initialized", False):
+            if model_path is not None and Path(model_path) != self.model_path:
+                self.model_path = Path(model_path)
+                self._encoder = None
+                self._clf = None
+            if threshold is not None:
+                self.threshold = threshold
             return
         self.model_path = Path(model_path or _CLS_PATH)
         self.threshold = threshold if threshold is not None else float(_CONF["model"].get("confidence_threshold", 0.5))
@@ -125,47 +125,64 @@ class MLFilter:
             if self._encoder is not None and self._clf is not None:
                 return
             if not self.model_path.exists():
-                raise FileNotFoundError(
+                raise MLModelNotFoundError(
                     f"Trained classifier not found: {self.model_path}. Run `python src/training/train.py` first."
                 )
             logger.info("Loading embedding model '%s'…", _EMBED_MODEL)
-            from sentence_transformers import SentenceTransformer
-            self._encoder = SentenceTransformer(_EMBED_MODEL)
-            logger.info("Embedding model loaded.")
-            import joblib
-            self._clf = joblib.load(self.model_path)
-            logger.info("RandomForest classifier loaded from %s", self.model_path)
+            try:
+                from sentence_transformers import SentenceTransformer
+                self._encoder = SentenceTransformer(_EMBED_MODEL)
+                logger.info("Embedding model loaded.")
+                import joblib
+                self._clf = joblib.load(self.model_path)
+                logger.info("RandomForest classifier loaded from %s", self.model_path)
+            except Exception as exc:
+                logger.error("Failed to load ML model: %s", type(exc).__name__)
+                raise MLModelLoadError(f"Corrupt or unreadable model file: {type(exc).__name__}") from exc
 
     # ------------------------------------------------------------------ public
     def embed(self, texts: str | list[str]) -> np.ndarray:
         self._ensure_loaded()
         if isinstance(texts, str):
             texts = [texts]
-        return np.asarray(self._encoder.encode(prepare_texts(list(texts)), normalize_embeddings=True),
-                          dtype=np.float32)
+        try:
+            return np.asarray(self._encoder.encode(prepare_texts(list(texts)), normalize_embeddings=True),
+                              dtype=np.float32)
+        except Exception as exc:
+            raise MLInferenceError(f"Embedding generation failed: {type(exc).__name__}") from exc
 
     def predict_proba(self, texts: str | list[str]) -> np.ndarray:
         """Return malicious probability in [0,1] (columns follow ``classes_``)."""
         self._ensure_loaded()
-        x = self.embed(texts)
-        probs = self._clf.predict_proba(x)
-        pos_idx = int(np.flatnonzero(self._clf.classes_ == 1)[0])
-        return probs[:, pos_idx]
+        try:
+            x = self.embed(texts)
+            probs = self._clf.predict_proba(x)
+            pos_idx = int(np.flatnonzero(self._clf.classes_ == 1)[0])
+            return probs[:, pos_idx]
+        except MLError:
+            raise
+        except Exception as exc:
+            raise MLInferenceError(f"ML probability prediction failed: {type(exc).__name__}") from exc
 
     def analyze(self, text: str) -> MLResult:
         self._ensure_loaded()
-        chunks = chunk_text(text or "", self.chunk_chars, self.chunk_overlap)
-        x = self.embed(chunks)
-        probs = self._clf.predict_proba(x)
-        pos_idx = int(np.flatnonzero(self._clf.classes_ == 1)[0])
-        prob = float(probs[:, pos_idx].max())
-        ti = self.feature_importance()
-        return MLResult(
-            blocked=prob >= self.threshold,
-            probability=prob,
-            threshold=self.threshold,
-            feature_importances=ti,
-        )
+        try:
+            chunks = chunk_text(text or "", self.chunk_chars, self.chunk_overlap)
+            x = self.embed(chunks)
+            probs = self._clf.predict_proba(x)
+            pos_idx = int(np.flatnonzero(self._clf.classes_ == 1)[0])
+            prob = float(probs[:, pos_idx].max())
+            ti = self.feature_importance()
+            return MLResult(
+                blocked=prob >= self.threshold,
+                probability=prob,
+                threshold=self.threshold,
+                feature_importances=ti,
+            )
+        except MLError:
+            raise
+        except Exception as exc:
+            raise MLInferenceError(f"ML inference failed: {type(exc).__name__}") from exc
 
     def feature_importance(self, top_k: int = 384) -> dict[str, float]:
         self._ensure_loaded()

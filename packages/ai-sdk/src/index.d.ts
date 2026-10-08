@@ -75,6 +75,7 @@ export type PromptionOptions = (FilterApiOptions | { transport: GuardTransport }
   maxConversationMessages?: number;
   maxConversationChars?: number;
   maxStreamBytes?: number;
+  earlyOutputCheckChars?: number;
   onDecision?: (event: { direction: Direction; allowed: boolean; action?: string; userId: string; scope?: ScopeDecision }) => void;
 };
 export class PromptionError extends Error {

@@ -23,7 +23,7 @@ from sklearn.metrics import (
 )
 
 from promption.training.dataset import load_training_data
-from promption.training.split import SYNTH_SOURCES, stratified_split
+from promption.training.split import SYNTH_SOURCES, create_splits, save_manifest
 from promption.training.artifacts import file_sha256, preserve_records
 from promption.utils.config import load_config
 from promption.utils.logger import logger
@@ -80,10 +80,11 @@ def main(embed_model: str | None = None, out_path: str | None = None,
         cache_path if cache else None,
     )
 
-    # deterministic split, stratified by (label, lang) so EN/ES are
-    # represented in train and test proportionally (honest per-language eval)
-    te_idx = stratified_split(df, seed=int(_CONF["model"].get("random_state", 42)))
-    tr_idx = np.array([i for i in range(len(df)) if i not in set(te_idx.tolist())])
+    seed = int(_CONF["model"].get("random_state", 42))
+    tr_idx, v_idx, te_idx, ext_idx = create_splits(df, seed=seed)
+
+    out_dir = Path(_CONF["paths"]["processed_data"])
+    manifest = save_manifest(df, tr_idx, v_idx, te_idx, ext_idx, seed=seed, out_dir=out_dir)
 
     clf = RandomForestClassifier(
         n_estimators=int(_CONF["model"].get("n_trees", 200)),
@@ -94,8 +95,22 @@ def main(embed_model: str | None = None, out_path: str | None = None,
     )
     clf.fit(X[tr_idx], y[tr_idx])
 
-    proba = clf.predict_proba(X[te_idx])
     pos_idx = int(np.flatnonzero(clf.classes_ == 1)[0])
+
+    # Evaluación en partición de validación
+    val_proba = clf.predict_proba(X[v_idx])[:, pos_idx]
+    val_pred = clf.predict(X[v_idx])
+    val_metrics = {
+        "accuracy": float(accuracy_score(y[v_idx], val_pred)),
+        "precision": float(precision_score(y[v_idx], val_pred, zero_division=0)),
+        "recall": float(recall_score(y[v_idx], val_pred, zero_division=0)),
+        "f1": float(f1_score(y[v_idx], val_pred, zero_division=0)),
+        "roc_auc": float(roc_auc_score(y[v_idx], val_proba)),
+        "n_val": int(len(v_idx)),
+    }
+
+    # Evaluación en partición de test
+    proba = clf.predict_proba(X[te_idx])
     y_prob = proba[:, pos_idx]
     y_pred = clf.predict(X[te_idx])
 
@@ -106,6 +121,8 @@ def main(embed_model: str | None = None, out_path: str | None = None,
         "f1": float(f1_score(y[te_idx], y_pred, zero_division=0)),
         "roc_auc": float(roc_auc_score(y[te_idx], y_prob)),
         "n_samples": int(len(df)),
+        "n_train": int(len(tr_idx)),
+        "n_val": int(len(v_idx)),
         "n_test": int(len(te_idx)),
         "n_features": int(X.shape[1]),
         "features": [f"dim_{i}" for i in range(X.shape[1])],
@@ -132,10 +149,13 @@ def main(embed_model: str | None = None, out_path: str | None = None,
         "sha256": file_sha256(model_path),
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "dataset_sha256": hashlib.sha256(df.to_csv(index=False).encode("utf-8")).hexdigest(),
+        "manifest_hash": manifest.get("hash"),
+        "manifest_splits": manifest.get("splits"),
         "embedding_model": embed_model or _CONF["model"]["embedding_model"],
         "sklearn_version": sklearn.__version__,
         "seed": int(_CONF["model"].get("random_state", 42)),
         "metrics": {key: value for key, value in metrics.items() if not isinstance(value, list)},
+        "val_metrics": val_metrics,
     }, indent=2), encoding="utf-8")
     logger.info("Model saved to %s", model_path)
 

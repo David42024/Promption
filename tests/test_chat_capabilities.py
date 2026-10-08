@@ -216,7 +216,7 @@ def test_guard_denial_reports_only_safe_direction_reason_and_policy_metadata(mon
     assert error.value.status_code == 403
     assert error.value.detail == {'code': 'CONTENT_BLOCKED', 'direction': 'output', 'reason': 'insufficient_scope'}
     assert client.events[0]['details']['policy_id'] == 'internal.stock'
-    assert text not in json.dumps(client.events)
+    assert text not in str(client.events)
 
 
 @pytest.mark.usefixtures('scope_in_scope')

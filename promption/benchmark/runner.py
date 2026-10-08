@@ -152,9 +152,13 @@ class BenchmarkRunner:
 
     # --------------------------------------------------------------- execution
     def run(self) -> tuple[pd.DataFrame, dict]:
-        df = self.opts.data if self.opts.data is not None else load_evaluation_set()
-        if self.opts.sample_size and len(df) > self.opts.sample_size:
-            df = df.sample(n=self.opts.sample_size, random_state=42).reset_index(drop=True)
+        model_path = getattr(getattr(self.filters, "ml", None), "model_path", None)
+        df = self.opts.data if self.opts.data is not None else load_evaluation_set(model_path=model_path)
+        conf_max = int(load_config().get("limits", {}).get("max_benchmark_sample_size", 5000))
+        effective_limit = self.opts.sample_size if self.opts.sample_size is not None else conf_max
+        effective_limit = min(effective_limit, conf_max)
+        if len(df) > effective_limit:
+            df = df.sample(n=effective_limit, random_state=42).reset_index(drop=True)
 
         llm_ok = self.ollama.health()["connected"] if self.opts.use_llm else False
         if self.opts.use_llm and not llm_ok:
@@ -181,13 +185,15 @@ class BenchmarkRunner:
         }
         token_stats = {"input": 0, "output": 0, "total": 0, "calls": 0}
 
-        def record_response(response, is_attack: bool):
+        def record_llm_call(response):
             token_stats["input"] += int(getattr(response, "input_tokens", 0) or 0)
             token_stats["output"] += int(getattr(response, "output_tokens", 0) or 0)
             token_stats["total"] += int(getattr(response, "total_tokens", 0) or 0)
             token_stats["calls"] += 1
-            delivered, verdict = apply_output_guard(response.text, self.opts.use_output_guard)
-            raw_secret = contains_secret(response.text)
+
+        def evaluate_guard(response_text: str, is_attack: bool):
+            delivered, verdict = apply_output_guard(response_text, self.opts.use_output_guard)
+            raw_secret = contains_secret(response_text)
             kind = "attack" if is_attack else "benign"
             if raw_secret:
                 guard_stats[f"{kind}_raw_secret_matches"] += 1
@@ -225,12 +231,13 @@ class BenchmarkRunner:
             if is_attack and llm_ok:
                 # Resultado sin filtro (el prompt llega tal cual al LLM)
                 r0 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
-                token_stats["input"] += int(getattr(r0, "input_tokens", 0) or 0)
-                token_stats["output"] += int(getattr(r0, "output_tokens", 0) or 0)
-                token_stats["total"] += int(getattr(r0, "total_tokens", 0) or 0)
-                token_stats["calls"] += 1
-                no_filter = float(is_compromised(r0.text))
-                resp_raw = r0.text[:2000]
+                record_llm_call(r0)
+                if getattr(r0, "ok", True):
+                    no_filter = float(is_compromised(r0.text))
+                    resp_raw = r0.text[:2000]
+                else:
+                    no_filter = np.nan
+                    resp_raw = "(Error de generacion)"
                 llm_lat = r0.latency_ms
                 # Resultado con filtro (solo llega si fue permitido)
                 if res.blocked:
@@ -238,11 +245,16 @@ class BenchmarkRunner:
                     resp_filt = "(bloqueado por el filtro)"
                 else:
                     r1 = self.ollama.generate(clean, system=SYSTEM_PROMPT)
-                    delivered, verdict = record_response(r1, is_attack=True)
-                    with_filter = 0.0 if verdict is not None and verdict.action != Action.PASS else float(
-                        is_compromised(delivered)
-                    )
-                    resp_filt = delivered[:2000]
+                    record_llm_call(r1)
+                    if getattr(r1, "ok", True):
+                        delivered, verdict = evaluate_guard(r1.text, is_attack=True)
+                        with_filter = 0.0 if verdict is not None and verdict.action != Action.PASS else float(
+                            is_compromised(delivered)
+                        )
+                        resp_filt = delivered[:2000]
+                    else:
+                        with_filter = np.nan
+                        resp_filt = "(Error de generacion)"
                     llm_lat = max(llm_lat, r1.latency_ms)
             elif is_attack:
                 # Sin LLM: proxy determinista
@@ -254,9 +266,13 @@ class BenchmarkRunner:
                 no_filter = 0.0
                 with_filter = 0.0
                 r1 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
-                delivered, _ = record_response(r1, is_attack=False)
-                resp_raw = r1.text[:2000]
-                resp_filt = delivered[:2000]
+                record_llm_call(r1)
+                if getattr(r1, "ok", True):
+                    delivered, _ = evaluate_guard(r1.text, is_attack=False)
+                    resp_raw = r1.text[:2000]
+                    resp_filt = delivered[:2000]
+                else:
+                    resp_raw = resp_filt = "(Error de generacion)"
                 llm_lat = r1.latency_ms
             elif llm_ok:
                 no_filter = 0.0

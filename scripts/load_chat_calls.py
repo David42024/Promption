@@ -89,13 +89,17 @@ def build_plan(total, seed):
     return plan
 
 
-def post_chat(client, text, stream):
+def post_chat(client, text, stream, role):
+    payload = {
+        "text": text,
+        "user": {"id": f"simulated-{role}", "name": role.capitalize(), "email": f"{role}@demo.com", "roles": [role]}
+    }
     if not stream:
-        response = client.post("/api/v1/chat", json={"text": text})
+        response = client.post("/api/v1/chat", json=payload)
         response.raise_for_status()
         return response.json()
     result = None
-    with client.stream("POST", "/api/v1/chat", json={"text": text}, headers={"Accept": "text/event-stream"}) as response:
+    with client.stream("POST", "/api/v1/chat", json=payload, headers={"Accept": "text/event-stream"}) as response:
         response.raise_for_status()
         for line in response.iter_lines():
             if not line.startswith("data: "):
@@ -109,20 +113,16 @@ def post_chat(client, text, stream):
         raise RuntimeError("stream_without_result")
     return result
 
-
 def run_call(case, base_url, timeout):
     started = time.perf_counter()
     failures, data = [], {}
     try:
         with httpx.Client(base_url=base_url, timeout=timeout) as client:
-            if case["role"] != "guest":
-                client.post("/api/v1/auth/login", json={"email": DEMO_EMAILS[case["role"]],
-                                                "password": "demo123"}).raise_for_status()
             if case["reset"]:
                 client.delete("/api/v1/chat")
             for turn in case["history"]:
-                post_chat(client, turn, case["stream"])
-            data = post_chat(client, case["text"], case["stream"])
+                post_chat(client, turn, case["stream"], case["role"])
+            data = post_chat(client, case["text"], case["stream"], case["role"])
         if data.get("block_type") in INFRA_BLOCKS:
             failures.append("infrastructure_" + data["block_type"])
         elif case["category"] == "fixture":
@@ -133,6 +133,7 @@ def run_call(case, base_url, timeout):
             failures.append("empty_reply")
     except Exception as error:
         failures.append(type(error).__name__)
+        
     return {"id": case["id"], "role": case["role"], "category": case["category"], "stream": case["stream"],
             "history_turns": len(case["history"]), "reset": case["reset"], "text": case["text"],
             "expected_blocked": case["blocked"], "blocked": data.get("blocked"),

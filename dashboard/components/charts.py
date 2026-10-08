@@ -57,17 +57,34 @@ def _base(fig: go.Figure, title: str, x: str | None = None, y: str | None = None
 
 def plot_asr_comparison(overall: dict) -> go.Figure:
     pal = _pal()
-    without = overall.get("asr_without_filter", 0) * 100
-    with_f = overall.get("asr_with_filter", 0) * 100
+    raw_without = overall.get("asr_without_filter")
+    raw_with = overall.get("asr_with_filter")
+
+    if raw_without is None and raw_with is None:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="ASR no evaluado (sin ataques o LLM no consultado)",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(color=pal["text_faint"], size=13),
+        )
+        return _base(fig, "Attack Success Rate — antes y después del filtro")
+
+    without = raw_without * 100 if raw_without is not None else None
+    with_f = raw_with * 100 if raw_with is not None else None
+    text_without = f"{without:.1f}%" if without is not None else "N/A"
+    text_with = f"{with_f:.1f}%" if with_f is not None else "N/A"
+
     fig = go.Figure(go.Bar(
         x=["ASR amplio sin filtro", "ASR amplio protegido"],
         y=[without, with_f],
         marker_color=[pal["red"], pal["green"]],
-        text=[f"{without:.1f}%", f"{with_f:.1f}%"],
+        text=[text_without, text_with],
         textposition="outside",
-        hovertemplate="%{x}: %{y:.1f}%<extra></extra>",
+        hovertemplate="%{x}: %{text}<extra></extra>",
     ))
-    fig.update_yaxes(title="ASR (%)", range=[0, max(without, with_f, 10) * 1.15])
+    valid_vals = [v for v in [without, with_f] if v is not None]
+    max_val = max(valid_vals) if valid_vals else 10
+    fig.update_yaxes(title="ASR (%)", range=[0, max(max_val, 10) * 1.15])
     return _base(fig, "Attack Success Rate — antes y después del filtro")
 
 
@@ -95,12 +112,17 @@ def plot_performance_by_dataset(rows: list[dict]) -> go.Figure:
     if not rows:
         return go.Figure()
     names = [r["dataset"] for r in rows]
+    y_without = [r.get("asr_without_filter") * 100 if r.get("asr_without_filter") is not None else None for r in rows]
+    y_with = [r.get("asr_with_filter") * 100 if r.get("asr_with_filter") is not None else None for r in rows]
+    text_without = [f"{v:.1f}%" if v is not None else "N/A" for v in y_without]
+    text_with = [f"{v:.1f}%" if v is not None else "N/A" for v in y_with]
+
     fig = go.Figure()
     fig.add_trace(go.Bar(name="ASR amplio sin filtro", x=names,
-                         y=[r.get("asr_without_filter", 0) * 100 for r in rows],
+                         y=y_without, text=text_without, textposition="outside",
                          marker_color=pal["red"]))
     fig.add_trace(go.Bar(name="ASR amplio protegido", x=names,
-                         y=[r.get("asr_with_filter", 0) * 100 for r in rows],
+                         y=y_with, text=text_with, textposition="outside",
                          marker_color=pal["green"]))
     fig.update_layout(barmode="group", legend=dict(orientation="h", y=-0.15))
     fig.update_yaxes(title="ASR (%)")
@@ -116,10 +138,13 @@ def plot_performance_by_attack_type(df: pd.DataFrame) -> go.Figure:
     asr_ok = at.groupby("attack_type")["llm_success_with_filter"].mean().reindex(det_rate.index) * 100
     asr0 = at.groupby("attack_type")["llm_success_no_filter"].mean().reindex(det_rate.index) * 100
     names = det_rate.index.tolist()
+    y_asr0 = [v if pd.notna(v) else None for v in asr0.values]
+    y_asr_ok = [v if pd.notna(v) else None for v in asr_ok.values]
+
     fig = go.Figure()
     fig.add_trace(go.Bar(name="Tasa de bloqueo del filtro", x=names, y=det_rate.values, marker_color=pal["blue"]))
-    fig.add_trace(go.Bar(name="ASR amplio sin filtro", x=names, y=asr0.values, marker_color=pal["red"]))
-    fig.add_trace(go.Bar(name="ASR amplio protegido", x=names, y=asr_ok.fillna(0).values, marker_color=pal["green"]))
+    fig.add_trace(go.Bar(name="ASR amplio sin filtro", x=names, y=y_asr0, marker_color=pal["red"]))
+    fig.add_trace(go.Bar(name="ASR amplio protegido", x=names, y=y_asr_ok, marker_color=pal["green"]))
     fig.update_layout(barmode="group", legend=dict(orientation="h", y=-0.25))
     fig.update_yaxes(title="%")
     return _base(fig, "Detección y ASR por tipo de ataque")

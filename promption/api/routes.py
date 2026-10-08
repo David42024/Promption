@@ -18,6 +18,7 @@ from promption.api.models import (AuditEventRequest, BenchmarkRequest, FilterReq
 from promption.benchmark.runner import BenchmarkRunner, RunnerOptions, json_safe, sanitize_prompt
 from promption.filter.ensemble_filter import EnsembleFilter
 from promption.filter.heuristic_filter import HeuristicFilter
+from promption.limiter import concurrency_limiter, rate_limiter
 from promption.llm import get_llm_client
 from promption.utils.config import load_config
 from promption.utils.logger import logger
@@ -54,23 +55,20 @@ def _sanitize_audit_value(value, key: str = ""):
     return str(value)[:500]
 
 
-def _filter_for(tenant: TenantContext, final_override: float | None = None) -> EnsembleFilter:
+def _filter_for(tenant: TenantContext) -> EnsembleFilter:
     """Return a cached attack filter configured with tenant thresholds."""
     th = tenant.thresholds or {}
     h_thr = th.get("heuristic")
     m_thr = th.get("ml")
-    f_thr = final_override if final_override is not None else th.get("final")
 
-    if h_thr is None and m_thr is None and f_thr is None:
+    if h_thr is None and m_thr is None:
         return _filter
-    key = (tenant.tenant_id, h_thr, m_thr, f_thr)
+    key = (tenant.tenant_id, h_thr, m_thr)
     if key not in _tenant_filters:
         flt = EnsembleFilter(
             heuristic=HeuristicFilter(threshold=float(h_thr)) if h_thr is not None else None,
             ml_threshold=float(m_thr) if m_thr is not None else None,
         )
-        if f_thr is not None:
-            flt.final_threshold = float(f_thr)
         _tenant_filters[key] = flt
     return _tenant_filters[key]
 
@@ -316,99 +314,112 @@ def reload_filter(tenant: TenantContext = Depends(_require_admin)):
 # ------------------------------------------------------------------ filtering
 @router.post("/filter", tags=["filter"])
 def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_filter)) -> FilterResponse:
-    t0 = time.perf_counter()
-    flt = _filter_for(tenant, req.threshold)
-    merged_roles = list(req.roles) + list(getattr(tenant, "roles", []) or [])
-    res = flt.analyze(req.text, use_ml=req.use_ml, roles=merged_roles)
-    conversation = None
+    rate_limiter.check_protection_quota(tenant.tenant_id, endpoint="filter", tenant_quotas=tenant.quotas)
     if req.messages:
-        try:
-            conversation = ConversationGuard(flt).analyze(
-                [message.model_dump() for message in req.messages], roles=merged_roles, use_ml=req.use_ml)
-        except ConversationLimitError as exc:
-            raise HTTPException(status_code=413, detail="Conversation security context exceeds limits") from exc
-        if conversation.blocked:
-            res = replace(res, blocked=True, decision="BLOCKED", score=max(res.score, 1.0))
-        elif conversation.requires_output_guard and res.decision == "ALLOWED":
-            res = replace(res, decision="GUARDED")
-    latency = (time.perf_counter() - t0) * 1000
+        total_chars = sum(len(m.content) for m in req.messages)
+        max_hist = int(_CONF.get("limits", {}).get("max_history_chars", 100000))
+        if total_chars > max_hist:
+            raise HTTPException(status_code=413, detail=f"Conversation history exceeds limit of {max_hist} characters")
 
-    rules = [{"name": r["name"], "severity": r["severity"], "description": r.get("description", "")}
-             for r in res.heuristic.matched_rules]
-    ml_info = {
-        "available": res.ml is not None,
-        "blocked": res.ml.blocked if res.ml else None,
-        "probability": res.ml.probability if res.ml else None,
-        "threshold": res.ml.threshold if res.ml else None,
-    }
-    classification_conf = _CONF.get("classification", {})
-    benign_threshold = float(classification_conf.get("ml_benign_threshold", 0.33))
-    malicious_threshold = float(classification_conf.get("ml_malicious_threshold", 0.66))
-    classification, requires_review = classify_security_result(
-        blocked=res.blocked,
-        ml_probability=res.ml.probability if res.ml else None,
-        benign_threshold=benign_threshold,
-        malicious_threshold=malicious_threshold,
-        explicit_benign=bool(res.merged_features.get("explicit_benign_override"))
-        and not bool(conversation and conversation.requires_output_guard),
-        requires_output_guard=res.requires_output_guard,
-    )
-    layers = {
-        "heuristic": {"blocked": res.heuristic.blocked, "score": res.heuristic.score,
-                      "signal": res.heuristic.signal,
-                      "matched_rules": rules, "threshold": res.heuristic.threshold,
-                      "benign_matched": list(res.heuristic.benign_matched)},
-        "ml": ml_info,
-        "ensemble": {"score": res.score, "threshold": flt.final_threshold,
-                     "decision": res.decision,
-                     "requires_output_guard": res.requires_output_guard,
-                     "heuristic_band": res.merged_features.get("heuristic_band"),
-                     "ml_band": res.merged_features.get("ml_band"),
-                     "decision_low_threshold": flt.low_threshold,
-                     "decision_high_threshold": flt.high_threshold,
-                     "benign_matched": list(res.heuristic.benign_matched)},
-        "classification": {
-            "label": classification,
-            "requires_review": requires_review,
-            "ml_benign_threshold": benign_threshold,
-            "ml_malicious_threshold": malicious_threshold,
-        },
-    }
-    if conversation is not None:
-        layers["conversation"] = conversation.metadata()
-    logger.info("Filter [%s] tenant=%s user=%s roles=%s length=%d in %.1fms",
-                res.decision, tenant.tenant_id, req.user_id, req.roles, len(req.text), latency)
-    
-    # Structured logging
-    from promption.utils.structured_logger import log_filter_decision
-    log_filter_decision(
-        decision=res.decision,
-        confidence=res.score,
-        tenant_id=tenant.tenant_id,
-        user_id=req.user_id,
-        roles=req.roles,
-        text=req.text,
-        layers=layers,
-    )
-    
-    return FilterResponse(
-        text=req.text,
-        decision=res.decision,
-        blocked=res.blocked,
-        confidence=res.score,
-        latency_ms=round(latency, 3),
-        reason=conversation.reason if conversation and conversation.blocked else res.blocking_reason,
-        layers=layers,
-        sanitized=sanitize_prompt(req.text, res) if res.blocked else req.text,
-        tenant_id=tenant.tenant_id,
-        classification=classification,
-        requires_review=requires_review,
-        requires_output_guard=res.requires_output_guard,
-    )
+    with concurrency_limiter.acquire_protection():
+        t0 = time.perf_counter()
+        flt = _filter_for(tenant)
+        merged_roles = list(req.roles) + list(getattr(tenant, "roles", []) or [])
+        res = flt.analyze(req.text, use_ml=req.use_ml, roles=merged_roles)
+        conversation = None
+        if req.messages:
+            try:
+                conversation = ConversationGuard(flt).analyze(
+                    [message.model_dump() for message in req.messages], roles=merged_roles, use_ml=req.use_ml)
+            except ConversationLimitError as exc:
+                raise HTTPException(status_code=413, detail="Conversation security context exceeds limits") from exc
+            if conversation.blocked:
+                res = replace(res, blocked=True, decision="BLOCKED", score=max(res.score, 1.0))
+            elif conversation.requires_output_guard and res.decision == "ALLOWED":
+                res = replace(res, decision="GUARDED")
+        latency = (time.perf_counter() - t0) * 1000
+
+        rules = [{"name": r["name"], "severity": r["severity"], "description": r.get("description", "")}
+                 for r in res.heuristic.matched_rules]
+        ml_info = {
+            "available": res.ml is not None,
+            "blocked": res.ml.blocked if res.ml else None,
+            "probability": res.ml.probability if res.ml else None,
+            "threshold": res.ml.threshold if res.ml else None,
+            "status": res.merged_features.get("ml_status", "UNKNOWN"),
+            "error_code": res.merged_features.get("ml_error_code"),
+            "state": res.merged_features.get("ml_state", "HEALTHY"),
+        }
+        classification_conf = _CONF.get("classification", {})
+        benign_threshold = float(classification_conf.get("ml_benign_threshold", 0.33))
+        malicious_threshold = float(classification_conf.get("ml_malicious_threshold", 0.66))
+        classification, requires_review = classify_security_result(
+            blocked=res.blocked,
+            ml_probability=res.ml.probability if res.ml else None,
+            benign_threshold=benign_threshold,
+            malicious_threshold=malicious_threshold,
+            explicit_benign=bool(res.merged_features.get("explicit_benign_override"))
+            and not bool(conversation and conversation.requires_output_guard),
+            requires_output_guard=res.requires_output_guard,
+        )
+        layers = {
+            "heuristic": {"blocked": res.heuristic.blocked, "score": res.heuristic.score,
+                          "signal": res.heuristic.signal,
+                          "matched_rules": rules, "threshold": res.heuristic.threshold,
+                          "benign_matched": list(res.heuristic.benign_matched)},
+            "ml": ml_info,
+            "ensemble": {"score": res.score,
+                         "decision": res.decision,
+                         "requires_output_guard": res.requires_output_guard,
+                         "heuristic_band": res.merged_features.get("heuristic_band"),
+                         "ml_band": res.merged_features.get("ml_band"),
+                         "decision_low_threshold": flt.low_threshold,
+                         "decision_high_threshold": flt.high_threshold,
+                         "benign_matched": list(res.heuristic.benign_matched)},
+            "classification": {
+                "label": classification,
+                "requires_review": requires_review,
+                "ml_benign_threshold": benign_threshold,
+                "ml_malicious_threshold": malicious_threshold,
+            },
+        }
+        if conversation is not None:
+            layers["conversation"] = conversation.metadata()
+        logger.info("Filter [%s] tenant=%s user=%s roles=%s length=%d in %.1fms",
+                    res.decision, tenant.tenant_id, req.user_id, req.roles, len(req.text), latency)
+        
+        # Structured logging
+        from promption.utils.structured_logger import log_filter_decision
+        log_filter_decision(
+            decision=res.decision,
+            confidence=res.score,
+            tenant_id=tenant.tenant_id,
+            user_id=req.user_id,
+            roles=req.roles,
+            text=req.text,
+            layers=layers,
+        )
+        
+        return FilterResponse(
+            text=req.text,
+            decision=res.decision,
+            blocked=res.blocked,
+            confidence=res.score,
+            latency_ms=round(latency, 3),
+            reason=conversation.reason if conversation and conversation.blocked else res.blocking_reason,
+            layers=layers,
+            sanitized=sanitize_prompt(req.text, res) if res.blocked else req.text,
+            tenant_id=tenant.tenant_id,
+            classification=classification,
+            requires_review=requires_review,
+            requires_output_guard=res.requires_output_guard,
+        )
 
 
 @router.post("/filter/batch", tags=["filter"])
 def filter_batch(reqs: list[FilterRequest], tenant: TenantContext = Depends(_require_filter)):
+    if len(reqs) > 100:
+        raise HTTPException(status_code=422, detail="Batch size exceeds limit of 100")
     t0 = time.perf_counter()
     out = []
     for req in reqs:
@@ -421,47 +432,53 @@ def filter_batch(reqs: list[FilterRequest], tenant: TenantContext = Depends(_req
 @router.post("/output-guard", tags=["output-guard"])
 def output_guard(req: OutputGuardRequest, tenant: TenantContext = Depends(_require_output_guard)) -> OutputGuardResponse:
     """Inspecciona una respuesta del LLM antes de entregarla (PASS/REDACT/BLOCK)."""
-    from promption.output_guard import guard_response, scan
-    from promption.utils.structured_logger import log_output_guard
-    
-    roles = {
-        str(role).strip().lower()
-        for role in [*req.roles, *(req.context.get("roles", []) or [])]
-        if str(role).strip()
-    }
-    is_admin = "admin" in roles
-    
-    res = guard_response(req.text, admin_mode=is_admin)
-    findings = scan(req.text) if res.action != "PASS" else []
-    fps = [f.fingerprint for f in findings]
-    logger.info(
-        "OutputGuard [%s] tenant=%s user=%s is_admin=%s cats=%s matches=%d risk=%.3f fps=%s",
-        res.action, tenant.tenant_id, req.user_id, is_admin, res.categories, res.matches, res.risk,
-        [f"sha256:{fp[:12]}" for fp in fps],
-    )
-    
-    # Structured logging
-    log_output_guard(
-        action=res.action,
-        categories=res.categories,
-        tenant_id=tenant.tenant_id,
-        user_id=req.user_id,
-        matches=res.matches,
-        risk=res.risk,
-    )
-    
-    return OutputGuardResponse(**res.to_dict(), tenant_id=tenant.tenant_id)
+    rate_limiter.check_protection_quota(tenant.tenant_id, endpoint="output-guard", tenant_quotas=tenant.quotas)
+    with concurrency_limiter.acquire_protection():
+        from promption.output_guard import guard_response, scan
+        from promption.utils.structured_logger import log_output_guard
+        
+        roles = {
+            str(role).strip().lower()
+            for role in [*req.roles, *(req.context.get("roles", []) or [])]
+            if str(role).strip()
+        }
+        is_admin = "admin" in roles
+        
+        res = guard_response(req.text, admin_mode=is_admin)
+        findings = scan(req.text) if res.action != "PASS" else []
+        fps = [f.fingerprint for f in findings]
+        logger.info(
+            "OutputGuard [%s] tenant=%s user=%s is_admin=%s cats=%s matches=%d risk=%.3f fps=%s",
+            res.action, tenant.tenant_id, req.user_id, is_admin, res.categories, res.matches, res.risk,
+            [f"sha256:{fp[:12]}" for fp in fps],
+        )
+        
+        # Structured logging
+        log_output_guard(
+            action=res.action,
+            categories=res.categories,
+            tenant_id=tenant.tenant_id,
+            user_id=req.user_id,
+            matches=res.matches,
+            risk=res.risk,
+        )
+        
+        return OutputGuardResponse(**res.to_dict(), tenant_id=tenant.tenant_id)
 
 
 # ------------------------------------------------------------------ benchmark
 @router.post("/benchmark", tags=["benchmark"])
 def run_benchmark(req: BenchmarkRequest, tenant: TenantContext = Depends(_require_benchmark)):
-    opts = RunnerOptions(sample_size=req.sample_size, use_llm=req.use_llm, save=True)
-    runner = BenchmarkRunner(filter=_filter, ollama=_ollama, opts=opts)
-    df, metrics = runner.run()
-    total_ms = _results_df()["filter_latency_ms"].mean() if not df.empty else 0
-    metrics_json = _latest_payload()
-    return {"status": "ok", "n_rows": int(len(df)), "metrics": metrics, "payload": metrics_json}
+    rate_limiter.check_benchmark_quota(tenant.tenant_id, tenant_quotas=tenant.quotas)
+    max_sample_size = int(load_config().get("limits", {}).get("max_benchmark_sample_size", 5000))
+    sample_size = min(req.sample_size or max_sample_size, max_sample_size)
+    with concurrency_limiter.acquire_benchmark():
+        opts = RunnerOptions(sample_size=sample_size, use_llm=req.use_llm, save=True)
+        runner = BenchmarkRunner(filter=_filter, ollama=_ollama, opts=opts)
+        df, metrics = runner.run()
+        total_ms = _results_df()["filter_latency_ms"].mean() if not df.empty else 0
+        metrics_json = _latest_payload()
+        return {"status": "ok", "n_rows": int(len(df)), "metrics": metrics, "payload": metrics_json}
 
 
 @router.get("/benchmark/latest", tags=["benchmark"])

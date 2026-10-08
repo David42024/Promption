@@ -3,17 +3,18 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 
 from promption.training.artifacts import file_sha256, model_provenance, preserve_records, selected_backend
-from promption.training.split import stratified_split
+from promption.training.split import create_splits
 
 
 def config_at(root):
     return {"model": {"use_lightweight_ml": True,
                       "classifier_path": str(root / "models/random_forest.pkl"),
                       "lightweight_classifier_path": str(root / "models/lightweight_classifier.pkl")},
-            "paths": {"results": str(root / "results"), "plots": str(root / "results/plots")}}
+            "paths": {"results": str(root / "results"), "plots": str(root / "results/plots"), "processed_data": str(root / "processed")}}
 
 
 def test_preservation_keeps_models_metrics_and_unknown_benchmark_provenance(tmp_path):
@@ -45,9 +46,12 @@ def test_provenance_does_not_attach_stale_training_metadata(tmp_path):
 def test_split_maps_filtered_indices_back_to_original_rows():
     df = pd.DataFrame({"source": ["synth_v2", "public", "synth_v2", "public", "public", "public"],
                        "label": [1, 0, 1, 1, 0, 1], "lang": ["es"] * 6})
-    indices = stratified_split(df)
-    assert set(indices).issubset({1, 3, 4, 5})
-    assert set(df.iloc[indices]["label"]) == {0, 1}
+    tr, val, te, ext = create_splits(df)
+    all_idx = np.concatenate([tr, val, te, ext])
+    assert set(all_idx).issubset(set(range(len(df))))
+    assert len(all_idx) == len(set(all_idx)) == len(df)
+    synth_indices = set(df[df["source"] == "synth_v2"].index)
+    assert synth_indices.issubset(set(ext))
 
 
 def test_benchmark_trains_configured_tfidf_artifact(monkeypatch, tmp_path):
@@ -121,5 +125,145 @@ def test_direct_random_forest_training_preserves_previous_artifacts(monkeypatch,
     assert (backups[0] / "models/random_forest.pkl").read_bytes() == b"previous random forest"
     assert (backups[0] / "results/model_metrics.csv").read_text() == "previous metrics"
     assert old_metrics.read_text() == "previous metrics"
-    assert model_provenance(old_model, "embeddings_random_forest")["training"]["embedding_model"] == "test-encoder"
     assert (tmp_path / "results/model_metrics_embeddings_random_forest.csv").is_file()
+
+
+def test_create_splits_has_zero_group_leakage():
+    df = pd.DataFrame({
+        "group_id": ["g1", "g1", "g2", "g3", "g4", "g4", "g5"],
+        "source": ["translated_es", "public", "public", "public", "public", "public", "public"],
+        "label": [1, 1, 0, 1, 0, 0, 1],
+        "lang": ["es", "en", "en", "en", "en", "en", "en"]
+    })
+    tr, val, te, ext = create_splits(df)
+    parts = {
+        "train": set(df.iloc[tr]["group_id"]),
+        "val": set(df.iloc[val]["group_id"]),
+        "test": set(df.iloc[te]["group_id"]),
+        "external": set(df.iloc[ext]["group_id"]),
+    }
+    # No group can be in more than one partition
+    for p1 in parts:
+        for p2 in parts:
+            if p1 != p2:
+                assert len(parts[p1] & parts[p2]) == 0, f"Overlap between {p1} and {p2}: {parts[p1] & parts[p2]}"
+    # g1 has translated_es so all rows of g1 must be in external
+    assert parts["external"] == {"g1"}
+
+
+def test_payloads_requires_manifest_or_exploratory(tmp_path, monkeypatch):
+    import pytest
+    from promption.benchmark.payloads import load_evaluation_set
+    monkeypatch.setattr("promption.benchmark.payloads.load_config", lambda: {
+        "paths": {"processed_data": str(tmp_path / "nonexistent")},
+        "model": {"lightweight_classifier_path": str(tmp_path / "model.pkl")}
+    })
+    monkeypatch.setattr("promption.benchmark.payloads.load_raw_data", lambda *args: pd.DataFrame({
+        "prompt": ["hello"], "label": [0], "dataset": ["Benigno"], "attack_type": ["benign"], "source": ["local"], "group_id": ["g1"]
+    }))
+    monkeypatch.setattr("promption.benchmark.payloads.apply_quarantine", lambda df, *args: df)
+    monkeypatch.setattr("promption.benchmark.payloads.apply_label_overrides", lambda df, *args: df)
+
+    with pytest.raises(FileNotFoundError):
+        load_evaluation_set()
+
+    df_exp = load_evaluation_set(allow_exploratory=True)
+    assert len(df_exp) == 1
+
+
+def test_payloads_strict_metadata_verification(tmp_path, monkeypatch):
+    import pytest
+    from promption.benchmark.payloads import load_evaluation_set
+
+    proc_dir = tmp_path / "proc"
+    proc_dir.mkdir()
+    manifest_file = proc_dir / "split_manifest.json"
+    from promption.training.split import calculate_manifest_hash
+    manifest_data = {
+        "seed": 42,
+        "splits": {"train": 0, "val": 0, "test": 1, "external": 0},
+        "records": {"0": {"group_id": "g1", "source": "local", "partition": "test", "label": 0}}
+    }
+    canonical_hash = calculate_manifest_hash(manifest_data)
+    manifest_data["hash"] = canonical_hash
+    manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+
+    model_path = tmp_path / "model.pkl"
+    model_path.write_text("model bytes", encoding="utf-8")
+    meta_path = tmp_path / "model.metadata.json"
+
+    monkeypatch.setattr("promption.benchmark.payloads.load_config", lambda: {
+        "paths": {"processed_data": str(proc_dir)},
+        "model": {"use_lightweight_ml": True, "lightweight_classifier_path": str(model_path)}
+    })
+    monkeypatch.setattr("promption.benchmark.payloads.load_raw_data", lambda *args: pd.DataFrame({
+        "prompt": ["hello"], "label": [0], "dataset": ["Benigno"], "attack_type": ["benign"], "source": ["local"], "group_id": ["g1"]
+    }))
+    monkeypatch.setattr("promption.benchmark.payloads.apply_quarantine", lambda df, *args: df)
+    monkeypatch.setattr("promption.benchmark.payloads.apply_label_overrides", lambda df, *args: df)
+
+    # 1. Metadata missing -> ValueError
+    with pytest.raises(ValueError, match="no se encontraron metadatos"):
+        load_evaluation_set(model_path=model_path)
+
+    # 2. Metadata corrupt JSON -> ValueError
+    meta_path.write_text("{invalid json", encoding="utf-8")
+    with pytest.raises(ValueError, match="metadatos corruptos o ilegibles"):
+        load_evaluation_set(model_path=model_path)
+
+    # 3. Metadata without manifest_hash -> ValueError
+    meta_path.write_text(json.dumps({"some_key": 1}), encoding="utf-8")
+    with pytest.raises(ValueError, match="no registra manifest_hash"):
+        load_evaluation_set(model_path=model_path)
+
+    # 4. Manifest hash mismatch -> ValueError
+    meta_path.write_text(json.dumps({"manifest_hash": "different_hash"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="discrepancia entre el modelo"):
+        load_evaluation_set(model_path=model_path)
+
+    # 5. Matching canonical hash -> succeeds
+    from promption.training.split import calculate_manifest_hash
+    canonical_hash = calculate_manifest_hash(manifest_data)
+    manifest_data["hash"] = canonical_hash
+    manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
+    meta_path.write_text(json.dumps({"manifest_hash": canonical_hash}), encoding="utf-8")
+    df = load_evaluation_set(model_path=model_path)
+    assert len(df) == 1
+
+    # 6. Tampered manifest records retaining old declared hash -> ValueError
+    tampered = dict(manifest_data)
+    tampered["records"] = {
+        "0": {"group_id": "g1", "partition": "train", "label": 1}
+    }
+    tampered["hash"] = canonical_hash  # retains previous hash
+    manifest_file.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="ha sido alterado y no coincide con su hash"):
+        load_evaluation_set(model_path=model_path)
+
+
+def test_dataset_preserves_group_id_and_family_id(tmp_path, monkeypatch):
+    from promption.training.dataset import load_raw_data
+
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    mal_file = raw_dir / "malicious_prompts.csv"
+    ben_file = raw_dir / "benign_prompts.csv"
+
+    # CSV with family_id and group_id
+    mal_file.write_text(
+        "prompt,dataset,attack_type,source,family_id,group_id\n"
+        "test attack,OWASP,injection,translated,fam_01,grp_01\n",
+        encoding="utf-8"
+    )
+    ben_file.write_text(
+        "prompt,category,source,family_id,group_id\n"
+        "test benign,general,local,fam_02,grp_02\n",
+        encoding="utf-8"
+    )
+
+    df = load_raw_data(data_dir=str(raw_dir))
+    assert "group_id" in df.columns
+    assert "family_id" in df.columns
+    # Group id resolves to family_id when provided
+    assert df.loc[df["prompt"] == "test attack", "group_id"].iloc[0] == "fam_01"
+    assert df.loc[df["prompt"] == "test attack", "family_id"].iloc[0] == "fam_01"

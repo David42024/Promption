@@ -34,6 +34,8 @@ models/*.model
 data/processed/*
 !data/processed/quarantine.csv
 !data/processed/label_overrides.csv
+!data/processed/split_manifest.json
+!data/processed/translation_links.json
 data/embeddings*.npy
 data/pdf_payloads/
 data/audio_payloads/

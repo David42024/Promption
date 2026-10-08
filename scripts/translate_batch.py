@@ -169,7 +169,12 @@ def main() -> None:
                 continue
             rec = row.to_dict()
             rec[args.text_col] = t
-            rec["source"] = args.source
+            if "family_id" in row and pd.notna(row.get("family_id")):
+                rec["family_id"] = str(row["family_id"])
+            if "group_id" in row and pd.notna(row.get("group_id")):
+                rec["group_id"] = str(row["group_id"])
+            elif "family_id" in rec:
+                rec["group_id"] = rec["family_id"]
             recs.append(rec)
         print(f"  ej: {texts[0][:60]!r} -> {trans[0][:60]!r}", flush=True)
         flush()  # checkpoint por lote: un corte no pierde lo avanzado

@@ -20,6 +20,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from promption.limiter import BodySizeLimitMiddleware
+from promption.utils.config import load_config
+
+_limits_conf = load_config().get("limits", {})
+_max_body = int(_limits_conf.get("max_body_bytes", 2097152))
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=_max_body)
+
 # Include routes
 app.include_router(router, prefix="/api/v1")
 

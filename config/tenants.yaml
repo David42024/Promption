@@ -5,10 +5,16 @@
 #   - aislamiento en logs/auditoría (tenant_id en cada decisión)
 #   - umbrales propios (heuristic / ml / final)
 #
-# SEGURIDAD: las keys de este archivo son SOLO para demo local.
-# En producción define PROMPTION_API_KEYS="tenant:key,otro:key2" como
-# variable de entorno (o secret). Al existir, reemplaza por completo las
-# claves demo de este archivo para que nunca sean válidas en producción.
+# SEGURIDAD Y MODO DEMO:
+# Las claves de este archivo son EXCLUSIVAMENTE para demostración local.
+# Se cargan únicamente si se define explícitamente PROMPTION_DEMO_MODE=true.
+# Por defecto, el modo demo está desactivado y estas claves públicas NO se cargan.
+#
+# En entornos de producción (ENVIRONMENT=production / PROMPTION_ENV=production),
+# el modo demo está estrictamente prohibido y la API rechazará su inicio.
+# Para despliegues y producción, defina PROMPTION_API_KEYS="tenant:key,otro:key2"
+# como variable de entorno o secreto. Al existir un registro de entorno, las
+# claves demo se ignoran por completo garantizando precedencia de credenciales.
 # ============================================================
 
 tenants:
@@ -20,7 +26,9 @@ tenants:
     thresholds:
       heuristic: 0.6
       ml: 0.6
-      final: 0.4
+    quotas:
+      requests_per_minute: 60
+      benchmarks_per_hour: 1
 
   - tenant_id: "acme-bank"
     name: "Acme Bank (perfil estricto de ejemplo)"
@@ -30,7 +38,9 @@ tenants:
     thresholds:
       heuristic: 0.6
       ml: 0.6
-      final: 0.6
+    quotas:
+      requests_per_minute: 120
+      benchmarks_per_hour: 5
 
   # Credencial pública de sandbox solicitada para probar la integración.
   # No usar esta clave predecible para datos ni tráfico de producción.
@@ -41,4 +51,6 @@ tenants:
     thresholds:
       heuristic: 0.6
       ml: 0.6
-      final: 0.5
+    quotas:
+      requests_per_minute: 60
+      benchmarks_per_hour: 1

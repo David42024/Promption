@@ -14,7 +14,9 @@ def _card(html: str) -> None:
     )
 
 
-def pct(value: float, digits: int = 1) -> str:
+def pct(value: float | None, digits: int = 1) -> str:
+    if value is None:
+        return "N/A"
     return f"{value * 100:.{digits}f}%"
 
 

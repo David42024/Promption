@@ -8,7 +8,9 @@ Output:
     data/processed/training_data.csv -> prompt, label, attack_type, category, dataset, source
 """
 import hashlib
+import json
 from pathlib import Path
+import re
 
 import pandas as pd
 
@@ -41,11 +43,15 @@ def load_raw_data(data_dir: str | None = None) -> pd.DataFrame:
     mal = _read_csv(raw / "malicious_prompts.csv", MAL_COLS)
     ben = _read_csv(raw / "benign_prompts.csv", BEN_COLS)
 
+    TRACKING_COLS = ("family_id", "group_id")
+
     def _norm(df: pd.DataFrame, cols: tuple[str, ...], defaults: dict) -> pd.DataFrame:
+        df = df.copy()
         for c in cols:
             if c not in df.columns:
                 df[c] = defaults.get(c, "")
-        return df[list(cols)]
+        keep = list(cols) + [c for c in TRACKING_COLS if c in df.columns]
+        return df[keep]
 
     mal = _norm(mal, MAL_COLS, {"dataset": "OWASP", "attack_type": "direct_request", "source": "local"})
     ben = _norm(ben, BEN_COLS, {"category": "general", "source": "local"})
@@ -64,7 +70,35 @@ def load_raw_data(data_dir: str | None = None) -> pd.DataFrame:
     df["prompt"] = df["prompt"].astype(str).str.strip()
     df = df[df["prompt"].str.len() > 0].drop_duplicates(subset=["prompt"], keep="first").reset_index(drop=True)
     df["lang"] = df["prompt"].map(detect_lang)
-    return df[["prompt", "label", "attack_type", "category", "dataset", "source", "lang"]]
+    df["group_id"] = _resolve_group_ids(df)
+    cols = ["prompt", "label", "attack_type", "category", "dataset", "source", "lang", "group_id"]
+    if "family_id" in df.columns:
+        cols.append("family_id")
+    return df[cols]
+
+
+def _resolve_group_ids(df: pd.DataFrame, processed_dir: str | None = None) -> pd.Series:
+    links_path = Path(processed_dir or _CONF["paths"]["processed_data"]) / "translation_links.json"
+    links = {}
+    if links_path.exists():
+        try:
+            with open(links_path, "r", encoding="utf-8") as f:
+                links = json.load(f)
+        except Exception:
+            links = {}
+
+    def _resolve(row):
+        fam = row.get("family_id")
+        if pd.notna(fam) and str(fam).strip():
+            return str(fam).strip()
+        grp = row.get("group_id")
+        if pd.notna(grp) and str(grp).strip():
+            return str(grp).strip()
+        clean = re.sub(r"[^\w\s]", "", str(row.get("prompt", "")).lower()).strip()
+        h = hashlib.sha256(clean.encode("utf-8")).hexdigest()[:12]
+        return links.get(h, h)
+
+    return df.apply(_resolve, axis=1)
 
 
 def apply_quarantine(df: pd.DataFrame, processed_dir: str | None = None) -> pd.DataFrame:
@@ -126,6 +160,7 @@ def load_training_data(processed_dir: str | None = None) -> pd.DataFrame:
     df = pd.read_csv(path, encoding="utf-8")
     if "lang" not in df.columns:  # CSVs generados antes de la columna lang
         df["lang"] = df["prompt"].map(detect_lang)
+    df["group_id"] = _resolve_group_ids(df, processed_dir)
     return apply_quarantine(apply_label_overrides(df, processed_dir), processed_dir)
 
 

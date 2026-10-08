@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     debug: bool = False
     chat_service_token: Optional[str] = None
     security_state_path: str = "data/security-state.json"
+    storage_backend: str = "memory"
+    sqlite_db_path: str = "data/conversations.db"
+    redis_url: str = "redis://localhost:6379/0"
+    workers: int = 1
     
     # CORS Configuration (como string separado por comas)
     cors_origins_str: str = ""

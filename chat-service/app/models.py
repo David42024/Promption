@@ -2,8 +2,15 @@
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
-from promption.api.models import ConversationEvidence
+from pydantic import BaseModel, Field, field_validator
+from promption.api.models import (
+    ConversationEvidence,
+    _validate_context_dict,
+    _validate_messages_list,
+    _validate_roles_list,
+    _validate_text,
+    _validate_user_id,
+)
 
 
 class UserRole(str, Enum):
@@ -16,39 +23,96 @@ class UserRole(str, Enum):
 
 class User(BaseModel):
     """User information"""
-    id: str
-    name: str
-    email: str
-    roles: List[UserRole]
+    id: str = Field(...)
+    name: str = Field(...)
+    email: str = Field(...)
+    roles: List[UserRole] = Field(...)
     avatar: Optional[str] = None
     puesto: Optional[str] = None
     authenticated: bool = True
 
+    @field_validator("id", "name", "email")
+    @classmethod
+    def validate_user_strings(cls, v: str) -> str:
+        return _validate_user_id(v)
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, v: list) -> list:
+        return _validate_roles_list(v)
+
 
 class ChatRequest(BaseModel):
     """Chat request from frontend"""
-    text: str = Field(..., min_length=1, max_length=5000)
+    text: str = Field(..., min_length=1)
     user: User
     context: Optional[Dict[str, Any]] = None
 
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, v: str) -> str:
+        return _validate_text(v)
+
+    @field_validator("context")
+    @classmethod
+    def validate_context(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if v is not None:
+            return _validate_context_dict(v)
+        return v
+
 
 class ConversationHistoryRequest(BaseModel):
-    conversation_id: str
+    conversation_id: str = Field(...)
     user: User
+
+    @field_validator("conversation_id")
+    @classmethod
+    def validate_conv_id(cls, v: str) -> str:
+        return _validate_user_id(v)
 
 
 class AIGuardRequest(BaseModel):
-    text: str = Field(..., max_length=50000)
-    user_id: str = Field(..., min_length=1, max_length=128)
-    roles: List[UserRole]
+    text: str = Field(..., min_length=1)
+    user_id: str = Field(..., min_length=1)
+    roles: List[UserRole] = Field(...)
     direction: Literal["input", "output"]
-    messages: List[ConversationEvidence] = Field(default_factory=list, max_length=128)
+    messages: List[ConversationEvidence] = Field(default_factory=list)
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, v: str) -> str:
+        return _validate_text(v)
+
+    @field_validator("user_id")
+    @classmethod
+    def validate_user_id(cls, v: str) -> str:
+        return _validate_user_id(v)
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, v: list) -> list:
+        return _validate_roles_list(v)
+
+    @field_validator("messages")
+    @classmethod
+    def validate_messages(cls, v: list) -> list:
+        return _validate_messages_list(v)
 
 
 class ScopeCheckRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=5000)
+    text: str = Field(..., min_length=1)
     user: User
-    messages: List[ConversationEvidence] = Field(default_factory=list, max_length=128)
+    messages: List[ConversationEvidence] = Field(default_factory=list)
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, v: str) -> str:
+        return _validate_text(v)
+
+    @field_validator("messages")
+    @classmethod
+    def validate_messages(cls, v: list) -> list:
+        return _validate_messages_list(v)
 
 
 class SecurityStateUpdate(BaseModel):
