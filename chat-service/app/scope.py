@@ -15,14 +15,19 @@ async def _evaluate(request: dict) -> dict:
         raise RuntimeError("Scope classifier is not configured")
     timeout = float(request.get("timeout") or 30.0)
     url = urljoin(settings.vercel_ai_url, "scope")
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+    from .http_client import get_shared_http_client
+    import asyncio
+    client = get_shared_http_client()
+    req_id = request.get("request_id") or ""
+    async with asyncio.timeout(timeout):
         response = await client.post(url, json={
             "text": request["text"], "system_prompt": request["system_prompt"],
             "messages": request["messages"], "identity": request["identity"],
             **({"tool": request["tool"]} if "tool" in request else {}),
-        }, headers={"X-Chat-Service-Token": settings.chat_service_token})
-        response.raise_for_status()
-        return response.json()
+            **({"request_id": req_id} if req_id else {}),
+        }, headers={"X-Chat-Service-Token": settings.chat_service_token, "X-Request-ID": req_id}, timeout=timeout)
+    response.raise_for_status()
+    return response.json()
 
 
 def get_scope_guard(timeout_seconds: float = 30.0) -> AsyncScopeGuard:

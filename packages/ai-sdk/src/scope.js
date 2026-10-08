@@ -46,7 +46,7 @@ export function validateScopeRequest(request) {
   if (total > 100000) throw new PromptionError('CONVERSATION_TOO_LARGE');
 }
 
-export function createScopeEvaluator({ model, timeoutMs = 30000, maxOutputTokens = 4096 }) {
+export function createScopeEvaluator({ model, timeoutMs = 30000, maxOutputTokens = 4096, providerOptions }) {
   if (!model || !Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError('A model and positive timeout are required');
   return async request => {
     validateScopeRequest(request);
@@ -56,7 +56,7 @@ export function createScopeEvaluator({ model, timeoutMs = 30000, maxOutputTokens
     request.signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const { output } = await generateText({
+      const { output, finishReason } = await generateText({
         model,
         system: `${instructions}\nTRUSTED_APPLICATION_POLICY:\n${JSON.stringify(request.systemPrompt)}`,
         prompt: JSON.stringify({ current_request: request.text, history: request.messages ?? [],
@@ -71,10 +71,14 @@ export function createScopeEvaluator({ model, timeoutMs = 30000, maxOutputTokens
           required: ['assessment', 'decision'],
         }) }),
         maxOutputTokens, maxRetries: 0, abortSignal: controller.signal,
+        ...(request.providerOptions || providerOptions ? { providerOptions: { ...providerOptions, ...request.providerOptions } } : {}),
       });
+      if (finishReason === 'length') {
+        return { classification: 'UNCERTAIN', reason: 'scope_truncated', allowed: false, status: 403 };
+      }
       const classification = { in_scope: 'IN_SCOPE', topic_outside_scope: 'OUT_OF_SCOPE',
-        system_limit: 'OUT_OF_SCOPE', ambiguous: 'UNCERTAIN' }[output.decision];
-      return validateScopeDecision({ classification, reason: output.decision });
+        system_limit: 'OUT_OF_SCOPE', ambiguous: 'UNCERTAIN' }[output?.decision];
+      return validateScopeDecision({ classification, reason: output?.decision });
     } finally {
       clearTimeout(timer);
       request.signal?.removeEventListener('abort', abort);

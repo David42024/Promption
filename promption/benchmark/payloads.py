@@ -27,7 +27,9 @@ def load_evaluation_set(data_dir: str | None = None, partition: str = "test",
                 "el manifiesto de particiones. Ejecuta primero la preparación o pasa allow_exploratory=True."
             )
         logger.warning("split_manifest.json no encontrado: ejecutando benchmark en modo exploratorio sobre el corpus completo.")
-        return df[["prompt", "label", "dataset", "attack_type", "source"]].reset_index(drop=True)
+        df["partition"] = "exploratory"
+        df["manifest_hash"] = "N/A"
+        return df[["prompt", "label", "dataset", "attack_type", "source", "partition", "manifest_hash"]].reset_index(drop=True)
 
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
@@ -83,6 +85,7 @@ def load_evaluation_set(data_dir: str | None = None, partition: str = "test",
 
     group_to_part = {v["group_id"]: v["partition"] for v in manifest["records"].values()}
     df["partition"] = df["group_id"].map(group_to_part)
+    df["manifest_hash"] = manifest_hash or "N/A"
 
     if partition == "all":
         if not allow_exploratory:
@@ -95,8 +98,9 @@ def load_evaluation_set(data_dir: str | None = None, partition: str = "test",
 
     df = df[eval_mask].reset_index(drop=True)
     logger.info("Loaded %d samples for benchmark from '%s' partition.", len(df), partition)
-    df = df[["prompt", "label", "dataset", "attack_type", "source"]].reset_index(drop=True)
-    return df
+    extra_cols = [c for c in ("partition", "manifest_hash", "family_id", "group_id") if c in df.columns]
+    base_cols = ["prompt", "label", "dataset", "attack_type", "source"]
+    return df[base_cols + extra_cols].reset_index(drop=True)
 
 
 def summary(df):

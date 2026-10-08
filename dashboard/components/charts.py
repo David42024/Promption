@@ -150,18 +150,19 @@ def plot_performance_by_attack_type(df: pd.DataFrame) -> go.Figure:
     return _base(fig, "Detección y ASR por tipo de ataque")
 
 
-def plot_confusion_matrix(tp: int, fp: int, fn: int, tn: int) -> go.Figure:
+def plot_confusion_matrix(tp: int, fp: int, fn: int, tn: int, title: str = "Matriz de confusión del filtro") -> go.Figure:
     z = [[tn, fp], [fn, tp]]
     labels = [["TN", "FP"], ["FN", "TP"]]
+    total = max(int(np.sum(z)), 1)
     text = [[f"{labels[i][j]}<br>{z[i][j]}<br>{v:.1f}%" for j, v in enumerate(row)]
-            for i, row in enumerate((np.array(z) / max(np.sum(z), 1) * 100).tolist())]
+            for i, row in enumerate((np.array(z) / total * 100).tolist())]
     fig = go.Figure(go.Heatmap(
         z=np.array(z), x=["Permitido", "Bloqueado"], y=["Benigno", "Malicioso"],
         text=text, texttemplate="%{text}", colorscale="Blues", showscale=False,
         hovertemplate="Real: %{y}<br>Predicho: %{x}<br>Count: %{z}<extra></extra>",
     ))
     fig.update_layout(width=460, height=420)
-    return _base(fig, "Matriz de confusión del filtro")
+    return _base(fig, title)
 
 
 def plot_roc_curve(roc: dict) -> go.Figure:
@@ -272,3 +273,76 @@ def plot_word_cloud_side_by_side(df: pd.DataFrame) -> None:
             st.image(img, caption="Prompts benignos")
         else:
             st.info("Sin datos benignos")
+
+
+def plot_layer_blocks(df: pd.DataFrame) -> go.Figure:
+    """Bloqueos desglosados por capa: heurística, ML, alcance/permisos y output guard."""
+    pal = _pal()
+    if df.empty:
+        return go.Figure()
+    
+    heur_blocks = int(pd.to_numeric(df.get("heuristic_blocked", 0), errors="coerce").fillna(0).sum())
+    ml_blocks = int(pd.to_numeric(df.get("ml_blocked", 0), errors="coerce").fillna(0).sum()) if "ml_blocked" in df.columns else 0
+    scope_blocks = int((df.get("scope_decision") == "BLOCKED").sum()) if "scope_decision" in df.columns else 0
+    guard_blocks = int((df.get("output_guard_action") == "BLOCK").sum()) if "output_guard_action" in df.columns else 0
+    guard_redacts = int((df.get("output_guard_action") == "REDACT").sum()) if "output_guard_action" in df.columns else 0
+    
+    names = ["Heurística", "ML", "Alcance/Permisos", "Output Guard (Bloqueo)", "Output Guard (Redacción)"]
+    vals = [heur_blocks, ml_blocks, scope_blocks, guard_blocks, guard_redacts]
+    colors = [pal["orange"], pal["blue"], pal["purple"] if "purple" in pal else pal["primary"], pal["red"], pal["green"]]
+    
+    fig = go.Figure(go.Bar(
+        x=names, y=vals, text=[str(v) for v in vals], textposition="outside",
+        marker_color=colors,
+    ))
+    fig.update_layout(yaxis_title="Cantidad de intervenciones", showlegend=False)
+    return _base(fig, "Intervenciones y bloqueos por capa")
+
+
+def plot_leaks_before_after(df: pd.DataFrame) -> go.Figure:
+    """Comparativa de fugas estrictas del secreto antes y después de Output Guard."""
+    pal = _pal()
+    if df.empty or "secret_leaked_before_guard" not in df.columns:
+        return go.Figure()
+    
+    mal = df[pd.to_numeric(df.get("label", 0), errors="coerce").fillna(0).astype(int) == 1]
+    s_before = pd.to_numeric(mal.get("secret_leaked_before_guard", pd.Series(dtype=float)), errors="coerce").dropna()
+    s_after = pd.to_numeric(mal.get("secret_leaked_after_guard", pd.Series(dtype=float)), errors="coerce").dropna()
+    
+    leaks_before = int((s_before == 1.0).sum())
+    leaks_after = int((s_after == 1.0).sum())
+    prevented = max(0, leaks_before - leaks_after)
+    
+    names = ["Fugas antes de Output Guard", "Fugas entregadas tras Guard", "Fugas prevenidas / neutralizadas"]
+    vals = [leaks_before, leaks_after, prevented]
+    colors = [pal["red"], pal["red"] if leaks_after > 0 else pal["green"], pal["green"]]
+    
+    fig = go.Figure(go.Bar(
+        x=names, y=vals, text=[str(v) for v in vals], textposition="outside",
+        marker_color=colors,
+    ))
+    fig.update_layout(yaxis_title="Casos", showlegend=False)
+    return _base(fig, "Confidencialidad: Fugas de secreto antes y después de Output Guard")
+
+
+def plot_latency_breakdown(df: pd.DataFrame) -> go.Figure:
+    """Distribución de latencias medias por capa del recorrido."""
+    pal = _pal()
+    if df.empty:
+        return go.Figure()
+    
+    heur_mean = float(pd.to_numeric(df.get("heuristic_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
+    ml_mean = float(pd.to_numeric(df.get("ml_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
+    scope_mean = float(pd.to_numeric(df.get("scope_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
+    og_mean = float(pd.to_numeric(df.get("output_guard_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
+    llm_mean = float(pd.to_numeric(df.get("llm_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
+    
+    names = ["Heurística", "ML", "Alcance", "Output Guard", "Generación LLM"]
+    vals = [round(heur_mean, 2), round(ml_mean, 2), round(scope_mean, 2), round(og_mean, 2), round(llm_mean, 2)]
+    
+    fig = go.Figure(go.Bar(
+        x=names, y=vals, text=[f"{v} ms" for v in vals], textposition="outside",
+        marker_color=[pal["orange"], pal["blue"], pal["primary"], pal["green"], pal["red"]],
+    ))
+    fig.update_layout(yaxis_title="Latencia media (ms)", showlegend=False)
+    return _base(fig, "Latencia media por etapa del sistema")

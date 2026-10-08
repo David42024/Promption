@@ -142,6 +142,13 @@ class LLMResponse(BaseModel):
     model: str
     latency_ms: float
     ok: bool = True
+    requested_model: Optional[str] = None
+    fallback_count: int = 0
+    fallback_reason: Optional[str] = None
+    truncated: bool = False
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
 
 
 class MCPToolCall(BaseModel):
@@ -172,6 +179,11 @@ class PolicyInfo(BaseModel):
     confidence: float
     reason: str
 
+    @property
+    def tool_name(self) -> Optional[str]:
+        """Legacy single-tool accessor for backwards compatibility."""
+        return self.tool_names[0] if self.tool_names else None
+
 
 class ChatResponse(BaseModel):
     """Complete chat response"""
@@ -194,6 +206,12 @@ class ChatResponse(BaseModel):
     policy: Optional[PolicyInfo] = None
     security_classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
     scope: Optional[Dict[str, Any]] = None
+    requested_model: Optional[str] = None
+    fallback_count: int = 0
+    fallback_reason: Optional[str] = None
+    eval_counts: Optional[Dict[str, int]] = None
+    request_id: Optional[str] = None
+    execution_metrics: Optional[Dict[str, Any]] = None
 
 
 class HealthResponse(BaseModel):

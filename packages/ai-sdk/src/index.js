@@ -110,28 +110,46 @@ export function createPromption(config) {
 
   function middleware(options) {
     const identity = identityOf(options.identity);
-    const guard = (text, direction, params) => check(text, {
-      identity, direction, signal: options.signal ?? params?.abortSignal, context: options.context,
+    const turnCache = new Map();
+    const guardKey = (text, direction, opts = {}) => JSON.stringify({
+      t: text, d: direction, u: identity.userId, r: [...identity.roles].sort(), a: identity.authenticated,
+      m: opts.messages ?? null, c: opts.context ?? options.context ?? null,
     });
+    const cachedGuard = async (text, direction, params, extra = {}) => {
+      const opts = { identity, direction, signal: options.signal ?? params?.abortSignal, context: options.context, ...extra };
+      const key = guardKey(text, direction, opts);
+      if (turnCache.has(key)) return turnCache.get(key);
+      const res = await check(text, opts);
+      turnCache.set(key, res);
+      return res;
+    };
+    const guard = (text, direction, params) => cachedGuard(text, direction, params);
     const evidence = params => conversationEvidence(params?.prompt ?? [], options.securityMessages,
       { maxMessages: config.maxConversationMessages, maxChars: config.maxConversationChars });
+    const scopeKey = (text, systemPrompt, msgs, tool) => JSON.stringify({
+      t: text, u: identity.userId, r: [...identity.roles].sort(), a: identity.authenticated,
+      s: systemPrompt, m: msgs, tl: tool ?? null,
+    });
     const scopeGuard = async (params, tool) => {
       if (!config.scopeEvaluator) return;
       const systemPrompt = options.systemPrompt ?? (params?.prompt ?? [])
         .filter(message => message.role === "system").map(textOf).join("\n\n");
       const lastText = textOf((params?.prompt ?? []).filter(message => message.role === "user").at(-1));
       const texts = new Set([options.originalText ?? lastText, ...(lastText ? [lastText] : [])]);
+      const ev = evidence(params);
       for (const text of texts) {
-        await enforceScope(text, { identity, systemPrompt, messages: evidence(params), tool,
+        const key = scopeKey(text, systemPrompt, ev, tool);
+        if (turnCache.has(key)) continue;
+        await enforceScope(text, { identity, systemPrompt, messages: ev, tool,
           signal: options.signal ?? params?.abortSignal });
+        turnCache.set(key, true);
       }
     };
     const conversationGuard = async (text, params, extra = []) => {
       const messages = [...evidence(params), ...extra];
       if (!messages.length) return;
       const original = text || " ";
-      const safe = await check(original, { identity, direction: "input",
-        signal: options.signal ?? params?.abortSignal, context: options.context, messages });
+      const safe = await cachedGuard(original, "input", params, { messages });
       if (safe !== original) throw new PromptionError("CONVERSATION_REDACTED");
     };
     async function content(parts, params) {

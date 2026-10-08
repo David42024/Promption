@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     llm_max_attempts: int = 1
     llm_retry_backoff_seconds: float = 0.35
     
+    # Tool and Token Budgets
+    max_tool_turns: int = 5
+    max_tool_calls_per_turn: int = 8
+    token_budget_chat: int = 2500
+    token_budget_scope: int = 600
+    token_budget_tools: int = 4500
+    max_context_chars: int = 80000
+    
     # Service Configuration
     service_name: str = "promption-chat-service"
     version: str = "1.0.0"
@@ -75,6 +83,18 @@ def validate_chat_service_configuration(s: Settings | None = None, *, is_test: b
         raise ValueError("llm_max_attempts must be at least 1")
     if not cfg.llm_provider_order or not cfg.llm_provider_order.strip():
         raise ValueError("llm_provider_order cannot be empty")
+    if cfg.max_tool_turns < 1:
+        raise ValueError("max_tool_turns must be at least 1")
+    if cfg.max_tool_calls_per_turn < 1:
+        raise ValueError("max_tool_calls_per_turn must be at least 1")
+    if cfg.token_budget_chat < 100:
+        raise ValueError("token_budget_chat must be at least 100")
+    if cfg.token_budget_scope < 100:
+        raise ValueError("token_budget_scope must be at least 100")
+    if cfg.token_budget_tools < 100:
+        raise ValueError("token_budget_tools must be at least 100")
+    if cfg.max_context_chars < 1000:
+        raise ValueError("max_context_chars must be at least 1000")
 
     if is_test is None:
         is_test_mode = (
