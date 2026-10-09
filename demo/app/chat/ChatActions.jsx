@@ -11,21 +11,9 @@ function download(action) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function downloadExisting(action) {
-  const response = await fetch(`/api/docs?id=${encodeURIComponent(action.id)}`);
-  if (!response.ok) throw new Error("Ya no tienes permiso para descargar este documento.");
-  const file = await response.json();
-  const url = URL.createObjectURL(new Blob([file.body], { type: "text/markdown;charset=utf-8" }));
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `${action.id}.md`;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 export default function ChatActions({ actions = [], onAnswer }) {
   const dialog = actions.find(action => action.type === "dialog");
-  const files = actions.filter(action => action.type === "attachment" || action.type === "existing_document");
+  const files = actions.filter(action => action.type === "attachment");
   const [error, setError] = useState("");
   const [asking, setAsking] = useState(Boolean(dialog));
   const [answer, setAnswer] = useState("");
@@ -33,8 +21,7 @@ export default function ChatActions({ actions = [], onAnswer }) {
 
   async function receive(file) {
     try {
-      if (file.type === "existing_document") await downloadExisting(file);
-      else download(file);
+      download(file);
       setError("");
     } catch (cause) {
       setError(cause.message || "No se pudo descargar el archivo.");

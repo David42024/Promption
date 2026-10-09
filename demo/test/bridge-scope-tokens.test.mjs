@@ -231,3 +231,91 @@ test('Security block (CONTENT_BLOCKED) preserves code, status and prevents provi
   assert.equal(data.generation_calls, 0);
   assert.equal(data.scope_calls, 0);
 });
+import { POST as scopePOST } from '../app/api/ai/scope/route.js';
+
+test('Scope endpoint receipts eliminate equivalent turn classification without losing generation tokens', async t => {
+  const originalEnv = { ...process.env };
+  const originalFetch = globalThis.fetch;
+  Object.assign(process.env, { CHAT_SERVICE_TOKEN:'test-chat-token', CHAT_API_URL:'http://127.0.0.1:8000',
+    OPENAI_API_KEY:'test-openai-key', OPENAI_MODEL:'gpt-4o-mini', OPENAI_TOOL_MODEL:'gpt-4o-mini' });
+  t.after(() => { process.env = originalEnv; globalThis.fetch = originalFetch; });
+  let scopeAttempts = 0;
+  let generationAttempts = 0;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes('/api/v1/ai/guard')) {
+      const input = JSON.parse(options.body);
+      return Response.json({allowed:true,text:input.text,action:'PASS',conversation_checked:true});
+    }
+    if (String(options?.body).includes('scope_decision')) { scopeAttempts++; return makeScopeResponse(); }
+    generationAttempts++;
+    return makeGenerationResponse('Respuesta autorizada');
+  };
+  const text = 'Consulta de tienda';
+  const policy = 'Asistente de tienda oficial.';
+  const messages = [{role:'user',content:text}];
+  const scopeBinding = { request_id:'receipt-request', tenant_id:'tenant-1', conversation_id:'conv-1' };
+  const body = { text, system_prompt:policy, messages,
+    identity:{user_id:'u-1',roles:['customer'],authenticated:true}, scope_binding:scopeBinding };
+  const headers = {'content-type':'application/json','x-chat-service-token':'test-chat-token','x-request-id':'receipt-request'};
+  const first = await scopePOST(new Request('http://localhost/api/ai/scope',{method:'POST',headers,body:JSON.stringify(body)}));
+  const verdict = await first.json();
+  assert.equal(verdict.provider_calls,1);
+  assert.equal(scopeAttempts,1);
+  assert.equal(typeof verdict.scope_receipt,'string');
+  const repeated = await scopePOST(new Request('http://localhost/api/ai/scope',{method:'POST',headers,
+    body:JSON.stringify({...body,scope_receipts:[verdict.scope_receipt]})}));
+  const cached = await repeated.json();
+  assert.equal(cached.provider_calls,0);
+  assert.equal(cached.reused,true);
+  assert.equal(cached.scope_receipt,undefined);
+  assert.equal(scopeAttempts,1);
+  const result = await POST(makeTurnRequest({request_id:'receipt-request',security_messages:messages,
+    scope_system_prompt:policy,scope_binding:scopeBinding,scope_receipts:[verdict.scope_receipt]}, {'x-request-id':'receipt-request'}));
+  assert.equal(result.status,200);
+  const output = await result.json();
+  assert.equal(output.scope_calls,0);
+  assert.equal(output.generation_calls,1);
+  assert.equal(output.provider_calls,1);
+  assert.equal(output.usage.total_tokens,30);
+  assert.equal(output.usage_coverage.is_complete,true);
+  assert.equal(scopeAttempts,1);
+  assert.equal(generationAttempts,1);
+});
+
+test('Scope endpoint timeout after provider dispatch retains one call and HTTP 504', async t => {
+  const originalEnv = { ...process.env };
+  const originalFetch = globalThis.fetch;
+  Object.assign(process.env, { CHAT_SERVICE_TOKEN:'test-chat-token', OPENAI_API_KEY:'test-openai-key', OPENAI_MODEL:'gpt-4o-mini' });
+  t.after(() => { process.env = originalEnv; globalThis.fetch = originalFetch; });
+  let attempts = 0;
+  globalThis.fetch = async (_url, options) => {
+    attempts++;
+    return new Promise((resolve, reject) => {
+      if (options.signal.aborted) reject(options.signal.reason);
+      else options.signal.addEventListener('abort', () => reject(options.signal.reason), {once:true});
+    });
+  };
+  const result = await scopePOST(new Request('http://localhost/api/ai/scope', {method:'POST',
+    headers:{'content-type':'application/json','x-chat-service-token':'test-chat-token'},
+    body:JSON.stringify({text:'Catálogo',system_prompt:'Solo tienda',messages:[],timeout_ms:20,
+      identity:{user_id:'u',roles:['customer'],authenticated:true}}) }));
+  const decision = await result.json();
+  assert.equal(attempts,1);
+  assert.equal(result.status,504);
+  assert.equal(decision.reason,'scope_timeout');
+  assert.equal(decision.provider_calls,1);
+  assert.equal(decision.usage,null);
+});
+
+test('Scope endpoint malformed policy is rejected before provider dispatch', async t => {
+  const originalEnv = { ...process.env };
+  const originalFetch = globalThis.fetch;
+  Object.assign(process.env, { CHAT_SERVICE_TOKEN:'test-chat-token', OPENAI_API_KEY:'test-openai-key', OPENAI_MODEL:'gpt-4o-mini' });
+  t.after(() => { process.env = originalEnv; globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => assert.fail('Invalid policy must not reach the provider');
+  const result = await scopePOST(new Request('http://localhost/api/ai/scope', {method:'POST',
+    headers:{'content-type':'application/json','x-chat-service-token':'test-chat-token'},
+    body:JSON.stringify({text:'Catálogo',system_prompt:'',messages:[],identity:{user_id:'u',roles:['customer']}}) }));
+  assert.equal(result.status,400);
+  assert.equal((await result.json()).provider_calls,0);
+});

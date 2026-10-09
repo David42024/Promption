@@ -1,3 +1,4 @@
+import { withScopeReceipts } from "./scopeReceipts.js";
 import { createPromption, createGuardEndpointTransport, createScopeEvaluator } from "@promption/ai-sdk";
 
 function getChatApiUrl() {
@@ -12,12 +13,15 @@ const toolPolicies = {
   getEmployees: { roles: ["admin"] }, getVIPClients: { roles: ["admin"] },
   getKPIStats: { roles: ["admin"] }, getRevenueReport: { roles: ["admin"] },
   getTopProducts: { roles: ["admin"] },
-  ask_user: {}, attach_existing_document: {},
+  ask_user: {},
   web_search: { roles: ["ventas", "admin"] }, web_open: { roles: ["ventas", "admin"] },
 };
 
-function promption(scopeModel, scopeProviderOptions, onScope) {
-  const evaluateScope = scopeModel ? createScopeEvaluator({ model: scopeModel, providerOptions: scopeProviderOptions }) : null;
+function promption(scopeModel, scopeProviderOptions, onScope, options = {}) {
+  const evaluateScope = scopeModel ? withScopeReceipts(
+    createScopeEvaluator({ model: scopeModel, providerOptions: scopeProviderOptions }),
+    { receipts: options.scopeReceipts, binding: options.scopeBinding, model: options.scopeModelId,
+      secret: process.env.CHAT_SERVICE_TOKEN, requestId: options.requestId, onReceipt: options.onScopeReceipt }) : null;
   return createPromption({
     transport: createGuardEndpointTransport({
       url: `${getChatApiUrl()}/api/v1/ai/guard`, token: process.env.CHAT_SERVICE_TOKEN,
@@ -41,7 +45,8 @@ function promption(scopeModel, scopeProviderOptions, onScope) {
 
 export function promptionMiddleware(identity, originalText, signal, securityMessages, scopeModel, scopeProviderOptions, options = {}) {
   const onScope = typeof options === 'function' ? options : options?.onScope;
-  return promption(scopeModel, scopeProviderOptions, onScope).middleware({
+  return promption(scopeModel, scopeProviderOptions, onScope, options).middleware({
+    systemPrompt: options?.systemPrompt,
     identity, originalText, signal, securityMessages, toolPolicies, onScope,
   });
 }

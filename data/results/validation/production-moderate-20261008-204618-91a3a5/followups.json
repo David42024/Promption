@@ -1,0 +1,1028 @@
+[
+  {
+    "case": "repeat_budget_1",
+    "http": 200,
+    "latency_ms": 8303.0,
+    "data": {
+      "blocked": false,
+      "reply": "Puedo ayudarte a comparar laptops de nuestra tienda, siempre usando información autorizada. Para darte una comparación precisa necesito algo de contexto:\n\n- ¿Qué dos modelos tienes en lista o en nuestro catálogo? Si me dices nombres o SKUs, te devuelvo una comparación de características y precios vigentes.\n- ¿Cuál es tu presupuesto máximo y qué uso principal le darás (trabajo, juegos, edición, movilidad)?\n- ¿Qué características te importan más (CPU, RAM, SSD, GPU, pantalla, autonomía, peso)?\n\nSi prefieres, puedo empezar con una guía rápida para comparar sin gastar de más:\n\nGuía rápida para comparar laptops y evitar gastar de más\n- Define el uso principal: productividad (ofimática, navegación), creatividad (edición de video/foto), o gaming.\n- Prioriza el cuello de botella: para productividad, enfocarte en CPU y RAM; para edición, en CPU + GPU y almacenamiento; para gaming, en GPU y tasa de refresco.\n- Relación rendimiento-precio: busca al menos dos generaciones recientes de procesadores y 8–16 GB de RAM para tareas modernas; 256 GB SSD mínimo para sistema y aplicaciones, 512 GB si trabajas con archivos grandes.\n- Considera la capacidad futura: si planeas usar el equipo 4–5 años, elige un extra de RAM o un SSD más rápido y mayor.\n- Eficiencia energética: pantallas IPS, 1080p o más, y buena batería para movilidad.\n- Expansión y puertos: USB-C/Thunderbolt si planeas conectar periféricos; lector de tarjetas si necesitas transferir datos.\n- Garantía y servicio: verifica duración y cobertura del fabricante o tienda.\n- Oferta y promociones: compara precios actuales y revisa si hay descuentos por modelos anteriores o bundles.\n\nSi me das dos modelos o una lista de opciones de nuestro catálogo, te hago una comparación directa de especificaciones, precio y duración estimada de rendimiento para ayudarte a decidir sin gastar de más.",
+      "leaked": false,
+      "audit": [],
+      "actions": [],
+      "guard": "PASS",
+      "filter_enabled": true,
+      "output_guard_enabled": true,
+      "filter_skipped": false,
+      "output_guard_skipped": false,
+      "role": "customer",
+      "model": "OpenAI · gpt-5-nano",
+      "filter_layers": {
+        "heuristic": {
+          "blocked": false,
+          "score": 0.5,
+          "signal": "unknown",
+          "matched_rules": [],
+          "threshold": 0.8,
+          "benign_matched": []
+        },
+        "ml": {
+          "available": true,
+          "blocked": false,
+          "probability": 0.28843697636138615,
+          "threshold": 0.66,
+          "status": "SUCCESS",
+          "error_code": null,
+          "state": "HEALTHY"
+        },
+        "ensemble": {
+          "score": 0.28843697636138615,
+          "decision": "GUARDED",
+          "requires_output_guard": true,
+          "heuristic_band": "MEDIUM",
+          "ml_band": "LOW",
+          "decision_low_threshold": 0.33,
+          "decision_high_threshold": 0.66,
+          "benign_matched": []
+        },
+        "classification": {
+          "label": "UNCERTAIN",
+          "requires_review": true,
+          "ml_benign_threshold": 0.33,
+          "ml_malicious_threshold": 0.66
+        },
+        "conversation": {
+          "blocked": false,
+          "requires_output_guard": true,
+          "matched_rules": [],
+          "message_count": 1,
+          "tool_message_count": 0,
+          "reason": "conversation_checked"
+        }
+      },
+      "reason": null,
+      "confidence": null,
+      "block_type": null,
+      "policy": {
+        "allowed": true,
+        "matched": false,
+        "policy_id": "unclassified",
+        "resource": "general_assistance",
+        "tier": "unclassified",
+        "tool_names": [],
+        "required_roles": [],
+        "confidence": 0.5,
+        "reason": "No resource identified; application unmatched policy applied"
+      },
+      "security_classification": "UNCERTAIN",
+      "scope": {
+        "classification": "IN_SCOPE",
+        "reason": "in_scope",
+        "status": 200,
+        "model": "gpt-5-nano",
+        "provider_calls": 1,
+        "prompt_tokens": 1721,
+        "completion_tokens": 59,
+        "total_tokens": 1780,
+        "reasoning_tokens": 0,
+        "allowed": true
+      },
+      "requested_model": "OpenAI · gpt-5-nano",
+      "fallback_count": 0,
+      "fallback_reason": null,
+      "eval_counts": {
+        "input": 1,
+        "conversation": 0,
+        "scope": 1,
+        "tool": 0,
+        "output": 1,
+        "deduplicated": 1
+      },
+      "request_id": "c6cbd2057dfc4dfb842a21d152b98278",
+      "execution_metrics": {
+        "request_id": "c6cbd2057dfc4dfb842a21d152b98278",
+        "requested_model": "OpenAI · gpt-5-nano",
+        "effective_model": "OpenAI · gpt-5-nano",
+        "scope_model": "gpt-5-nano",
+        "call_type": "chat",
+        "generation_calls": 1,
+        "scope_calls": 2,
+        "provider_calls": 3,
+        "failed_calls": 0,
+        "fallback_count": 0,
+        "fallback_reason": null,
+        "prompt_tokens": 5147,
+        "completion_tokens": 557,
+        "total_tokens": 5704,
+        "reasoning_tokens": 0,
+        "known_usage": {
+          "prompt_tokens": 5147,
+          "completion_tokens": 557,
+          "total_tokens": 5704,
+          "reasoning_tokens": 0
+        },
+        "usage_coverage": {
+          "calls_total": 3,
+          "calls_with_usage": 3,
+          "calls_without_usage": 0,
+          "is_complete": true,
+          "fields": {
+            "prompt_tokens": true,
+            "completion_tokens": true,
+            "total_tokens": true,
+            "reasoning_tokens": true
+          }
+        },
+        "filter_status": "executed",
+        "output_guard_status": "executed",
+        "stages": {
+          "input_filter": {
+            "status": "executed",
+            "latency_ms": 151.78
+          },
+          "conversation_guard": {
+            "status": "skipped",
+            "latency_ms": null
+          },
+          "scope": {
+            "status": "executed",
+            "latency_ms": 1667.22
+          },
+          "generation": {
+            "status": "executed",
+            "latency_ms": 6033.35
+          },
+          "tools": {
+            "status": "skipped",
+            "latency_ms": null
+          },
+          "output_guard": {
+            "status": "executed",
+            "latency_ms": 76.04
+          }
+        },
+        "stage_latencies_ms": {
+          "input_filter": 151.78,
+          "scope": 1667.22,
+          "generation": 6033.35,
+          "output_guard": 76.04
+        },
+        "total_latency_ms": 7932.05
+      }
+    }
+  },
+  {
+    "case": "repeat_budget_2",
+    "http": 200,
+    "latency_ms": 4058.85,
+    "data": {
+      "blocked": true,
+      "reply": "La revisión de alcance bloqueó la operación propuesta. Reformula la solicitud.",
+      "leaked": false,
+      "audit": [],
+      "actions": [],
+      "guard": "SKIPPED",
+      "filter_enabled": true,
+      "output_guard_enabled": true,
+      "filter_skipped": false,
+      "output_guard_skipped": false,
+      "role": "customer",
+      "model": "",
+      "filter_layers": null,
+      "reason": "out_of_scope",
+      "confidence": null,
+      "block_type": "scope",
+      "policy": {
+        "allowed": true,
+        "matched": false,
+        "policy_id": "unclassified",
+        "resource": "general_assistance",
+        "tier": "unclassified",
+        "tool_names": [],
+        "required_roles": [],
+        "confidence": 0.5,
+        "reason": "No resource identified; application unmatched policy applied"
+      },
+      "security_classification": "UNCERTAIN",
+      "scope": {
+        "classification": "OUT_OF_SCOPE",
+        "reason": "topic_outside_scope",
+        "status": 403,
+        "model": null,
+        "provider_calls": 0,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null,
+        "reasoning_tokens": null,
+        "allowed": false
+      },
+      "requested_model": "",
+      "fallback_count": 0,
+      "fallback_reason": null,
+      "eval_counts": {
+        "input": 1,
+        "conversation": 0,
+        "scope": 1,
+        "tool": 0,
+        "output": 0,
+        "deduplicated": 1
+      },
+      "request_id": "acfb570c79984232a2ccf1bbf8eccdb9",
+      "execution_metrics": {
+        "request_id": "acfb570c79984232a2ccf1bbf8eccdb9",
+        "requested_model": "none",
+        "effective_model": "none",
+        "scope_model": "gpt-5-nano",
+        "call_type": "chat",
+        "generation_calls": 0,
+        "scope_calls": 2,
+        "provider_calls": 2,
+        "failed_calls": 1,
+        "fallback_count": 0,
+        "fallback_reason": null,
+        "prompt_tokens": 3533,
+        "completion_tokens": 121,
+        "total_tokens": 3654,
+        "reasoning_tokens": 0,
+        "known_usage": {
+          "prompt_tokens": 3533,
+          "completion_tokens": 121,
+          "total_tokens": 3654,
+          "reasoning_tokens": 0
+        },
+        "usage_coverage": {
+          "calls_total": 2,
+          "calls_with_usage": 2,
+          "calls_without_usage": 0,
+          "is_complete": true,
+          "fields": {
+            "prompt_tokens": true,
+            "completion_tokens": true,
+            "total_tokens": true,
+            "reasoning_tokens": true
+          }
+        },
+        "filter_status": "executed",
+        "output_guard_status": "skipped",
+        "stages": {
+          "input_filter": {
+            "status": "executed",
+            "latency_ms": 131.77
+          },
+          "conversation_guard": {
+            "status": "skipped",
+            "latency_ms": null
+          },
+          "scope": {
+            "status": "executed",
+            "latency_ms": 994.24
+          },
+          "generation": {
+            "status": "skipped",
+            "latency_ms": null
+          },
+          "tools": {
+            "status": "skipped",
+            "latency_ms": null
+          },
+          "output_guard": {
+            "status": "skipped",
+            "latency_ms": null
+          }
+        },
+        "stage_latencies_ms": {
+          "input_filter": 131.77,
+          "scope": 994.24
+        },
+        "total_latency_ms": 3690.4
+      }
+    }
+  },
+  {
+    "case": "repeat_quoted_product_1",
+    "http": 200,
+    "latency_ms": 5321.63,
+    "data": {
+      "blocked": true,
+      "reply": "Promption no pudo autorizar la operación propuesta por el modelo.",
+      "leaked": false,
+      "audit": [
+        {
+          "tool": "getCatalogSummary",
+          "allowed": true,
+          "result": null,
+          "reason": null,
+          "tier": "publico"
+        }
+      ],
+      "actions": [],
+      "guard": "SKIPPED",
+      "filter_enabled": true,
+      "output_guard_enabled": true,
+      "filter_skipped": false,
+      "output_guard_skipped": false,
+      "role": "customer",
+      "model": "",
+      "filter_layers": null,
+      "reason": "content_blocked",
+      "confidence": null,
+      "block_type": "model_guard",
+      "policy": {
+        "allowed": true,
+        "matched": true,
+        "policy_id": "public.catalog",
+        "resource": "product_catalog",
+        "tier": "publico",
+        "tool_names": [
+          "getCatalogSummary"
+        ],
+        "required_roles": [],
+        "confidence": 0.88,
+        "reason": "Roles authorized for every matched resource"
+      },
+      "security_classification": "UNCERTAIN",
+      "scope": {
+        "classification": "IN_SCOPE",
+        "reason": "in_scope",
+        "status": 200,
+        "model": "gpt-5-nano",
+        "provider_calls": 1,
+        "prompt_tokens": 1732,
+        "completion_tokens": 71,
+        "total_tokens": 1803,
+        "reasoning_tokens": 0,
+        "allowed": true
+      },
+      "requested_model": "",
+      "fallback_count": 0,
+      "fallback_reason": null,
+      "eval_counts": {
+        "input": 1,
+        "conversation": 1,
+        "scope": 1,
+        "tool": 1,
+        "output": 0,
+        "deduplicated": 1
+      },
+      "request_id": "fd19c78000ff426bb01e203c0b2561ae",
+      "execution_metrics": {
+        "request_id": "fd19c78000ff426bb01e203c0b2561ae",
+        "requested_model": "none",
+        "effective_model": "none",
+        "scope_model": "gpt-5-nano",
+        "call_type": "tool",
+        "generation_calls": 1,
+        "scope_calls": 2,
+        "provider_calls": 3,
+        "failed_calls": 2,
+        "fallback_count": 0,
+        "fallback_reason": null,
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null,
+        "reasoning_tokens": null,
+        "known_usage": {
+          "prompt_tokens": 3599,
+          "completion_tokens": 132,
+          "total_tokens": 3731,
+          "reasoning_tokens": 0
+        },
+        "usage_coverage": {
+          "calls_total": 3,
+          "calls_with_usage": 2,
+          "calls_without_usage": 1,
+          "is_complete": false,
+          "fields": {
+            "prompt_tokens": false,
+            "completion_tokens": false,
+            "total_tokens": false,
+            "reasoning_tokens": false
+          }
+        },
+        "filter_status": "executed",
+        "output_guard_status": "skipped",
+        "stages": {
+          "input_filter": {
+            "status": "executed",
+            "latency_ms": 58.46
+          },
+          "conversation_guard": {
+            "status": "skipped",
+            "latency_ms": null
+          },
+          "scope": {
+            "status": "executed",
+            "latency_ms": 1941.83
+          },
+          "generation": {
+            "status": "failed",
+            "latency_ms": null
+          },
+          "tools": {
+            "status": "executed",
+            "latency_ms": 0.46
+          },
+          "output_guard": {
+            "status": "skipped",
+            "latency_ms": null
+          }
+        },
+        "stage_latencies_ms": {
+          "input_filter": 58.46,
+          "scope": 1941.83,
+          "tools": 0.46
+        },
+        "total_latency_ms": 5049.94
+      }
+    }
+  },
+  {
+    "case": "repeat_quoted_product_2",
+    "http": 200,
+    "latency_ms": 5494.06,
+    "data": {
+      "blocked": false,
+      "reply": "Este texto de producto es una descripción breve y clara que resalta dos características clave de los auriculares:\n\n- Inalámbricos: sugiriendo libertad de movimiento y ausencia de cables.\n- Batería de larga duración: enfatiza una mayor autonomía entre cargas.\n\nEs una descripción genérica que probablemente forme parte de una ficha técnica o título de producto, y podría ampliarse con detalles como capacidad de la batería (miriametrar la duración en minutos/horas), tipo de conectividad (Bluetooth versión), calidad de sonido, comodidad, compatibilidad con dispositivos, y características adicionales (cancelación de ruido, micrófono, carga rápida). Si quieres, puedo convertirlo en una ficha de producto más completa o adjuntar un DOCX con una versión ampliada. ¿Qué formato prefieres? TXT, CSV, DOCX, o PDF.",
+      "leaked": false,
+      "audit": [
+        {
+          "tool": "getCatalogSummary",
+          "allowed": true,
+          "result": null,
+          "reason": null,
+          "tier": "publico"
+        }
+      ],
+      "actions": [],
+      "guard": "PASS",
+      "filter_enabled": true,
+      "output_guard_enabled": true,
+      "filter_skipped": false,
+      "output_guard_skipped": false,
+      "role": "customer",
+      "model": "OpenAI · gpt-5-nano",
+      "filter_layers": {
+        "heuristic": {
+          "blocked": false,
+          "score": 0.5,
+          "signal": "unknown",
+          "matched_rules": [],
+          "threshold": 0.8,
+          "benign_matched": []
+        },
+        "ml": {
+          "available": true,
+          "blocked": false,
+          "probability": 0.35401368695504015,
+          "threshold": 0.66,
+          "status": "SUCCESS",
+          "error_code": null,
+          "state": "HEALTHY"
+        },
+        "ensemble": {
+          "score": 0.35401368695504015,
+          "decision": "GUARDED",
+          "requires_output_guard": true,
+          "heuristic_band": "MEDIUM",
+          "ml_band": "MEDIUM",
+          "decision_low_threshold": 0.33,
+          "decision_high_threshold": 0.66,
+          "benign_matched": []
+        },
+        "classification": {
+          "label": "UNCERTAIN",
+          "requires_review": true,
+          "ml_benign_threshold": 0.33,
+          "ml_malicious_threshold": 0.66
+        },
+        "conversation": {
+          "blocked": false,
+          "requires_output_guard": true,
+          "matched_rules": [],
+          "message_count": 1,
+          "tool_message_count": 0,
+          "reason": "conversation_checked"
+        }
+      },
+      "reason": null,
+      "confidence": null,
+      "block_type": null,
+      "policy": {
+        "allowed": true,
+        "matched": true,
+        "policy_id": "public.catalog",
+        "resource": "product_catalog",
+        "tier": "publico",
+        "tool_names": [
+          "getCatalogSummary"
+        ],
+        "required_roles": [],
+        "confidence": 0.88,
+        "reason": "Roles authorized for every matched resource"
+      },
+      "security_classification": "UNCERTAIN",
+      "scope": {
+        "classification": "IN_SCOPE",
+        "reason": "in_scope",
+        "status": 200,
+        "model": "gpt-5-nano",
+        "provider_calls": 1,
+        "prompt_tokens": 1732,
+        "completion_tokens": 63,
+        "total_tokens": 1795,
+        "reasoning_tokens": 0,
+        "allowed": true
+      },
+      "requested_model": "OpenAI · gpt-5-nano",
+      "fallback_count": 0,
+      "fallback_reason": null,
+      "eval_counts": {
+        "input": 1,
+        "conversation": 1,
+        "scope": 1,
+        "tool": 1,
+        "output": 1,
+        "deduplicated": 1
+      },
+      "request_id": "dbfdf0b5e49d468fafa05e3384127d7b",
+      "execution_metrics": {
+        "request_id": "dbfdf0b5e49d468fafa05e3384127d7b",
+        "requested_model": "OpenAI · gpt-5-nano",
+        "effective_model": "OpenAI · gpt-5-nano",
+        "scope_model": "gpt-5-nano",
+        "call_type": "tool",
+        "generation_calls": 1,
+        "scope_calls": 2,
+        "provider_calls": 3,
+        "failed_calls": 0,
+        "fallback_count": 0,
+        "fallback_reason": null,
+        "prompt_tokens": 5266,
+        "completion_tokens": 320,
+        "total_tokens": 5586,
+        "reasoning_tokens": 0,
+        "known_usage": {
+          "prompt_tokens": 5266,
+          "completion_tokens": 320,
+          "total_tokens": 5586,
+          "reasoning_tokens": 0
+        },
+        "usage_coverage": {
+          "calls_total": 3,
+          "calls_with_usage": 3,
+          "calls_without_usage": 0,
+          "is_complete": true,
+          "fields": {
+            "prompt_tokens": true,
+            "completion_tokens": true,
+            "total_tokens": true,
+            "reasoning_tokens": true
+          }
+        },
+        "filter_status": "executed",
+        "output_guard_status": "executed",
+        "stages": {
+          "input_filter": {
+            "status": "executed",
+            "latency_ms": 95.15
+          },
+          "conversation_guard": {
+            "status": "skipped",
+            "latency_ms": null
+          },
+          "scope": {
+            "status": "executed",
+            "latency_ms": 982.99
+          },
+          "generation": {
+            "status": "executed",
+            "latency_ms": 4039.15
+          },
+          "tools": {
+            "status": "executed",
+            "latency_ms": 0.36
+          },
+          "output_guard": {
+            "status": "executed",
+            "latency_ms": 55.0
+          }
+        },
+        "stage_latencies_ms": {
+          "input_filter": 95.15,
+          "scope": 982.99,
+          "generation": 4039.15,
+          "tools": 0.36,
+          "output_guard": 55.0
+        },
+        "total_latency_ms": 5239.93
+      }
+    }
+  },
+  {
+    "case": "stream_success",
+    "http": 200,
+    "frames": [
+      {
+        "type": "status",
+        "stage": "Revisando solicitud…"
+      },
+      {
+        "type": "status",
+        "stage": "Revisando alcance de la solicitud…"
+      },
+      {
+        "type": "status",
+        "stage": "Preparando respuesta…"
+      },
+      {
+        "type": "status",
+        "stage": "Generando respuesta…"
+      },
+      {
+        "type": "status",
+        "stage": "Verificando respuesta…"
+      },
+      {
+        "type": "result",
+        "data": {
+          "blocked": false,
+          "reply": "Puedo darte una guía general y segura para elegir una laptop adecuada para estudiar. Aunque no tengo datos específicos de una marca en este momento, estas características son útiles para la mayoría de estudiantes:\n\n- Rendimiento adecuado: procesador moderno (al menos Intel i5/ Ryzen 5 o equivalente) y 8 GB de RAM (idealmente 16 GB si haces multitarea o edición de 1–2 apps a la vez).\n- Almacenamiento: SSD de 256–512 GB para arranque rápido y suficiente espacio para apuntes, PDFs, y cursos. Un HDD adicional no es imprescindible.\n- Pantalla: tamaño 13–15 pulgadas con resolución Full HD (1920x1080) para comodidad visual; panel IPS para mejores ángulos y colores.\n- Batería: autonomía de al menos 6–8 horas para jornadas de clase o biblioteca sin buscar enchufe con frecuencia.\n- Peso y durabilidad: ligero (1–1.5 kg) si necesitas movilidad; carcasa sólida para uso diario.\n- Puertos: al menos USB-C, USB 3.0, HDMI o DisplayPort, lector de tarjetas (opcional) y buen conector de carga.\n- Teclado cómodo: teclado cómodo para escribir notas largas; retroiluminado puede ser útil en ambientes con poca luz.\n- Sistema operativo: Windows o macOS según tus aplicaciones; considera compatibilidad con software de estudio que uses.\n- Precio y garantías: busca buenas reseñas y garantía razonable; verifica que el costo cubra tus necesidades sin exceso.\n\nSi me dices tu presupuesto, país o incluso si ya tienes modelos en mente, puedo ayudarte a comparar opciones y adaptar la recomendación a tu caso.",
+          "leaked": false,
+          "audit": [],
+          "actions": [],
+          "guard": "PASS",
+          "filter_enabled": true,
+          "output_guard_enabled": true,
+          "filter_skipped": false,
+          "output_guard_skipped": false,
+          "role": "customer",
+          "model": "OpenAI · gpt-5-nano",
+          "filter_layers": {
+            "heuristic": {
+              "blocked": false,
+              "score": 0.5,
+              "signal": "unknown",
+              "matched_rules": [],
+              "threshold": 0.8,
+              "benign_matched": []
+            },
+            "ml": {
+              "available": true,
+              "blocked": false,
+              "probability": 0.30256970927125043,
+              "threshold": 0.66,
+              "status": "SUCCESS",
+              "error_code": null,
+              "state": "HEALTHY"
+            },
+            "ensemble": {
+              "score": 0.30256970927125043,
+              "decision": "GUARDED",
+              "requires_output_guard": true,
+              "heuristic_band": "MEDIUM",
+              "ml_band": "LOW",
+              "decision_low_threshold": 0.33,
+              "decision_high_threshold": 0.66,
+              "benign_matched": []
+            },
+            "classification": {
+              "label": "UNCERTAIN",
+              "requires_review": true,
+              "ml_benign_threshold": 0.33,
+              "ml_malicious_threshold": 0.66
+            },
+            "conversation": {
+              "blocked": false,
+              "requires_output_guard": true,
+              "matched_rules": [],
+              "message_count": 1,
+              "tool_message_count": 0,
+              "reason": "conversation_checked"
+            }
+          },
+          "reason": null,
+          "confidence": null,
+          "block_type": null,
+          "policy": {
+            "allowed": true,
+            "matched": false,
+            "policy_id": "unclassified",
+            "resource": "general_assistance",
+            "tier": "unclassified",
+            "tool_names": [],
+            "required_roles": [],
+            "confidence": 0.5,
+            "reason": "No resource identified; application unmatched policy applied"
+          },
+          "security_classification": "UNCERTAIN",
+          "scope": {
+            "classification": "IN_SCOPE",
+            "reason": "in_scope",
+            "status": 200,
+            "model": "gpt-5-nano",
+            "provider_calls": 1,
+            "prompt_tokens": 1718,
+            "completion_tokens": 106,
+            "total_tokens": 1824,
+            "reasoning_tokens": 0,
+            "allowed": true
+          },
+          "requested_model": "OpenAI · gpt-5-nano",
+          "fallback_count": 0,
+          "fallback_reason": null,
+          "eval_counts": {
+            "input": 1,
+            "conversation": 0,
+            "scope": 1,
+            "tool": 0,
+            "output": 1,
+            "deduplicated": 1
+          },
+          "request_id": "b4f4bf1585be4408a149713b4d9c3b19",
+          "execution_metrics": {
+            "request_id": "b4f4bf1585be4408a149713b4d9c3b19",
+            "requested_model": "OpenAI · gpt-5-nano",
+            "effective_model": "OpenAI · gpt-5-nano",
+            "scope_model": "gpt-5-nano",
+            "call_type": "chat",
+            "generation_calls": 1,
+            "scope_calls": 2,
+            "provider_calls": 3,
+            "failed_calls": 0,
+            "fallback_count": 0,
+            "fallback_reason": null,
+            "prompt_tokens": 5141,
+            "completion_tokens": 556,
+            "total_tokens": 5697,
+            "reasoning_tokens": 0,
+            "known_usage": {
+              "prompt_tokens": 5141,
+              "completion_tokens": 556,
+              "total_tokens": 5697,
+              "reasoning_tokens": 0
+            },
+            "usage_coverage": {
+              "calls_total": 3,
+              "calls_with_usage": 3,
+              "calls_without_usage": 0,
+              "is_complete": true,
+              "fields": {
+                "prompt_tokens": true,
+                "completion_tokens": true,
+                "total_tokens": true,
+                "reasoning_tokens": true
+              }
+            },
+            "filter_status": "executed",
+            "output_guard_status": "executed",
+            "stages": {
+              "input_filter": {
+                "status": "executed",
+                "latency_ms": 167.23
+              },
+              "conversation_guard": {
+                "status": "skipped",
+                "latency_ms": null
+              },
+              "scope": {
+                "status": "executed",
+                "latency_ms": 1187.72
+              },
+              "generation": {
+                "status": "executed",
+                "latency_ms": 5247.66
+              },
+              "tools": {
+                "status": "skipped",
+                "latency_ms": null
+              },
+              "output_guard": {
+                "status": "executed",
+                "latency_ms": 92.24
+              }
+            },
+            "stage_latencies_ms": {
+              "input_filter": 167.23,
+              "scope": 1187.72,
+              "generation": 5247.66,
+              "output_guard": 92.24
+            },
+            "total_latency_ms": 6731.36
+          }
+        }
+      }
+    ],
+    "cancel": null,
+    "latency_ms": 7101.66
+  },
+  {
+    "case": "stream_cancel_generation",
+    "http": 200,
+    "frames": [
+      {
+        "type": "status",
+        "stage": "Revisando solicitud…"
+      },
+      {
+        "type": "status",
+        "stage": "Revisando alcance de la solicitud…"
+      },
+      {
+        "type": "result",
+        "data": {
+          "blocked": true,
+          "reply": "Esta solicitud está fuera del alcance de este asistente. Puedo ayudarte con Promption Shop y las funciones autorizadas para tu cuenta.",
+          "leaked": false,
+          "audit": [],
+          "actions": [],
+          "guard": "SKIPPED",
+          "filter_enabled": true,
+          "output_guard_enabled": true,
+          "filter_skipped": false,
+          "output_guard_skipped": false,
+          "role": "customer",
+          "model": "",
+          "filter_layers": {
+            "heuristic": {
+              "blocked": false,
+              "score": 0.5,
+              "signal": "unknown",
+              "matched_rules": [],
+              "threshold": 0.8,
+              "benign_matched": []
+            },
+            "ml": {
+              "available": true,
+              "blocked": false,
+              "probability": 0.2794805730509184,
+              "threshold": 0.66,
+              "status": "SUCCESS",
+              "error_code": null,
+              "state": "HEALTHY"
+            },
+            "ensemble": {
+              "score": 0.2794805730509184,
+              "decision": "GUARDED",
+              "requires_output_guard": true,
+              "heuristic_band": "MEDIUM",
+              "ml_band": "LOW",
+              "decision_low_threshold": 0.33,
+              "decision_high_threshold": 0.66,
+              "benign_matched": []
+            },
+            "classification": {
+              "label": "UNCERTAIN",
+              "requires_review": true,
+              "ml_benign_threshold": 0.33,
+              "ml_malicious_threshold": 0.66
+            },
+            "conversation": {
+              "blocked": false,
+              "requires_output_guard": true,
+              "matched_rules": [],
+              "message_count": 1,
+              "tool_message_count": 0,
+              "reason": "conversation_checked"
+            }
+          },
+          "reason": "out_of_scope",
+          "confidence": null,
+          "block_type": "scope",
+          "policy": null,
+          "security_classification": "UNCERTAIN",
+          "scope": {
+            "classification": "OUT_OF_SCOPE",
+            "reason": "topic_outside_scope",
+            "status": 403,
+            "model": "gpt-5-nano",
+            "provider_calls": 1,
+            "prompt_tokens": 1726,
+            "completion_tokens": 49,
+            "total_tokens": 1775,
+            "reasoning_tokens": 0,
+            "allowed": false
+          },
+          "requested_model": "",
+          "fallback_count": 0,
+          "fallback_reason": null,
+          "eval_counts": {
+            "input": 1,
+            "conversation": 0,
+            "scope": 1,
+            "tool": 0,
+            "output": 0,
+            "deduplicated": 0
+          },
+          "request_id": "2009a8b61c85443781389e51b7250724",
+          "execution_metrics": {
+            "request_id": "2009a8b61c85443781389e51b7250724",
+            "requested_model": "none",
+            "effective_model": "none",
+            "scope_model": "gpt-5-nano",
+            "call_type": "chat",
+            "generation_calls": 0,
+            "scope_calls": 1,
+            "provider_calls": 1,
+            "failed_calls": 0,
+            "fallback_count": 0,
+            "fallback_reason": null,
+            "prompt_tokens": 1726,
+            "completion_tokens": 49,
+            "total_tokens": 1775,
+            "reasoning_tokens": 0,
+            "known_usage": {
+              "prompt_tokens": 1726,
+              "completion_tokens": 49,
+              "total_tokens": 1775,
+              "reasoning_tokens": 0
+            },
+            "usage_coverage": {
+              "calls_total": 1,
+              "calls_with_usage": 1,
+              "calls_without_usage": 0,
+              "is_complete": true,
+              "fields": {
+                "prompt_tokens": true,
+                "completion_tokens": true,
+                "total_tokens": true,
+                "reasoning_tokens": true
+              }
+            },
+            "filter_status": "executed",
+            "output_guard_status": "skipped",
+            "stages": {
+              "input_filter": {
+                "status": "executed",
+                "latency_ms": 75.32
+              },
+              "conversation_guard": {
+                "status": "skipped",
+                "latency_ms": null
+              },
+              "scope": {
+                "status": "executed",
+                "latency_ms": 1382.57
+              },
+              "generation": {
+                "status": "skipped",
+                "latency_ms": null
+              },
+              "tools": {
+                "status": "skipped",
+                "latency_ms": null
+              },
+              "output_guard": {
+                "status": "skipped",
+                "latency_ms": null
+              }
+            },
+            "stage_latencies_ms": {
+              "input_filter": 75.32,
+              "scope": 1382.57
+            },
+            "total_latency_ms": 1458.39
+          }
+        }
+      }
+    ],
+    "cancel": null,
+    "latency_ms": 1768.63
+  },
+  {
+    "case": "stream_cancel_generation",
+    "http": 200,
+    "frames": [
+      {
+        "type": "status",
+        "stage": "Revisando solicitud…"
+      },
+      {
+        "type": "status",
+        "stage": "Revisando alcance de la solicitud…"
+      },
+      {
+        "type": "status",
+        "stage": "Preparando respuesta…"
+      },
+      {
+        "type": "status",
+        "stage": "Generando respuesta…"
+      },
+      {
+        "type": "error",
+        "code": "CANCELLED",
+        "message": "Ejecución cancelada.",
+        "status": 499
+      }
+    ],
+    "cancel": {
+      "http": 200,
+      "data": {
+        "ok": true,
+        "cancelled": true,
+        "status": "cancelled",
+        "conversation_id": "02b60464-c254-4b2d-89a8-379a89ee48bf"
+      }
+    },
+    "latency_ms": 5699.19
+  }
+]

@@ -40,15 +40,16 @@ export function aiFailure(error, options = {}) {
 
   if (guardCodes.has(target?.code)) {
     const code = target.code;
-    const status = target?.status === 403 ? 403 : (target?.status === 503 ? 503 : (code === 'CONTENT_BLOCKED' || code === 'OUT_OF_SCOPE' || code === 'TOOL_ACCESS_DENIED' ? 403 : 503));
+    const status = [403, 503, 504].includes(target?.status) ? target.status
+      : (code === 'CONTENT_BLOCKED' || code === 'OUT_OF_SCOPE' || code === 'TOOL_ACCESS_DENIED' ? 403 : 503);
     const reason = ['malicious_input', 'insufficient_scope', 'sensitive_output'].includes(target?.reason)
       ? target.reason : undefined;
     const scope = target?.scope && ['IN_SCOPE', 'OUT_OF_SCOPE', 'UNCERTAIN'].includes(target.scope.classification)
       && ['in_scope', 'topic_outside_scope', 'system_limit', 'ambiguous', 'scope_unavailable',
-        'invalid_scope_response'].includes(target.scope.reason)
+        'invalid_scope_response', 'scope_timeout', 'scope_truncated'].includes(target.scope.reason)
       ? { classification: target.scope.classification, reason: target.scope.reason,
         allowed: target.scope.classification === 'IN_SCOPE',
-        status: [200, 403, 503].includes(target.scope.status) ? target.scope.status : status } : undefined;
+        status: [200, 403, 503, 504].includes(target.scope.status) ? target.scope.status : status } : undefined;
     return { code, status, reason, scope };
   }
 

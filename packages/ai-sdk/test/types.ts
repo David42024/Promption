@@ -16,3 +16,10 @@ const scoped = createPromption({ baseUrl: 'http://localhost:8000', apiKey: 'serv
 void generateText({ model: wrapLanguageModel({ model: baseModel, middleware: scoped.middleware({ identity }) }),
   system: 'Only answer shop questions', prompt: 'What products are available?' });
 void scoped.checkScope('Question', { identity, systemPrompt: 'Only answer shop questions' });
+import { withScopeReceipts, issueScopeReceipt, verifyScopeReceipt } from '../src/scope-receipts.js';
+const receiptRequest = { text: 'Catalog', systemPrompt: 'Shop only', identity: { userId: 'u', roles: ['customer'], authenticated: true } };
+const receiptBinding = { request_id: 'r', tenant_id: 't', conversation_id: 'c' };
+const signedReceipt = issueScopeReceipt(receiptRequest, receiptBinding, 'model', 'synthetic-key');
+verifyScopeReceipt(signedReceipt, receiptRequest, receiptBinding, 'model', 'synthetic-key');
+withScopeReceipts(async () => ({ classification: 'IN_SCOPE', reason: 'in_scope' }),
+  { receipts: [signedReceipt], binding: receiptBinding, model: 'model', secret: 'synthetic-key', requestId: 'r' });

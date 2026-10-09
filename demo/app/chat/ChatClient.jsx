@@ -23,20 +23,6 @@ const LogoutIcon = () => (
   </svg>
 );
 
-const FileIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-
 const ShieldOn = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -72,47 +58,12 @@ const SettingsIcon = () => (
   </svg>
 );
 
-const docLevelStyles = {
-  publico: {
-    icon: "🌐",
-    bg: "linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(16, 185, 129, 0.05))",
-    border: "1px solid rgba(16, 185, 129, 0.35)",
-    color: "var(--success-400)",
-    label: "Público",
-  },
-  interno: {
-    icon: "🔐",
-    bg: "linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(245, 158, 11, 0.05))",
-    border: "1px solid rgba(245, 158, 11, 0.35)",
-    color: "#fbbf24",
-    label: "Interno",
-  },
-  confidencial: {
-    icon: "🛑",
-    bg: "linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(239, 68, 68, 0.05))",
-    border: "1px solid rgba(239, 68, 68, 0.35)",
-    color: "var(--danger-400)",
-    label: "Confidencial",
-  },
-};
-
-function pickDocStyle(id, title = "", tier = "publico") {
-  const key = `${id} ${title} ${tier}`.toLowerCase();
-  if (key.includes("confidencial") || tier === "confidencial")
-    return docLevelStyles.confidencial;
-  if (key.includes("interno") || tier === "interno")
-    return docLevelStyles.interno;
-  return docLevelStyles.publico;
-}
-
 export default function ChatClient({ user }) {
   const { msgs, setMsgs, historyLoaded, newConversation } = useChat();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const requestController = useRef(null);
-  const [docs, setDocs] = useState([]);
-  const [docView, setDocView] = useState(null);
   const [filterStatus, setFilterStatus] = useState({ filterEnabled: true, outputGuardEnabled: true });
   const [showConfig, setShowConfig] = useState(false);
   const scrollRef = useRef(null);
@@ -147,27 +98,10 @@ export default function ChatClient({ user }) {
   }, [historyLoaded]);
 
   useEffect(() => {
-    fetch("/api/docs")
-      .then(r => r.json())
-      .then(d => setDocs(d.docs || []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [msgs, busy]);
-
-  async function viewDoc(id) {
-    const r = await fetch(`/api/docs?id=${encodeURIComponent(id)}`);
-    const d = await r.json();
-    setDocView(
-      r.ok
-        ? { title: d.title, body: d.body, id, tier: d.tier }
-        : { title: id, body: `⛔ ${d.error}`, id, denied: true, tier: "confidencial" }
-    );
-  }
 
   async function send(e, override) {
     e?.preventDefault();
@@ -690,148 +624,6 @@ export default function ChatClient({ user }) {
             ? "🛡️ Cada mensaje se analiza en 3 capas antes de tocar el LLM. Nada escapa."
             : "🚨 Modo DEMO sin protección. Ideal para demostrar cómo el filtro evita fugas. Actívalo en Panel Admin."}
         </p>
-      </div>
-
-      <div className="doc-section">
-        <div className="card" style={{ padding: 24 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 12,
-              marginBottom: 4,
-            }}
-          >
-            <div>
-              <h3
-                style={{
-                  margin: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  fontSize: "1.05rem",
-                }}
-              >
-                <FileIcon />
-                Base de conocimientos (por niveles)
-                <span
-                  style={{
-                    fontSize: "0.75rem",
-                    padding: "3px 10px",
-                    borderRadius: "var(--radius-full)",
-                    background: "rgba(99, 102, 241, 0.15)",
-                    color: "var(--brand-400)",
-                    fontWeight: 600,
-                  }}
-                >
-                  Tu acceso: {user.roles.join(", ")}
-                </span>
-              </h3>
-              <p className="hint" style={{ margin: "6px 0 0" }}>
-                3 tiers: 🌐 público (todos) · 🔐 interno (ventas+) · 🛑 confidencial (solo admin).
-              </p>
-            </div>
-          </div>
-
-          <div className="doc-list">
-            {docs.map(d => {
-              const s = pickDocStyle(d.id, d.title, d.tier);
-              return (
-                <button
-                  key={d.id}
-                  className="doc-item"
-                  onClick={() => viewDoc(d.id)}
-                >
-                  <div
-                    className="doc-icon"
-                    style={{ background: s.bg, border: s.border, color: s.color }}
-                  >
-                    <FileIcon />
-                  </div>
-                  <div className="doc-info">
-                    <strong>{d.title}</strong>
-                    <span>{s.label} · {d.id}</span>
-                  </div>
-                </button>
-              );
-            })}
-            {docs.length === 0 && (
-              <div className="empty-state" style={{ gridColumn: "1 / -1", padding: "32px 24px" }}>
-                <div className="empty-icon">📭</div>
-                <h4>No hay documentos disponibles</h4>
-                <p>Tu rol no tiene acceso a ningún documento en este momento.</p>
-              </div>
-            )}
-          </div>
-
-          {docView && (
-            <div className="doc-viewer">
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 12,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div
-                    className="doc-icon"
-                    style={{
-                      background: docView.denied
-                        ? docLevelStyles.confidencial.bg
-                        : pickDocStyle(docView.id, docView.title, docView.tier).bg,
-                      border: docView.denied
-                        ? docLevelStyles.confidencial.border
-                        : pickDocStyle(docView.id, docView.title, docView.tier).border,
-                      color: docView.denied
-                        ? docLevelStyles.confidencial.color
-                        : pickDocStyle(docView.id, docView.title, docView.tier).color,
-                    }}
-                  >
-                    {docView.denied ? "🚫" : <FileIcon />}
-                  </div>
-                  <div>
-                    <h4
-                      style={{
-                        margin: 0, padding: 0, border: 0,
-                        color: docView.denied ? "var(--danger-400)" : "var(--text-primary)",
-                      }}
-                    >
-                      {docView.title}
-                    </h4>
-                    {!docView.denied && (
-                      <span className="hint" style={{ fontSize: "0.75rem" }}>
-                        {pickDocStyle(docView.id, docView.title, docView.tier).label}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button className="icon-btn" onClick={() => setDocView(null)} title="Cerrar">
-                  <CloseIcon />
-                </button>
-              </div>
-              <pre
-                style={{
-                  whiteSpace: "pre-wrap",
-                  marginTop: 16,
-                  background: docView.denied
-                    ? "rgba(239, 68, 68, 0.08)"
-                    : "var(--bg-secondary)",
-                  borderColor: docView.denied
-                    ? "rgba(239, 68, 68, 0.25)"
-                    : "var(--border)",
-                  color: docView.denied ? "#fecaca" : "var(--text-secondary)",
-                  maxHeight: 280,
-                }}
-              >
-                {docView.body}
-              </pre>
-            </div>
-          )}
-        </div>
       </div>
 
       <PermissionsConfig 

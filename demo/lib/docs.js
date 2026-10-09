@@ -1,3 +1,4 @@
+/** Lector legado conservado; el chat y el visor ya no consultan Markdown. */
 import fs from "node:fs";
 import path from "node:path";
 
