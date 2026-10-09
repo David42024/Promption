@@ -5,6 +5,7 @@ import { validateScopeDecision, validateScopeRequest } from "./scope.js";
 export { createScopeEvaluator } from "./scope.js";
 export { PromptionError } from "./errors.js";
 export { createFilterApiTransport, createGuardEndpointTransport } from "./transports.js";
+export { MetricsAggregator } from "./metrics.js";
 
 const serialize = value => typeof value === "string" ? value : JSON.stringify(value);
 
@@ -64,6 +65,12 @@ export function createPromption(config) {
     options.signal?.throwIfAborted();
     config.onDecision?.({ direction: "input", allowed: decision.allowed,
       action: decision.allowed ? "PASS" : "BLOCK", userId: request.identity.userId, scope: decision });
+    if (typeof config.onScope === "function") {
+      config.onScope(decision);
+    }
+    if (typeof options.onScope === "function" && options.onScope !== config.onScope) {
+      options.onScope(decision);
+    }
     return decision;
   }
 
@@ -141,7 +148,7 @@ export function createPromption(config) {
         const key = scopeKey(text, systemPrompt, ev, tool);
         if (turnCache.has(key)) continue;
         await enforceScope(text, { identity, systemPrompt, messages: ev, tool,
-          signal: options.signal ?? params?.abortSignal });
+          signal: options.signal ?? params?.abortSignal, onScope: options.onScope });
         turnCache.set(key, true);
       }
     };
@@ -313,7 +320,8 @@ export function createPromption(config) {
           const texts = new Set([options.originalText ?? lastText, ...(lastText ? [lastText] : [])]);
           for (const text of texts) {
             await enforceScope(text, { identity, signal, systemPrompt: options.systemPrompt, messages,
-              tool: { name: options.name, input: raw, description: definition.description } });
+              tool: { name: options.name, input: raw, description: definition.description },
+              onScope: options.onScope });
           }
         }
         const result = await definition.execute(input, execution);

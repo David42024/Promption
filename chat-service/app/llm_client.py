@@ -3,10 +3,12 @@ import asyncio
 import logging
 import random
 import time
+from functools import wraps
 from contextvars import ContextVar
 from typing import Any, Dict, List, Optional
 
 import httpx
+from promption.metrics_aggregator import MetricsAggregator
 
 from promption.llm.exceptions import (
     LLMConfigurationError,
@@ -39,11 +41,92 @@ def _resolve_client(explicit_client: Optional[httpx.AsyncClient] = None):
             return httpx.AsyncClient
     return get_shared_http_client()
 
+_attempt_metrics = ContextVar("llm_attempt_metrics", default=None)
+
+
+class _AttemptMetrics:
+    """Keep each transport attempt and remote consumption summary isolated."""
+
+    def __init__(self):
+        self.aggregator = MetricsAggregator()
+        self.events = []
+
+    def record(self, data=None, failed=False):
+        data = data if isinstance(data, dict) else {}
+        calls = data.get("provider_calls")
+        calls = int(calls) if isinstance(calls, int) and calls >= 0 else 1
+        scope = data.get("scope_calls", 0)
+        scope = scope if isinstance(scope, int) and 0 <= scope <= calls else 0
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+        known = data.get("known_usage")
+        coverage = data.get("usage_coverage")
+        if not isinstance(known, dict) or not isinstance(coverage, dict):
+            local = MetricsAggregator()
+            local.add_call("generation", calls=calls,
+                prompt_tokens=_extract_token_count(usage, "prompt_tokens", "input_tokens"),
+                completion_tokens=_extract_token_count(usage, "completion_tokens", "output_tokens"),
+                total_tokens=_extract_token_count(usage, "total_tokens"),
+                reasoning_tokens=_extract_token_count(usage, "reasoning_tokens"))
+            base = local.summary()
+            known, coverage = base["known_usage"], base["usage_coverage"]
+        summary = {"provider_calls": calls, "generation_calls": calls - scope,
+                   "scope_calls": scope, "failed_calls": data.get("failed_calls", calls if failed else 0),
+                   "known_usage": known, "usage_coverage": coverage}
+        event_id = f"attempt-{len(self.events) + 1}"
+        self.aggregator.add_summary(summary, event_id)
+        self.events.append(summary)
+
+    def packet(self):
+        return {**self.aggregator.summary(), "usage_events": self.events}
+
+    def fail_last(self):
+        if self.events and self.events[-1]["failed_calls"] == 0:
+            self.events[-1]["failed_calls"] = self.events[-1]["provider_calls"]
+            self.aggregator = MetricsAggregator()
+            for index, event in enumerate(self.events):
+                self.aggregator.add_summary(event, f"attempt-{index + 1}")
+
+
+def _track_attempts(method):
+    @wraps(method)
+    async def tracked(*args, **kwargs):
+        metrics = _AttemptMetrics()
+        token = _attempt_metrics.set(metrics)
+        try:
+            result = await method(*args, **kwargs)
+            packet = metrics.packet()
+            if isinstance(result, LLMResponse):
+                return result.model_copy(update=packet)
+            return {**result, **packet}
+        except BaseException as exc:
+            metrics.fail_last()
+            for name, value in metrics.packet().items():
+                setattr(exc, name, value)
+            raise
+        finally:
+            _attempt_metrics.reset(token)
+    return tracked
+
+
 async def _post_http(client, url, **kwargs):
-    if not isinstance(client, _ORIGINAL_ASYNC_CLIENT) and hasattr(client, "__aenter__"):
-        async with client as active_client:
-            return await active_client.post(url, **kwargs)
-    return await client.post(url, **kwargs)
+    metrics = _attempt_metrics.get()
+    try:
+        if not isinstance(client, _ORIGINAL_ASYNC_CLIENT) and hasattr(client, "__aenter__"):
+            async with client as active_client:
+                response = await active_client.post(url, **kwargs)
+        else:
+            response = await client.post(url, **kwargs)
+    except BaseException:
+        if metrics is not None:
+            metrics.record(failed=True)
+        raise
+    if metrics is not None:
+        try:
+            data = response.json()
+        except (ValueError, TypeError):
+            data = None
+        metrics.record(data, failed=getattr(response, "status_code", 200) >= 400)
+    return response
 
 _guard_identity = ContextVar("vercel_ai_guard_identity", default=None)
 
@@ -51,9 +134,10 @@ _guard_identity = ContextVar("vercel_ai_guard_identity", default=None)
 class AIGuardBlocked(Exception):
     """Carry a sanitized model-guard failure without treating it as provider downtime."""
 
-    def __init__(self, code: str, scope: dict | None = None):
+    def __init__(self, code: str, scope: dict | None = None, provider_calls: int = 0):
         self.code = code
         self.scope = scope
+        self.provider_calls = provider_calls
         super().__init__(code)
 
 
@@ -74,7 +158,20 @@ def _raise_bridge_guard(response: httpx.Response) -> None:
     code = data.get("code") if isinstance(data, dict) else None
     if code in codes or response.status_code == 403:
         scope = data.get("scope") if isinstance(data, dict) else None
-        raise AIGuardBlocked(code if code in codes else "CONTENT_BLOCKED", scope)
+        calls = int(data.get("provider_calls", 0)) if isinstance(data, dict) and str(data.get("provider_calls", "")).isdigit() else 0
+        raise AIGuardBlocked(code if code in codes else "CONTENT_BLOCKED", scope, provider_calls=calls)
+
+
+def _extract_token_count(usage: dict | None, *keys: str) -> int | None:
+    if not isinstance(usage, dict):
+        return None
+    for k in keys:
+        if k in usage and usage[k] is not None:
+            try:
+                return int(usage[k])
+            except (ValueError, TypeError):
+                pass
+    return None
 
 
 def set_guard_identity(user_id: str, roles: list[str], original_text: str,
@@ -274,6 +371,7 @@ class LLMClient:
                 return str(choice.get("message", {}).get("content", "")).strip()
         return ""
 
+    @_track_attempts
     async def generate(
         self,
         messages: List[Dict[str, str]],
@@ -295,6 +393,7 @@ class LLMClient:
         requested_model = self.models[0]["label"] if self.models else ""
         fallback_count = 0
         fallback_reason = None
+        prior_provider_calls = 0
 
         for model_idx, model_config in enumerate(self.models):
             if model_idx > 0:
@@ -304,7 +403,11 @@ class LLMClient:
                                requested_model, model_config["label"], fallback_reason)
             for attempt in range(self.max_attempts):
                 if budget.is_expired:
-                    raise LLMTimeoutError("Total time budget exhausted across LLM providers")
+                    exc = LLMTimeoutError("Total time budget exhausted across LLM providers")
+                    exc.provider_calls = prior_provider_calls
+                    exc.fallback_count = fallback_count
+                    exc.fallback_reason = fallback_reason
+                    raise exc
 
                 step_timeout = budget.remaining_for_step(self.provider_timeout, step_name=model_config["provider"])
                 headers = {"Content-Type": "application/json"}
@@ -365,6 +468,7 @@ class LLMClient:
                     logger.info("LLM generation cancelled")
                     raise
                 except (httpx.TimeoutException, TimeoutError) as exc:
+                    prior_provider_calls += 1
                     last_exception = LLMTimeoutError(
                         f"{model_config['provider'].upper()} timed out after {step_timeout:.1f}s",
                         model=model_config["label"], provider=model_config["provider"]
@@ -372,6 +476,7 @@ class LLMClient:
                     logger.warning("LLM timeout provider=%s attempt=%d timeout=%.1fs",
                                    model_config["provider"], attempt + 1, step_timeout)
                 except (httpx.ConnectError, httpx.NetworkError) as exc:
+                    prior_provider_calls += 1
                     last_exception = LLMConnectivityError(
                         f"Connection error to {model_config['provider']}",
                         model=model_config["label"], provider=model_config["provider"]
@@ -379,6 +484,7 @@ class LLMClient:
                     logger.warning("LLM network error provider=%s attempt=%d",
                                    model_config["provider"], attempt + 1)
                 except Exception as exc:
+                    prior_provider_calls += 1
                     last_exception = exc
                     logger.warning("LLM unexpected error provider=%s attempt=%d error=%s",
                                    model_config["provider"], attempt + 1, exc.__class__.__name__)
@@ -402,18 +508,30 @@ class LLMClient:
                         if content:
                             budget.check_expired("generate_accept_result")
                             latency = (time.perf_counter() - t0) * 1000
-                            truncated = False
                             p_tokens = None
                             c_tokens = None
                             t_tokens = None
+                            r_tokens = None
+                            provider_calls = None
                             if isinstance(data, dict):
                                 finish_r = data.get("finish_reason") or data.get("finishReason")
                                 truncated = (finish_r == "length")
                                 usage = data.get("usage")
                                 if isinstance(usage, dict):
-                                    p_tokens = usage.get("prompt_tokens") or usage.get("input_tokens")
-                                    c_tokens = usage.get("completion_tokens") or usage.get("output_tokens")
-                                    t_tokens = usage.get("total_tokens")
+                                    p_tokens = _extract_token_count(usage, "prompt_tokens", "input_tokens")
+                                    c_tokens = _extract_token_count(usage, "completion_tokens", "output_tokens")
+                                    t_tokens = _extract_token_count(usage, "total_tokens")
+                                    r_tokens = _extract_token_count(usage, "reasoning_tokens")
+                                current_calls = data.get("provider_calls", 1)
+                                if current_calls is not None:
+                                    try:
+                                        provider_calls = prior_provider_calls + int(current_calls)
+                                    except (ValueError, TypeError):
+                                        provider_calls = prior_provider_calls + 1
+                                else:
+                                    provider_calls = None
+                            else:
+                                provider_calls = prior_provider_calls + 1
                             return LLMResponse(
                                 text=content,
                                 model=model_config["label"],
@@ -426,12 +544,29 @@ class LLMClient:
                                 prompt_tokens=p_tokens,
                                 completion_tokens=c_tokens,
                                 total_tokens=t_tokens,
+                                reasoning_tokens=r_tokens,
+                                provider_calls=provider_calls,
                             )
+                        call_cnt = 1
+                        if isinstance(data, dict) and "provider_calls" in data:
+                            try:
+                                call_cnt = int(data["provider_calls"])
+                            except (ValueError, TypeError):
+                                pass
+                        prior_provider_calls += call_cnt
                         last_exception = LLMInvalidResponseError(
                             "LLM returned empty or whitespace content",
                             model=model_config["label"], provider=model_config["provider"]
                         )
                     else:
+                        call_cnt = 1
+                        try:
+                            err_data = response.json()
+                            if isinstance(err_data, dict) and "provider_calls" in err_data:
+                                call_cnt = int(err_data["provider_calls"])
+                        except Exception:
+                            pass
+                        prior_provider_calls += call_cnt
                         status = getattr(response, "status_code", 500)
                         resp_headers = getattr(response, "headers", {})
                         if status in (401, 403):
@@ -468,6 +603,9 @@ class LLMClient:
                             if status not in _RETRYABLE_STATUS_CODES:
                                 break
 
+                if _attempt_metrics.get() is not None:
+                    _attempt_metrics.get().fail_last()
+
                 # Retry delay calculation with exponential backoff & jitter
                 if attempt + 1 < self.max_attempts and not budget.is_expired:
                     retry_after = getattr(last_exception, "retry_after", None)
@@ -480,10 +618,19 @@ class LLMClient:
             if budget.is_expired:
                 break
 
-        if isinstance(last_exception, (LLMError, AIGuardBlocked)):
-            raise last_exception
-        raise LLMProviderUnavailableError(f"All LLM providers failed: {last_exception}")
+        if last_exception is not None:
+            setattr(last_exception, "provider_calls", prior_provider_calls)
+            setattr(last_exception, "fallback_count", fallback_count)
+            setattr(last_exception, "fallback_reason", fallback_reason)
+            if isinstance(last_exception, (LLMError, AIGuardBlocked)):
+                raise last_exception
+        exc = LLMProviderUnavailableError(f"All LLM providers failed: {last_exception}")
+        exc.provider_calls = prior_provider_calls
+        exc.fallback_count = fallback_count
+        exc.fallback_reason = fallback_reason
+        raise exc
 
+    @_track_attempts
     async def generate_tool_turn(
         self,
         messages: List[Dict[str, Any]],
@@ -504,6 +651,7 @@ class LLMClient:
         requested_model = candidates[0]["label"] if candidates else ""
         fallback_count = 0
         fallback_reason = None
+        prior_provider_calls = 0
 
         for cand_idx, config in enumerate(candidates):
             if cand_idx > 0:
@@ -512,7 +660,11 @@ class LLMClient:
                 logger.warning("LLM tool turn fallback: requested=%s fallback_to=%s reason=%s",
                                requested_model, config["label"], fallback_reason)
             if budget.is_expired:
-                raise LLMTimeoutError("Total time budget exhausted across LLM providers")
+                exc = LLMTimeoutError("Total time budget exhausted across LLM providers")
+                exc.provider_calls = prior_provider_calls
+                exc.fallback_count = fallback_count
+                exc.fallback_reason = fallback_reason
+                raise exc
 
             step_timeout = budget.remaining_for_step(self.provider_timeout, step_name=config["provider"])
             try:
@@ -526,6 +678,14 @@ class LLMClient:
                             timeout=step_timeout)
                     _raise_bridge_guard(response)
                     if not response.is_success:
+                        call_cnt = 1
+                        try:
+                            err_data = response.json()
+                            if isinstance(err_data, dict) and "provider_calls" in err_data:
+                                call_cnt = int(err_data["provider_calls"])
+                        except Exception:
+                            pass
+                        prior_provider_calls += call_cnt
                         status = response.status_code
                         if status in (401, 403):
                             raise LLMConfigurationError("Bridge auth failed", model=config["label"],
@@ -551,13 +711,17 @@ class LLMClient:
                     p_tokens = None
                     c_tokens = None
                     t_tokens = None
+                    r_tokens = None
                     finish_r = data.get("finish_reason") or data.get("finishReason")
                     truncated = (finish_r == "length")
                     usage = data.get("usage")
                     if isinstance(usage, dict):
-                        p_tokens = usage.get("prompt_tokens") or usage.get("input_tokens")
-                        c_tokens = usage.get("completion_tokens") or usage.get("output_tokens")
-                        t_tokens = usage.get("total_tokens")
+                        p_tokens = _extract_token_count(usage, "prompt_tokens", "input_tokens")
+                        c_tokens = _extract_token_count(usage, "completion_tokens", "output_tokens")
+                        t_tokens = _extract_token_count(usage, "total_tokens")
+                        r_tokens = _extract_token_count(usage, "reasoning_tokens")
+                    current_calls = data.get("provider_calls", 1) if isinstance(data, dict) else 1
+                    total_provider_calls = prior_provider_calls + (int(current_calls) if current_calls is not None else 1)
                     return {
                         "text": text, "calls": calls, "assistant": {},
                         "model": config["label"], "model_id": config["id"],
@@ -569,6 +733,8 @@ class LLMClient:
                         "prompt_tokens": p_tokens,
                         "completion_tokens": c_tokens,
                         "total_tokens": t_tokens,
+                        "reasoning_tokens": r_tokens,
+                        "provider_calls": total_provider_calls,
                     }
 
                 if config["api"] == "gemini":
@@ -611,6 +777,14 @@ class LLMClient:
                     response = await _post_http(client, url, headers=headers, json=payload, timeout=step_timeout)
                 is_ok = getattr(response, "is_success", None)
                 if not (is_ok is True or (is_ok is None and getattr(response, "status_code", 200) < 400)):
+                    call_cnt = 1
+                    try:
+                        err_data = response.json()
+                        if isinstance(err_data, dict) and "provider_calls" in err_data:
+                            call_cnt = int(err_data["provider_calls"])
+                    except Exception:
+                        pass
+                    prior_provider_calls += call_cnt
                     status = getattr(response, "status_code", 500)
                     if status in (401, 403):
                         raise LLMConfigurationError(f"Auth failed (HTTP {status})",
@@ -653,12 +827,16 @@ class LLMClient:
                 p_tokens = None
                 c_tokens = None
                 t_tokens = None
+                r_tokens = None
                 if isinstance(data, dict):
                     usage = data.get("usage")
                     if isinstance(usage, dict):
-                        p_tokens = usage.get("prompt_tokens") or usage.get("input_tokens")
-                        c_tokens = usage.get("completion_tokens") or usage.get("output_tokens")
-                        t_tokens = usage.get("total_tokens")
+                        p_tokens = _extract_token_count(usage, "prompt_tokens", "input_tokens")
+                        c_tokens = _extract_token_count(usage, "completion_tokens", "output_tokens")
+                        t_tokens = _extract_token_count(usage, "total_tokens")
+                        r_tokens = _extract_token_count(usage, "reasoning_tokens")
+                current_calls = data.get("provider_calls", 1) if isinstance(data, dict) else 1
+                total_provider_calls = prior_provider_calls + (int(current_calls) if current_calls is not None else 1)
                 return {
                     "text": content, "calls": calls, "assistant": assistant,
                     "model": config["label"], "model_id": config["id"],
@@ -670,27 +848,43 @@ class LLMClient:
                     "prompt_tokens": p_tokens,
                     "completion_tokens": c_tokens,
                     "total_tokens": t_tokens,
+                    "reasoning_tokens": r_tokens,
+                    "provider_calls": total_provider_calls,
                 }
 
             except (AIGuardBlocked, asyncio.CancelledError):
                 raise
             except (httpx.TimeoutException, TimeoutError) as exc:
+                prior_provider_calls += 1
                 last_exception = LLMTimeoutError(f"Timeout during tool turn after {step_timeout:.1f}s",
                                                  model=config["label"], provider=config["provider"])
                 logger.warning("Tool turn timeout provider=%s", config["provider"])
             except (httpx.ConnectError, httpx.NetworkError) as exc:
+                prior_provider_calls += 1
                 last_exception = LLMConnectivityError(f"Connection failure to {config['provider']}",
                                                       model=config["label"], provider=config["provider"])
                 logger.warning("Tool turn connection failure provider=%s", config["provider"])
             except Exception as exc:
+                if _attempt_metrics.get() is not None:
+                    _attempt_metrics.get().fail_last()
+                if not isinstance(exc, LLMError):
+                    prior_provider_calls += 1
                 last_exception = exc
                 logger.warning("Tool turn failed provider=%s error=%s", config["provider"], exc.__class__.__name__)
                 if model_id or budget.is_expired:
                     break
 
-        if isinstance(last_exception, (LLMError, AIGuardBlocked)):
-            raise last_exception
-        raise LLMProviderUnavailableError(f"All LLM providers failed: {last_exception}")
+        if last_exception is not None:
+            setattr(last_exception, "provider_calls", prior_provider_calls)
+            setattr(last_exception, "fallback_count", fallback_count)
+            setattr(last_exception, "fallback_reason", fallback_reason)
+            if isinstance(last_exception, (LLMError, AIGuardBlocked)):
+                raise last_exception
+        exc = LLMProviderUnavailableError(f"All LLM providers failed: {last_exception}")
+        exc.provider_calls = prior_provider_calls
+        exc.fallback_count = fallback_count
+        exc.fallback_reason = fallback_reason
+        raise exc
 
 
 # Singleton instance

@@ -47,15 +47,17 @@ class MockRedisPipeline:
         self.watching = set()
         self.commands = []
         self.in_multi = False
+        self.watch_versions = {}
 
     def watch(self, *keys):
         self.watching.update(keys)
         with self.client._lock:
             for k in keys:
-                self.client._watch_versions[k] = self.client._versions.get(k, 0)
+                self.watch_versions[k] = self.client._versions.get(k, 0)
 
     def unwatch(self):
         self.watching.clear()
+        self.watch_versions.clear()
 
     def multi(self):
         self.in_multi = True
@@ -104,7 +106,7 @@ class MockRedisPipeline:
         with self.client._lock:
             # Check version collisions on watched keys
             for k in self.watching:
-                if self.client._watch_versions.get(k, 0) != self.client._versions.get(k, 0):
+                if self.watch_versions.get(k, 0) != self.client._versions.get(k, 0):
                     raise RuntimeError("WatchError: Key changed")
             res = []
             for cmd, args, kwargs in self.commands:
@@ -113,12 +115,14 @@ class MockRedisPipeline:
             self.commands.clear()
             self.in_multi = False
             self.watching.clear()
+            self.watch_versions.clear()
             return res
 
     def reset(self):
         self.commands.clear()
         self.in_multi = False
         self.watching.clear()
+        self.watch_versions.clear()
 
 
 class ControlledMockRedis:

@@ -91,7 +91,11 @@ async def test_llm_client_records_fallback_with_cause():
     assert resp.requested_model == "Model Primary"
     assert resp.fallback_count == 1
     assert "Model Primary" in str(resp.fallback_reason)
-    assert resp.total_tokens == 15
+    assert resp.total_tokens is None
+    assert resp.known_usage["total_tokens"] == 15
+    assert resp.provider_calls == 2
+    assert resp.failed_calls == 1
+    assert resp.usage_coverage["calls_without_usage"] == 1
 
 
 @pytest.mark.asyncio

@@ -1,9 +1,11 @@
+import { createTrackingModel } from "../../../../lib/ai/tracking.js";
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, jsonSchema, tool, wrapLanguageModel } from "ai";
 import { promptionMiddleware } from "../../../../lib/ai/promptionMiddleware.js";
 import { trustedAIRequest } from "../../../../lib/ai/trusted.js";
 import { aiFailure } from "../../../../lib/ai/errors.mjs";
 import { getModelProviderOptions, validateModelConfiguration } from "../../../../lib/ai/modelOptions.js";
+import { MetricsAggregator } from "../../../../lib/ai/metrics.js";
 
 export const maxDuration = 300;
 export const runtime = "nodejs";
@@ -64,6 +66,17 @@ export async function POST(request) {
   const abortFromRequest = () => controller.abort(request.signal.reason);
   if (request.signal?.aborted) {
     controller.abort(request.signal.reason);
+    return Response.json({
+      error: "Cancelado",
+      code: "CANCELLED",
+      provider_calls: 0,
+      scope_calls: 0,
+      generation_calls: 0,
+      usage: null,
+      known_usage: { prompt_tokens: null, completion_tokens: null, total_tokens: null, reasoning_tokens: null },
+      usage_coverage: { calls_total: 0, calls_with_usage: 0, calls_without_usage: 0, is_complete: true, fields: { prompt_tokens: true, completion_tokens: true, total_tokens: true, reasoning_tokens: true } },
+      request_id: requestId,
+    }, { status: 499, headers: { "x-request-id": requestId } });
   } else {
     request.signal?.addEventListener("abort", abortFromRequest, { once: true });
   }
@@ -73,15 +86,40 @@ export async function POST(request) {
     controller.abort(new DOMException("The operation timed out.", "TimeoutError"));
   }, timeoutMs) : null;
 
+  let scopeCalls = 0;
+  let generationCalls = 0;
+  const aggregator = new MetricsAggregator();
+  const onScope = (decision) => {
+    const u = decision?.usage;
+    const hasUsage = Boolean(u && (
+      typeof u.prompt_tokens === "number" ||
+      typeof u.completion_tokens === "number" ||
+      typeof u.total_tokens === "number" ||
+      typeof u.reasoning_tokens === "number"
+    ));
+    aggregator.addCall({
+      callType: "scope",
+      calls: 1,
+      promptTokens: typeof u?.prompt_tokens === "number" ? u.prompt_tokens : null,
+      completionTokens: typeof u?.completion_tokens === "number" ? u.completion_tokens : null,
+      totalTokens: typeof u?.total_tokens === "number" ? u.total_tokens : null,
+      reasoningTokens: typeof u?.reasoning_tokens === "number" ? u.reasoning_tokens : null,
+      hasUsage,
+      eventId: `scope-${aggregator.scopeCalls + 1}`,
+    });
+  };
+
   try {
     const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const identity = { userId: body.user_id, roles: body.roles, authenticated: body.authenticated === true };
     const scopeModelId = process.env.OPENAI_MODEL;
     const scopeProviderOptions = getModelProviderOptions(scopeModelId);
+    const trackingScopeModel = createTrackingModel(provider(scopeModelId), () => { scopeCalls++; });
+    const trackingGenerationModel = createTrackingModel(provider(body.model), () => { generationCalls++; });
     const model = wrapLanguageModel({
-      model: provider(body.model),
+      model: trackingGenerationModel,
       middleware: promptionMiddleware(identity, body.original_text, controller.signal, body.security_messages,
-        provider(scopeModelId), scopeProviderOptions),
+        trackingScopeModel, scopeProviderOptions, { onScope }),
     });
     const tools = Object.fromEntries(body.tools.map(spec => [
       spec.function.name,
@@ -109,21 +147,78 @@ export async function POST(request) {
         streamError = error;
       },
     });
-    let text, toolCalls, finishReason;
+    let text, toolCalls, finishReason, rawUsage;
     try {
-      [text, toolCalls, finishReason] = await Promise.all([
+      [text, toolCalls, finishReason, rawUsage] = await Promise.all([
         result.text, result.toolCalls, result.finishReason,
+        Promise.resolve(result.usage).catch(() => null),
       ]);
     } catch (err) {
       throw (streamError || err);
     }
+
+    // Account for any scope calls tracked but not in aggregator
+    while (aggregator.scopeCalls < scopeCalls) {
+      aggregator.addCall({ callType: "scope", calls: 1, hasUsage: false });
+    }
+
+    if (generationCalls > 0) {
+      const inputTok = rawUsage?.inputTokens ?? rawUsage?.promptTokens ?? null;
+      const outputTok = rawUsage?.outputTokens ?? rawUsage?.completionTokens ?? null;
+      const totalTok = rawUsage?.totalTokens ?? null;
+      const reasoningTok = rawUsage?.outputTokenDetails?.reasoningTokens ?? rawUsage?.reasoningTokens ?? null;
+      const hasUsage = Boolean(rawUsage && (
+        typeof inputTok === "number" ||
+        typeof outputTok === "number" ||
+        typeof totalTok === "number" ||
+        typeof reasoningTok === "number"
+      ));
+      aggregator.addCall({
+        callType: "generation",
+        calls: generationCalls,
+        promptTokens: typeof inputTok === "number" ? inputTok : null,
+        completionTokens: typeof outputTok === "number" ? outputTok : null,
+        totalTokens: typeof totalTok === "number" ? totalTok : null,
+        reasoningTokens: typeof reasoningTok === "number" ? reasoningTok : null,
+        hasUsage,
+        eventId: "generation-turn",
+      });
+    }
+
+    const summary = aggregator.summary();
+    const usage = summary.provider_calls > 0 ? {
+      prompt_tokens: summary.prompt_tokens,
+      completion_tokens: summary.completion_tokens,
+      total_tokens: summary.total_tokens,
+      reasoning_tokens: summary.reasoning_tokens,
+    } : null;
+
     if (!text.trim() && !toolCalls.length) {
       console.warn("AI turn returned no usable output", { model: body.model, finishReason });
       if (finishReason === "length") {
-        return Response.json({ error: "Respuesta del modelo truncada por límite de tokens", code: "MODEL_RESPONSE_TRUNCATED" }, { status: 502 });
+        return Response.json({
+          error: "Respuesta del modelo truncada por límite de tokens",
+          code: "MODEL_RESPONSE_TRUNCATED",
+          provider_calls: summary.provider_calls,
+          scope_calls: summary.scope_calls,
+          generation_calls: summary.generation_calls,
+          usage,
+          known_usage: summary.known_usage,
+          usage_coverage: summary.usage_coverage,
+        }, { status: 502, headers: { "x-request-id": requestId } });
       }
-      return Response.json({ error: "El modelo no produjo una respuesta", code: "MODEL_EMPTY_RESPONSE" }, { status: 503 });
+      return Response.json({
+        error: "El modelo no produjo una respuesta",
+        code: "MODEL_EMPTY_RESPONSE",
+        provider_calls: summary.provider_calls,
+        scope_calls: summary.scope_calls,
+        generation_calls: summary.generation_calls,
+        usage,
+        known_usage: summary.known_usage,
+        usage_coverage: summary.usage_coverage,
+      }, { status: 503, headers: { "x-request-id": requestId } });
     }
+
     return Response.json({
       text,
       calls: toolCalls.map(call => ({
@@ -135,6 +230,12 @@ export async function POST(request) {
       finish_reason: finishReason,
       truncated: finishReason === "length",
       request_id: requestId,
+      provider_calls: summary.provider_calls,
+      scope_calls: summary.scope_calls,
+      generation_calls: summary.generation_calls,
+      usage,
+      known_usage: summary.known_usage,
+      usage_coverage: summary.usage_coverage,
     }, {
       headers: { "x-request-id": requestId },
     });
@@ -143,8 +244,26 @@ export async function POST(request) {
     console.warn("AI turn failed", { code, status, model: body.model,
       guardReason: reason, scopeReason: scope?.reason,
       errorType: error.name, providerStatus: error.statusCode });
-    return Response.json({ error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta",
-      code, ...(reason ? { reason } : {}), ...(scope ? { scope } : {}) }, { status });
+
+    while (aggregator.scopeCalls < scopeCalls) {
+      aggregator.addCall({ callType: "scope", calls: 1, hasUsage: false, failed: true });
+    }
+    if (generationCalls > 0 && aggregator.generationCalls < generationCalls) {
+      aggregator.addCall({ callType: "generation", calls: generationCalls - aggregator.generationCalls, hasUsage: false, failed: true });
+    }
+    const errSummary = aggregator.summary();
+
+    return Response.json({
+      error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta",
+      code, ...(reason ? { reason } : {}), ...(scope ? { scope } : {}),
+      provider_calls: errSummary.provider_calls,
+      scope_calls: errSummary.scope_calls,
+      generation_calls: errSummary.generation_calls,
+      usage: null,
+      known_usage: errSummary.known_usage,
+      usage_coverage: errSummary.usage_coverage,
+      request_id: requestId,
+    }, { status, headers: { "x-request-id": requestId } });
   } finally {
     if (timer) clearTimeout(timer);
     request.signal?.removeEventListener("abort", abortFromRequest);

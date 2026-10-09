@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from promption import AsyncGuardPipeline, Identity, ScopeDecision, input_guard_decision, output_guard_decision
 from promption.conversation_guard import ConversationGuard, ConversationLimitError
+from promption.metrics_aggregator import MetricsAggregator
 from promption.client import FilterRateLimited
 from promption.llm.exceptions import (
     LLMConfigurationError,
@@ -316,8 +317,37 @@ def audit_chat_endpoint(handler):
         try:
             scope_token = _scope_decision.set(None)
             started = time.perf_counter()
-            request_id = str(uuid.uuid4())
-            response = await handler(request, *args, **kwargs)
+            request_id = None
+            if isinstance(request.context, dict):
+                raw_rid = str(request.context.get("request_id", "")).strip()
+                if raw_rid and re.match(r"^[a-zA-Z0-9_\-\.]{1,128}$", raw_rid):
+                    request_id = raw_rid
+            if not request_id:
+                request_id = str(uuid.uuid4())
+            try:
+                response = await handler(request, *args, **kwargs)
+            except Exception as exc:
+                dur = round((time.perf_counter() - started) * 1000, 2)
+                roles = [
+                    (role.value if isinstance(role, UserRole) else str(role)).strip().lower()
+                    for role in request.user.roles
+                ]
+                try:
+                    await get_filter_client().audit_event(
+                        event_type="chat_failed",
+                        identity=Identity(user_id=request.user.id, roles=roles),
+                        details={
+                            "request_id": request_id,
+                            "event_type": "chat_failed",
+                            "error_type": exc.__class__.__name__,
+                            "status": getattr(exc, "status_code", 500),
+                            "latency_ms": dur,
+                        },
+                        level="ERROR",
+                    )
+                except Exception:
+                    pass
+                raise
             scope = _scope_decision.get()
             if scope is not None:
                 response.scope = scope.to_dict()
@@ -332,8 +362,10 @@ def audit_chat_endpoint(handler):
                 (role.value if isinstance(role, UserRole) else str(role)).strip().lower()
                 for role in request.user.roles
             ]
+            final_req_id = response.request_id or request_id
+            response.request_id = final_req_id
             details = {
-                "request_id": request_id,
+                "request_id": final_req_id,
                 "event_type": "chat_completed",
                 "decision": "BLOCKED" if response.blocked else "ALLOWED",
                 "blocked": response.blocked,
@@ -349,6 +381,7 @@ def audit_chat_endpoint(handler):
                 "model": response.model or None,
                 "policy": response.policy.model_dump() if response.policy else None,
                 "tools": [item.model_dump(exclude={"result"}) for item in response.audit],
+                "execution_metrics": response.execution_metrics,
                 "latency_ms": round((time.perf_counter() - started) * 1000, 2),
             }
             await get_filter_client().audit_event(
@@ -539,6 +572,248 @@ async def chat(request: ChatRequest, deadline: RequestDeadline | None = Depends(
                 }
 
 
+class ExecutionContext:
+    def __init__(self, request_id: str, t_start: float):
+        self.request_id = request_id
+        self.t_start = t_start
+        self.stages = {
+            "input_filter": {"status": "skipped", "latency_ms": None},
+            "conversation_guard": {"status": "skipped", "latency_ms": None},
+            "scope": {"status": "skipped", "latency_ms": None},
+            "generation": {"status": "skipped", "latency_ms": None},
+            "tools": {"status": "skipped", "latency_ms": None},
+            "output_guard": {"status": "skipped", "latency_ms": None},
+        }
+        self.eval_counts = {
+            "input": 0,
+            "conversation": 0,
+            "scope": 0,
+            "tool": 0,
+            "output": 0,
+            "deduplicated": 0,
+        }
+        self.aggregator = MetricsAggregator()
+        self.fallback_count = 0
+        self.fallback_reason = None
+        self.requested_model = None
+        self.effective_model = None
+        self.scope_model = None
+        self.tools_executed = False
+
+    @property
+    def generation_calls(self) -> int:
+        return self.aggregator.generation_calls
+
+    @generation_calls.setter
+    def generation_calls(self, val: int):
+        diff = val - self.aggregator.generation_calls
+        if diff > 0:
+            self.aggregator.add_call(call_type="generation", calls=diff, has_usage=False)
+        elif diff < 0:
+            self.aggregator.generation_calls = val
+
+    @property
+    def scope_calls(self) -> int:
+        return self.aggregator.scope_calls
+
+    @scope_calls.setter
+    def scope_calls(self, val: int):
+        diff = val - self.aggregator.scope_calls
+        if diff > 0:
+            self.aggregator.add_call(call_type="scope", calls=diff, has_usage=False)
+        elif diff < 0:
+            self.aggregator.scope_calls = val
+
+    @property
+    def failed_calls(self) -> int:
+        return self.aggregator.failed_calls
+
+    @failed_calls.setter
+    def failed_calls(self, val: int):
+        self.aggregator.failed_calls = val
+
+    @property
+    def prompt_tokens(self) -> int | None:
+        return self.aggregator.prompt_tokens
+
+    @property
+    def completion_tokens(self) -> int | None:
+        return self.aggregator.completion_tokens
+
+    @property
+    def total_tokens(self) -> int | None:
+        return self.aggregator.total_tokens
+
+    @property
+    def reasoning_tokens(self) -> int | None:
+        return self.aggregator.reasoning_tokens
+
+    def record_scope_call(
+        self,
+        calls: int,
+        p: int | None = None,
+        c: int | None = None,
+        t: int | None = None,
+        r: int | None = None,
+        failed: bool = False,
+        event_id: str | None = None,
+    ):
+        has_usage = any(isinstance(x, int) for x in (p, c, t, r))
+        self.aggregator.add_call(
+            call_type="scope",
+            calls=calls,
+            prompt_tokens=p,
+            completion_tokens=c,
+            total_tokens=t,
+            reasoning_tokens=r,
+            has_usage=has_usage,
+            failed=failed,
+            event_id=event_id,
+        )
+
+    def record_generation_call(
+        self,
+        calls: int,
+        p: int | None = None,
+        c: int | None = None,
+        t: int | None = None,
+        r: int | None = None,
+        failed: bool = False,
+        event_id: str | None = None,
+    ):
+        has_usage = any(isinstance(x, int) for x in (p, c, t, r))
+        self.aggregator.add_call(
+            call_type="generation",
+            calls=calls,
+            prompt_tokens=p,
+            completion_tokens=c,
+            total_tokens=t,
+            reasoning_tokens=r,
+            has_usage=has_usage,
+            failed=failed,
+            event_id=event_id,
+        )
+
+    def add_tokens(self, p: int | None, c: int | None, t: int | None, r: int | None = None):
+        has_usage = any(isinstance(x, int) for x in (p, c, t, r))
+        self.aggregator.add_call(
+            call_type="generation",
+            calls=0,
+            prompt_tokens=p,
+            completion_tokens=c,
+            total_tokens=t,
+            reasoning_tokens=r,
+            has_usage=has_usage,
+            event_id=f"tokens-{len(self.aggregator._events) + 1}",
+        )
+
+    def import_llm_events(self, result, event_id: str) -> bool:
+        """Preserve remote scope usage and individual retry attempts."""
+        events = result.get("usage_events") if isinstance(result, dict) else getattr(result, "usage_events", None)
+        if events is None:
+            return False
+        for index, summary in enumerate(events):
+            self.aggregator.add_summary(summary, f"{event_id}-attempt-{index + 1}")
+        return True
+
+    def record_llm_result(self, result, event_id: str):
+        if self.import_llm_events(result, event_id):
+            return
+        get = result.get if isinstance(result, dict) else lambda name: getattr(result, name, None)
+        calls = get("provider_calls")
+        self.record_generation_call(1 if calls is None else calls,
+            get("prompt_tokens"), get("completion_tokens"), get("total_tokens"),
+            get("reasoning_tokens"), event_id=event_id)
+
+    def record_stage(self, stage: str, status: str, latency_ms: float | None = None):
+        if stage in self.stages:
+            self.stages[stage]["status"] = status
+            if latency_ms is not None:
+                self.stages[stage]["latency_ms"] = round(latency_ms, 2)
+
+    def build_metrics(self, actions: list | None = None, audit: list | None = None) -> dict:
+        total_lat = (time.perf_counter() - self.t_start) * 1000
+        has_tool = self.tools_executed or bool(actions) or any(bool(getattr(a, "allowed", False)) for a in (audit or []))
+        summary = self.aggregator.summary()
+        return {
+            "request_id": self.request_id,
+            "requested_model": self.requested_model or self.effective_model or "none",
+            "effective_model": self.effective_model or "none",
+            "scope_model": self.scope_model,
+            "call_type": "tool" if has_tool else "chat",
+            "generation_calls": summary["generation_calls"],
+            "scope_calls": summary["scope_calls"],
+            "provider_calls": summary["provider_calls"],
+            "failed_calls": summary["failed_calls"],
+            "fallback_count": self.fallback_count,
+            "fallback_reason": self.fallback_reason,
+            "prompt_tokens": summary["prompt_tokens"],
+            "completion_tokens": summary["completion_tokens"],
+            "total_tokens": summary["total_tokens"],
+            "reasoning_tokens": summary["reasoning_tokens"],
+            "known_usage": summary["known_usage"],
+            "usage_coverage": summary["usage_coverage"],
+            "filter_status": self.stages["input_filter"]["status"],
+            "output_guard_status": self.stages["output_guard"]["status"],
+            "stages": self.stages,
+            "stage_latencies_ms": {k: v["latency_ms"] for k, v in self.stages.items() if v["latency_ms"] is not None},
+            "total_latency_ms": round(total_lat, 2),
+        }
+
+
+def _make_response(
+    ctx: ExecutionContext,
+    *,
+    blocked: bool = False,
+    reply: str = "",
+    reason: str | None = None,
+    block_type: str | None = None,
+    security_classification: str = "UNCERTAIN",
+    guard: str = "SKIPPED",
+    confidence: float | None = None,
+    policy: PolicyInfo | None = None,
+    scope: dict | None = None,
+    audit: list[MCPToolCall] | None = None,
+    actions: list[dict] | None = None,
+    filter_layers: dict | None = None,
+    leaked: bool = False,
+    role: str = "customer",
+    model: str = "",
+    filter_enabled: bool = True,
+    output_guard_enabled: bool = True,
+    filter_skipped: bool = False,
+    output_guard_skipped: bool = False,
+) -> ChatResponse:
+    metrics = ctx.build_metrics(actions=actions, audit=audit)
+    return ChatResponse(
+        blocked=blocked,
+        reply=reply,
+        leaked=leaked,
+        audit=audit or [],
+        actions=actions or [],
+        guard=guard,
+        filter_enabled=filter_enabled,
+        output_guard_enabled=output_guard_enabled,
+        filter_skipped=filter_skipped,
+        output_guard_skipped=output_guard_skipped,
+        role=role,
+        model=model or ctx.effective_model or "",
+        requested_model=ctx.requested_model or ctx.effective_model or "",
+        fallback_count=ctx.fallback_count,
+        fallback_reason=ctx.fallback_reason,
+        filter_layers=filter_layers,
+        reason=reason,
+        confidence=confidence,
+        block_type=block_type,
+        policy=policy,
+        security_classification=security_classification,
+        scope=scope,
+        eval_counts=dict(ctx.eval_counts),
+        request_id=ctx.request_id,
+        execution_metrics=metrics,
+    )
+
+
 async def _chat_internal(
     request: ChatRequest,
     user_roles: list[str],
@@ -550,52 +825,51 @@ async def _chat_internal(
     if not request_id:
         request_id = uuid.uuid4().hex
     t_start = time.perf_counter()
-    stage_latencies = {}
+    ctx = ExecutionContext(request_id=request_id, t_start=t_start)
+    _request_review_cache.set({})
+    _request_eval_counts.set(ctx.eval_counts)
+
     try:
         security_messages = store.security_snapshot(conversation_id, request.user)
     except ConversationLimitError:
-        return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
-                            reason="conversation_limit", block_type="conversation")
+        return _make_response(ctx, blocked=True, reply="Inicia una nueva conversación para continuar.",
+                              reason="conversation_limit", block_type="conversation", role=primary_role)
     security_messages.append({"role": "user", "content": request.text})
     set_guard_identity(request.user.id, user_roles, request.text, request.user.authenticated, security_messages, request_id=request_id)
     total_context_chars = sum(len(m.get("content", "") or "") for m in security_messages)
     if total_context_chars > settings.max_context_chars:
-        return ChatResponse(
+        return _make_response(
+            ctx,
             blocked=True,
             reply="El contexto de la conversación excede el límite permitido. Inicia una nueva conversación para continuar.",
             reason="context_too_large",
             block_type="conversation_limit",
             role=primary_role,
         )
-    _request_review_cache.set({})
-    _request_eval_counts.set({
-        "input": 0,
-        "conversation": 0,
-        "scope": 0,
-        "tool": 0,
-        "output": 0,
-        "deduplicated": 0,
-    })
 
-    
     # Initialize clients
     filter_client = get_filter_client()
     llm_client = get_llm_client()
     mcp_executor = get_mcp_executor()
     policy_engine = get_policy_engine()
-    
+
     # 1. Input Filter
     security_state = get_security_state()
     filter_enabled = security_state["filter_enabled"]
     filter_skipped = not filter_enabled
     filter_result = None
     security_classification = "UNCERTAIN"
-    
+
     if filter_enabled:
+        t_f = time.perf_counter()
+        ctx.eval_counts["input"] += 1
+        ctx.record_stage("input_filter", "running")
         try:
             contextual = _conversation_guard.analyze(security_messages, roles=user_roles, use_ml=False)
             if contextual.blocked:
-                return ChatResponse(blocked=True,
+                ctx.record_stage("conversation_guard", "executed", (time.perf_counter() - t_f) * 1000)
+                ctx.record_stage("input_filter", "executed", (time.perf_counter() - t_f) * 1000)
+                return _make_response(ctx, blocked=True,
                     reply="Promption detectó instrucciones maliciosas en el contexto de la conversación.",
                     reason="conversation_injection", block_type="conversation", role=primary_role,
                     security_classification="MALICIOUS",
@@ -608,11 +882,12 @@ async def _chat_internal(
                 use_ml=True, messages=security_messages,
                 timeout=step_timeout
             )
+            ctx.record_stage("input_filter", "executed", (time.perf_counter() - t_f) * 1000)
             security_classification = filter_result.classification
             input_check = input_guard_decision(request.text, filter_result,
                 message_count=len(security_messages), output_enabled=security_state["output_guard_enabled"])
             if not input_check.allowed and input_check.reason != "malicious_input":
-                return ChatResponse(blocked=True,
+                return _make_response(ctx, blocked=True,
                     reply=("Esta solicitud requiere verificar la respuesta. Activa Output Guard para continuar.")
                         if input_check.reason == "output_guard_required" else
                         "No pude verificar la seguridad del contexto. Inténtalo nuevamente.",
@@ -620,7 +895,8 @@ async def _chat_internal(
                         else "filter_unavailable", role=primary_role, filter_layers=filter_result.layers,
                     security_classification="UNCERTAIN")
             if not input_check.allowed:
-                return ChatResponse(
+                return _make_response(
+                    ctx,
                     blocked=True,
                     reply=f"Bloqueado por el filtro ({filter_result.reason})",
                     filter_enabled=filter_enabled,
@@ -646,11 +922,13 @@ async def _chat_internal(
             if c is not None:
                 c[init_key] = True
         except ConversationLimitError:
-            return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
+            return _make_response(ctx, blocked=True, reply="Inicia una nueva conversación para continuar.",
                                 reason="conversation_limit", block_type="conversation", role=primary_role)
         except FilterRateLimited:
             logger.warning("Filter API rate limit exceeded")
-            return ChatResponse(
+            ctx.record_stage("input_filter", "failed", (time.perf_counter() - t_f) * 1000)
+            return _make_response(
+                ctx,
                 blocked=True,
                 reply="El servicio de seguridad está temporalmente saturado. Inténtalo de nuevo en unos segundos.",
                 filter_enabled=filter_enabled,
@@ -663,7 +941,9 @@ async def _chat_internal(
             )
         except Exception:
             logger.exception("Filter API unavailable")
-            return ChatResponse(
+            ctx.record_stage("input_filter", "failed", (time.perf_counter() - t_f) * 1000)
+            return _make_response(
+                ctx,
                 blocked=True,
                 reply="El servicio de seguridad no está disponible. El chat se bloqueó de forma preventiva.",
                 filter_enabled=filter_enabled,
@@ -686,7 +966,8 @@ async def _chat_internal(
             policy_decision.tier,
             policy_decision.resource,
         )
-        return ChatResponse(
+        return _make_response(
+            ctx,
             blocked=True,
             reply=authorization_message(policy_decision),
             filter_enabled=filter_enabled,
@@ -705,10 +986,23 @@ async def _chat_internal(
     _report_progress("Revisando alcance de la solicitud…")
     scope_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "scope_guard")
     sg = _call_get_scope_guard(timeout_seconds=scope_timeout)
+    ctx.eval_counts["scope"] += 1
+    t_scope = time.perf_counter()
     scope = await sg.check(
         request.text, system_prompt=system_prompt,
         identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
         messages=security_messages)
+    ctx.record_stage("scope", "executed", (time.perf_counter() - t_scope) * 1000)
+    scope_calls = getattr(scope, "provider_calls", 1 if getattr(scope, "model", None) else 0)
+    ctx.scope_model = getattr(scope, "model", None)
+    ctx.record_scope_call(
+        scope_calls,
+        getattr(scope, "prompt_tokens", None),
+        getattr(scope, "completion_tokens", None),
+        getattr(scope, "total_tokens", None),
+        getattr(scope, "reasoning_tokens", None),
+        event_id=f"scope-{ctx.scope_calls + 1}",
+    )
     _scope_decision.set(scope)
     if not scope.allowed:
         reply = ("Esta solicitud está fuera del alcance de este asistente. Puedo ayudarte con "
@@ -717,7 +1011,7 @@ async def _chat_internal(
             reply = ("No pude determinar si la solicitud está dentro del alcance del asistente. "
                      "Aclara qué necesitas hacer en Promption Shop.") if scope.status != 503 else (
                      "No pude verificar el alcance de la solicitud. Inténtalo nuevamente.")
-        return ChatResponse(blocked=True, reply=reply, scope=scope.to_dict(),
+        return _make_response(ctx, blocked=True, reply=reply, scope=scope.to_dict(),
             reason="out_of_scope" if scope.classification == "OUT_OF_SCOPE" else scope.reason,
             block_type="scope", role=primary_role, security_classification=security_classification,
             filter_layers=filter_result.layers if filter_result else None)
@@ -725,7 +1019,7 @@ async def _chat_internal(
     try:
         store.append_security(conversation_id, request.user, [{"role": "user", "content": request.text}])
     except ConversationLimitError:
-        return ChatResponse(blocked=True, reply="Inicia una nueva conversación para continuar.",
+        return _make_response(ctx, blocked=True, reply="Inicia una nueva conversación para continuar.",
                             reason="conversation_limit", block_type="conversation", role=primary_role)
     audit: List[MCPToolCall] = []
     authorized_contexts = []
@@ -733,8 +1027,12 @@ async def _chat_internal(
         request.user.authenticated or policy_decision.tier == "publico"
     ):
         for tool_name in policy_decision.tool_names:
+            ctx.eval_counts["tool"] += 1
+            ctx.tools_executed = True
+            t_tool = time.perf_counter()
             tool_response = await mcp_executor.execute(tool_name, {}, user_roles,
                                                  authenticated=request.user.authenticated)
+            ctx.record_stage("tools", "executed", (time.perf_counter() - t_tool) * 1000)
             tool_audit = tool_response.get("audit", {})
             audit.append(MCPToolCall(
                 tool=tool_audit.get("tool", tool_name),
@@ -749,7 +1047,8 @@ async def _chat_internal(
                     tool_name,
                     user_roles,
                 )
-                return ChatResponse(
+                return _make_response(
+                    ctx,
                     blocked=True,
                     reply=authorization_message(policy_decision),
                     audit=audit,
@@ -791,7 +1090,7 @@ async def _chat_internal(
                 await _review_conversation(security_messages + [evidence], request, filter_client, filter_enabled)
                 store.append_security(conversation_id, request.user, [evidence])
             except (ConversationBlocked, ConversationLimitError) as exc:
-                return ChatResponse(blocked=True,
+                return _make_response(ctx, blocked=True,
                     reply="Promption bloqueó el contexto recibido de una herramienta.",
                     reason=getattr(exc, "reason", "conversation_limit"), block_type="conversation",
                     role=primary_role, audit=audit)
@@ -834,6 +1133,7 @@ async def _chat_internal(
             reply = describe_capabilities(tool_specs,
                 authenticated=request.user.authenticated and "guest" not in user_roles)
             model_name = "Promption"
+            ctx.effective_model = model_name
         elif capability_report:
             _report_progress("Generando archivo…")
             content, highest_tier = _capabilities_csv(permitted_specs, mcp_executor.tools)
@@ -850,6 +1150,8 @@ async def _chat_internal(
                 raise ValueError("El catálogo de permisos fue bloqueado por Output Guard")
             content = checked_content.text
             _report_progress("Ejecutando herramienta MCP: make_document…")
+            ctx.tools_executed = True
+            ctx.eval_counts["tool"] += 1
             executed = await mcp_executor.execute(
                 "make_document",
                 {"title": "Mis capacidades en Promption Shop", "content": content,
@@ -862,6 +1164,7 @@ async def _chat_internal(
             actions.append(document)
             audit.append(MCPToolCall(tool="make_document", allowed=True, tier=highest_tier))
             model_name = "MCP"
+            ctx.effective_model = model_name
             reply = f"Estoy bien, {request.user.name}. Te adjunté tus capacidades disponibles en Excel."
         elif (not tool_specs or is_simple_greeting(request.text)) and hasattr(llm_client, 'generate'):
             _report_progress("Generando respuesta…")
@@ -870,9 +1173,16 @@ async def _chat_internal(
                 raise LLMTimeoutError("Presupuesto insuficiente para reservar tiempo de inspección en Output Guard")
             step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "review_conversation")
             await _review_conversation(security_messages, request, filter_client, filter_enabled, timeout=step_timeout)
+            t_gen = time.perf_counter()
             llm_response = await _call_generate(llm_client, messages, deadline=budget)
-            reply = llm_response.text
-            model_name = llm_response.model
+            ctx.record_stage("generation", "executed", (time.perf_counter() - t_gen) * 1000)
+            ctx.record_llm_result(llm_response, "generation-simple")
+            ctx.effective_model = getattr(llm_response, "model", None)
+            ctx.requested_model = getattr(llm_response, "requested_model", None) or getattr(llm_response, "model", None)
+            ctx.fallback_count = getattr(llm_response, "fallback_count", 0) or 0
+            ctx.fallback_reason = getattr(llm_response, "fallback_reason", None)
+            reply = getattr(llm_response, "text", "") or getattr(llm_response, "reply", "")
+            model_name = getattr(llm_response, "model", "llm")
         else:
             executed_signatures: set[str] = set()
             last_turn_signatures: list[str] = []
@@ -891,14 +1201,18 @@ async def _chat_internal(
                     raise LLMTimeoutError("Presupuesto insuficiente para continuar el ciclo de herramientas y validar salida")
                 step_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "review_conversation")
                 await _review_conversation(security_messages, request, filter_client, filter_enabled, timeout=step_timeout)
+                t_turn = time.perf_counter()
                 turn = await _call_generate_tool_turn(llm_client, messages, tool_specs, model_id=model_id, deadline=budget)
+                ctx.record_stage("generation", "executed", (time.perf_counter() - t_turn) * 1000)
+                ctx.record_llm_result(turn, f"generation-turn-{_ + 1}")
                 model_id = turn["model_id"]
                 model_name = turn["model"]
-                if requested_model is None:
-                    requested_model = turn.get("requested_model", model_name)
-                if turn.get("fallback_count", 0) > fallback_count:
-                    fallback_count = turn["fallback_count"]
-                    fallback_reason = turn.get("fallback_reason")
+                ctx.effective_model = model_name
+                if ctx.requested_model is None:
+                    ctx.requested_model = turn.get("requested_model", model_name)
+                if turn.get("fallback_count", 0) > ctx.fallback_count:
+                    ctx.fallback_count = turn["fallback_count"]
+                    ctx.fallback_reason = turn.get("fallback_reason")
                 attached = any(action["type"] in {"attachment", "existing_document"}
                                for action in actions)
                 document_spec = next((spec for spec in tool_specs
@@ -908,6 +1222,7 @@ async def _chat_internal(
                     forced_document = True
                     _report_progress("Generando archivo…")
                     try:
+                        t_doc = time.perf_counter()
                         turn = await _call_generate_tool_turn(
                             llm_client,
                             messages + [{"role": "system", "content": (
@@ -916,9 +1231,11 @@ async def _chat_internal(
                                 "no afirmes que existe un archivo sin ejecutar la herramienta.")}],
                             [document_spec], model_id=("openai-tools" if model_id == "openai-primary" else model_id),
                             force_tool="make_document", deadline=budget)
+                        ctx.record_llm_result(turn, "generation-doc")
                     except AIGuardBlocked:
                         raise
-                    except Exception:
+                    except Exception as exc:
+                        ctx.import_llm_events(exc, "generation-doc-error")
                         logger.exception("Document generation failed")
                         reply = "No pude generar el archivo solicitado. Inténtalo nuevamente."
                         break
@@ -942,6 +1259,8 @@ async def _chat_internal(
                     return f"{c_name}:{c_raw}"
 
                 calls = turn["calls"][:max_calls_per_turn]
+                ctx.tools_executed = True
+                ctx.record_stage("tools", "executed")
                 current_turn_signatures = [_sig_for_call(c) for c in calls]
                 if current_turn_signatures and current_turn_signatures == last_turn_signatures:
                     logger.warning("Tool loop without progress detected: %s", current_turn_signatures)
@@ -958,6 +1277,7 @@ async def _chat_internal(
                                                     for call in calls]})
                 for call in calls:
                     name = call["name"]
+                    ctx.eval_counts["tool"] += 1
                     allowed_names = {spec["function"]["name"] for spec in tool_specs}
                     try:
                         raw = call["arguments"]
@@ -972,12 +1292,23 @@ async def _chat_internal(
                                     "content": json.dumps(args, ensure_ascii=False)}
                         await _review_conversation(security_messages + [proposed], request, filter_client, filter_enabled)
                         _report_progress("Verificando alcance de la herramienta…")
+                        ctx.eval_counts["scope"] += 1
+                        t_tool_scope = time.perf_counter()
                         operation_scope = await _call_get_scope_guard().check(request.text,
                             system_prompt=system_prompt,
                             identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
                             messages=security_messages, tool={"name": name, "input": args,
                                 "description": next(spec["function"].get("description", "")
                                     for spec in tool_specs if spec["function"]["name"] == name)})
+                        op_calls = getattr(operation_scope, "provider_calls", 1 if getattr(operation_scope, "model", None) else 0)
+                        ctx.record_scope_call(
+                            op_calls,
+                            getattr(operation_scope, "prompt_tokens", None),
+                            getattr(operation_scope, "completion_tokens", None),
+                            getattr(operation_scope, "total_tokens", None),
+                            getattr(operation_scope, "reasoning_tokens", None),
+                            event_id=f"scope-tool-{call_id}",
+                        )
                         if not operation_scope.allowed:
                             _scope_decision.set(operation_scope)
                             raise ScopeBlocked(operation_scope)
@@ -1127,43 +1458,86 @@ async def _chat_internal(
                          if attached_file else
                          "No pude completar la solicitud con las herramientas disponibles.")
     except AIGuardBlocked as exc:
+        imported = ctx.import_llm_events(exc, "generation-error")
+        if imported and getattr(exc, "generation_calls", 0) > 0:
+            ctx.record_stage("generation", "failed")
+        calls = getattr(exc, "provider_calls", None)
+        if calls is None:
+            calls = 1
+        if calls > 0 and not imported:
+            ctx.failed_calls += calls
+            ctx.generation_calls += calls
+            ctx.record_stage("generation", "failed")
         scope = exc.scope
+        if isinstance(scope, dict):
+            usage = scope.get("usage")
+            if isinstance(usage, dict) and not imported:
+                ctx.record_scope_call(
+                    0,
+                    usage.get("prompt_tokens"),
+                    usage.get("completion_tokens"),
+                    usage.get("total_tokens"),
+                    usage.get("reasoning_tokens"),
+                    event_id="scope-blocked-usage",
+                )
         if exc.code in {"OUT_OF_SCOPE", "SCOPE_UNCERTAIN"} and isinstance(scope, dict):
             label = scope.get("classification")
             reason = scope.get("reason")
             if label in {"OUT_OF_SCOPE", "UNCERTAIN"} and reason in {
                 "topic_outside_scope", "system_limit", "ambiguous", "scope_unavailable", "invalid_scope_response"}:
                 _scope_decision.set(ScopeDecision(label, reason, 403 if label == "OUT_OF_SCOPE" else 503))
-            return ChatResponse(blocked=True, block_type="scope", reason=exc.code.lower(),
+            return _make_response(ctx, blocked=True, block_type="scope", reason=exc.code.lower(),
                 reply=("La revisión de alcance bloqueó la operación propuesta. Reformula la solicitud.")
                     if exc.code == "OUT_OF_SCOPE" else
                     "No pude verificar el alcance de la operación propuesta. Inténtalo nuevamente.",
                 role=primary_role, audit=audit, policy=policy_info, security_classification=security_classification)
-        return ChatResponse(blocked=True, block_type="model_guard", reason=exc.code.lower(),
+        return _make_response(ctx, blocked=True, block_type="model_guard", reason=exc.code.lower(),
             reply="Promption no pudo autorizar la operación propuesta por el modelo.",
             role=primary_role, audit=audit, policy=policy_info, security_classification=security_classification)
     except ScopeBlocked as exc:
-        return ChatResponse(blocked=True,
+        return _make_response(ctx, blocked=True,
             reply="La herramienta propuesta excede el alcance de esta solicitud y fue bloqueada.",
             reason="tool_out_of_scope", block_type="scope", scope=exc.decision.to_dict(),
             role=primary_role, audit=audit, policy=policy_info, security_classification=security_classification)
     except (ConversationBlocked, ConversationLimitError) as exc:
-        return ChatResponse(blocked=True,
+        return _make_response(ctx, blocked=True,
             reply="Promption bloqueó la secuencia de mensajes o resultados de herramientas.",
             reason=getattr(exc, "reason", "conversation_limit"), block_type="conversation",
             role=primary_role, audit=audit, policy=policy_info,
             security_classification="MALICIOUS" if getattr(exc, "reason", "") == "conversation_injection" else "UNCERTAIN")
     except (AIGuardBlocked, ScopeBlocked, ConversationBlocked, ConversationLimitError):
         raise
-    except asyncio.CancelledError:
+    except asyncio.CancelledError as exc:
         logger.info("Chat generation cancelled by client")
+        ctx.import_llm_events(exc, "generation-error")
+        ctx.record_stage("generation", "cancelled")
         raise
     except LLMTimeoutError as exc:
+        imported = ctx.import_llm_events(exc, "generation-error")
+        ctx.record_stage("generation", "failed")
+        calls = getattr(exc, "provider_calls", None)
+        calls = 1 if calls is None else calls
+        if calls > 0 and not imported:
+            ctx.generation_calls += calls
+            ctx.failed_calls += calls
+        if getattr(exc, "fallback_count", 0) > ctx.fallback_count:
+            ctx.fallback_count = exc.fallback_count
+            ctx.fallback_reason = getattr(exc, "fallback_reason", None)
         raise HTTPException(
             status_code=504,
             detail={"error": exc.message, "code": "GATEWAY_TIMEOUT"},
         ) from exc
     except LLMQuotaError as exc:
+        imported = ctx.import_llm_events(exc, "generation-error")
+        ctx.record_stage("generation", "failed")
+        calls = getattr(exc, "provider_calls", None)
+        calls = 1 if calls is None else calls
+        if calls > 0 and not imported:
+            ctx.generation_calls += calls
+            ctx.failed_calls += calls
+        if getattr(exc, "fallback_count", 0) > ctx.fallback_count:
+            ctx.fallback_count = exc.fallback_count
+            ctx.fallback_reason = getattr(exc, "fallback_reason", None)
         headers = {}
         if exc.retry_after is not None:
             headers["Retry-After"] = str(int(exc.retry_after))
@@ -1173,22 +1547,48 @@ async def _chat_internal(
             headers=headers or None,
         ) from exc
     except (LLMProviderUnavailableError, LLMConnectivityError) as exc:
+        imported = ctx.import_llm_events(exc, "generation-error")
+        ctx.record_stage("generation", "failed")
+        calls = getattr(exc, "provider_calls", None)
+        calls = 1 if calls is None else calls
+        if calls > 0 and not imported:
+            ctx.generation_calls += calls
+            ctx.failed_calls += calls
+        if getattr(exc, "fallback_count", 0) > ctx.fallback_count:
+            ctx.fallback_count = exc.fallback_count
+            ctx.fallback_reason = getattr(exc, "fallback_reason", None)
         raise HTTPException(
             status_code=503,
             detail={"error": exc.message, "code": "MODEL_UNAVAILABLE"},
         ) from exc
     except LLMInvalidResponseError as exc:
+        imported = ctx.import_llm_events(exc, "generation-error")
+        ctx.record_stage("generation", "failed")
+        calls = getattr(exc, "provider_calls", None)
+        calls = 1 if calls is None else calls
+        if calls > 0 and not imported:
+            ctx.generation_calls += calls
+            ctx.failed_calls += calls
+        if getattr(exc, "fallback_count", 0) > ctx.fallback_count:
+            ctx.fallback_count = exc.fallback_count
+            ctx.fallback_reason = getattr(exc, "fallback_reason", None)
         raise HTTPException(
             status_code=502,
             detail={"error": exc.message, "code": "INVALID_MODEL_RESPONSE"},
         ) from exc
     except LLMConfigurationError as exc:
+        ctx.record_stage("generation", "failed")
+        if not ctx.import_llm_events(exc, "generation-error"):
+            ctx.failed_calls += 1
         raise HTTPException(
             status_code=503,
             detail={"error": exc.message, "code": "CONFIGURATION_ERROR"},
         ) from exc
     except Exception as exc:
         logger.warning("LLM generation failed: %s", exc.__class__.__name__)
+        ctx.record_stage("generation", "failed")
+        if not ctx.import_llm_events(exc, "generation-error"):
+            ctx.failed_calls += 1
         raise HTTPException(
             status_code=503,
             detail={"error": "Error del proveedor LLM", "code": "MODEL_UNAVAILABLE"},
@@ -1205,6 +1605,8 @@ async def _chat_internal(
     guard_result = None
     
     if output_guard_enabled:
+        t_out = time.perf_counter()
+        ctx.eval_counts["output"] += 1
         try:
             budget.check_expired("output_guard")
             out_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "output_guard")
@@ -1214,12 +1616,13 @@ async def _chat_internal(
                 identity=Identity(user_id=request.user.id, roles=user_roles),
                 timeout=out_timeout
             )
-            
+            ctx.record_stage("output_guard", "executed", (time.perf_counter() - t_out) * 1000)
             checked_reply = output_guard_decision(reply, guard_result)
             if checked_reply.status == 503:
                 raise RuntimeError("invalid_output_guard_response")
             if not checked_reply.allowed:
-                return ChatResponse(
+                return _make_response(
+                    ctx,
                     blocked=True,
                     reply="No puedo mostrar información sensible o credenciales en la respuesta.",
                     guard="BLOCK",
@@ -1228,6 +1631,7 @@ async def _chat_internal(
                     filter_skipped=filter_skipped,
                     output_guard_skipped=False,
                     role=primary_role,
+                    model=model_name,
                     reason="sensitive_output",
                     confidence=float(guard_result.get("risk", 1.0)),
                     block_type="output_guard",
@@ -1235,12 +1639,12 @@ async def _chat_internal(
                     policy=policy_info,
                     security_classification=security_classification,
                 )
-            
             reply = checked_reply.text or "La respuesta fue ocultada por contener información sensible."
-                
         except Exception:
             logger.exception("Output guard unavailable")
-            return ChatResponse(
+            ctx.record_stage("output_guard", "failed", (time.perf_counter() - t_out) * 1000)
+            return _make_response(
+                ctx,
                 blocked=True,
                 reply="La respuesta no pudo validarse y fue bloqueada de forma preventiva.",
                 guard="UNAVAILABLE",
@@ -1249,6 +1653,7 @@ async def _chat_internal(
                 filter_skipped=filter_skipped,
                 output_guard_skipped=True,
                 role=primary_role,
+                model=model_name,
                 reason="output_guard_unavailable",
                 confidence=1.0,
                 block_type="output_guard",
@@ -1266,7 +1671,8 @@ async def _chat_internal(
             output_policy.policy_id,
             output_policy.tier,
         )
-        return ChatResponse(
+        return _make_response(
+            ctx,
             blocked=True,
             reply="La respuesta contenía información fuera de tu alcance y fue bloqueada.",
             guard="BLOCK",
@@ -1275,6 +1681,7 @@ async def _chat_internal(
             filter_skipped=filter_skipped,
             output_guard_skipped=False,
             role=primary_role,
+            model=model_name,
             reason="output_scope_violation",
             confidence=output_policy.confidence,
             block_type="output_guard",
@@ -1282,43 +1689,20 @@ async def _chat_internal(
             policy=PolicyInfo(**output_policy.to_dict()),
             security_classification=security_classification,
         )
-    
+
     # 6. Check for unauthorized secret leakage.
-    # Exact confidential business values are expected in admin answers when an
-    # ACL-authorized confidential tool was executed. Critical credentials still
-    # never pass because Output Guard / restricted policy handles them earlier.
     leaked = _contains_secret(reply) and not _allowed_confidential_reply(
         roles=user_roles,
         audit=audit,
         policy=policy_info,
     )
-    
+
     # 7. Add warning if filter was disabled
     if not filter_enabled:
         reply += "\n\n⚠️ (Nota del sistema: esta respuesta ha sido generada SIN filtro de entrada ni output guard. En producción, el filtro está activado y este contenido habría sido bloqueado.)"
-    
-    req_m = requested_model if 'requested_model' in locals() and requested_model else model_name
-    fb_c = fallback_count if 'fallback_count' in locals() else 0
-    fb_r = fallback_reason if 'fallback_reason' in locals() else None
-    total_lat = (time.perf_counter() - t_start) * 1000
-    p_tok = getattr(locals().get('llm_response'), 'prompt_tokens', None) if 'llm_response' in locals() else locals().get('turn', {}).get('prompt_tokens')
-    c_tok = getattr(locals().get('llm_response'), 'completion_tokens', None) if 'llm_response' in locals() else locals().get('turn', {}).get('completion_tokens')
-    t_tok = getattr(locals().get('llm_response'), 'total_tokens', None) if 'llm_response' in locals() else locals().get('turn', {}).get('total_tokens')
-    metrics = {
-        "request_id": request_id,
-        "requested_model": req_m,
-        "effective_model": model_name,
-        "call_type": "tool" if actions else "chat",
-        "fallback_count": fb_c,
-        "fallback_reason": fb_r,
-        "prompt_tokens": p_tok,
-        "completion_tokens": c_tok,
-        "total_tokens": t_tok,
-        "filter_status": "executed" if filter_enabled else "skipped",
-        "output_guard_status": "executed" if output_guard_enabled else "skipped",
-        "total_latency_ms": round(total_lat, 2),
-    }
-    response = ChatResponse(
+
+    response = _make_response(
+        ctx,
         blocked=False,
         reply=reply,
         leaked=leaked,
@@ -1329,12 +1713,6 @@ async def _chat_internal(
         output_guard_skipped=output_guard_skipped,
         role=primary_role,
         model=model_name,
-        requested_model=req_m,
-        fallback_count=fb_c,
-        fallback_reason=fb_r,
-        eval_counts=_request_eval_counts.get(),
-        request_id=request_id,
-        execution_metrics=metrics,
         actions=actions,
         filter_layers=filter_result.layers if filter_result else None,
         audit=audit,

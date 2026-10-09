@@ -84,6 +84,8 @@ async def test_retry_on_503_transient_error():
             res = await client.generate([{"role": "user", "content": "hi"}], deadline=RequestDeadline(10.0))
             assert res.text == "Success after 503"
             assert calls == 2
+            assert res.provider_calls == 2
+            assert res.fallback_count == 0
             mock_sleep.assert_called()
 
 
@@ -162,3 +164,108 @@ async def test_max_attempts_exhausted_raises_last_error():
             with pytest.raises(LLMProviderUnavailableError) as exc_info:
                 await client.generate([{"role": "user", "content": "hi"}], deadline=RequestDeadline(10.0))
             assert calls == 3
+            assert getattr(exc_info.value, "provider_calls", None) == 3
+
+
+@pytest.mark.asyncio
+async def test_fallback_across_candidates_accumulates_calls_and_tracks_fallback():
+    client = LLMClient()
+    client.models = [
+        {"id": "c1", "label": "Model-1", "provider": "openai", "api": "openai",
+         "model": "m1", "api_key": "k", "base_url": "http://m1", "temperature": 0.2, "max_tokens": 100},
+        {"id": "c2", "label": "Model-2", "provider": "groq", "api": "groq",
+         "model": "m2", "api_key": "k", "base_url": "http://m2", "temperature": 0.2, "max_tokens": 100},
+    ]
+    client.max_attempts = 1
+
+    calls = 0
+    async def mock_post(url, **kwargs):
+        nonlocal calls
+        calls += 1
+        if "http://m1" in url:
+            return MockResponse(503)
+        return MockResponse(200, json_data={"choices": [{"message": {"content": "Fallback success"}}]})
+
+    with patch("httpx.AsyncClient.post", side_effect=mock_post):
+        res = await client.generate([{"role": "user", "content": "hi"}], deadline=RequestDeadline(10.0))
+        assert res.text == "Fallback success"
+        assert res.model == "Model-2"
+        assert res.fallback_count == 1
+        assert res.provider_calls == 2
+        assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_three_attempts_two_failures_one_success_accumulates_three_calls():
+    client = LLMClient()
+    client.models = [{
+        "id": "c1", "label": "Model-1", "provider": "openai", "api": "openai",
+        "model": "m1", "api_key": "k", "base_url": "http://m1", "temperature": 0.2, "max_tokens": 100
+    }]
+    client.max_attempts = 3
+
+    calls = 0
+    async def mock_post(url, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            return MockResponse(503)
+        return MockResponse(200, json_data={"choices": [{"message": {"content": "Success on third"}}]})
+
+    with patch("httpx.AsyncClient.post", side_effect=mock_post):
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            res = await client.generate([{"role": "user", "content": "hi"}], deadline=RequestDeadline(10.0))
+            assert res.text == "Success on third"
+            assert res.provider_calls == 3
+            assert res.fallback_count == 0
+            assert calls == 3
+
+
+@pytest.mark.asyncio
+async def test_security_blocked_does_not_trigger_fallback():
+    client = LLMClient()
+    client.models = [
+        {"id": "c1", "label": "Model-1", "provider": "vercel_ai", "api": "vercel_ai",
+         "model": "m1", "api_key": "k", "base_url": "http://m1", "temperature": 0.2, "max_tokens": 100},
+        {"id": "c2", "label": "Model-2", "provider": "groq", "api": "groq",
+         "model": "m2", "api_key": "k", "base_url": "http://m2", "temperature": 0.2, "max_tokens": 100},
+    ]
+    client.max_attempts = 3
+
+    calls = 0
+    async def mock_post(url, **kwargs):
+        nonlocal calls
+        calls += 1
+        return MockResponse(403, json_data={"code": "CONTENT_BLOCKED"})
+
+    with patch("httpx.AsyncClient.post", side_effect=mock_post):
+        with pytest.raises(AIGuardBlocked):
+            await client.generate([{"role": "user", "content": "attack"}], deadline=RequestDeadline(10.0))
+        assert calls == 1  # Never fell back to Model-2
+
+
+@pytest.mark.asyncio
+async def test_tool_turn_fallback_accumulates_calls():
+    client = LLMClient()
+    client.models = [
+        {"id": "c1", "label": "Model-1", "provider": "openai", "api": "openai",
+         "model": "m1", "api_key": "k", "base_url": "http://m1", "temperature": 0.2, "max_tokens": 100},
+        {"id": "c2", "label": "Model-2", "provider": "groq", "api": "groq",
+         "model": "m2", "api_key": "k", "base_url": "http://m2", "temperature": 0.2, "max_tokens": 100},
+    ]
+
+    calls = 0
+    async def mock_post(url, **kwargs):
+        nonlocal calls
+        calls += 1
+        if "http://m1" in url:
+            return MockResponse(503)
+        return MockResponse(200, json_data={"choices": [{"message": {"content": "tool reply", "tool_calls": []}}]})
+
+    with patch("httpx.AsyncClient.post", side_effect=mock_post):
+        res = await client.generate_tool_turn([{"role": "user", "content": "hi"}], tools=[], deadline=RequestDeadline(10.0))
+        assert res["text"] == "tool reply"
+        assert res["model"] == "Model-2"
+        assert res["fallback_count"] == 1
+        assert res["provider_calls"] == 2
+        assert calls == 2

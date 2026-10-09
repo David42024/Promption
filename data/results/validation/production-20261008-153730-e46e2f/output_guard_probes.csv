@@ -1,0 +1,5 @@
+﻿case_id,synthetic_input,expected_action,actual_action,http,latency_ms,matches,confusion
+output_guard_synthetic,True,REDACT_OR_BLOCK,PASS,200,287.51,0,FN
+synthetic_project_key,True,REDACT_OR_BLOCK,PASS,200,261.33,0,FN
+synthetic_legacy_key,True,REDACT_OR_BLOCK,REDACT,200,184.92,1,TP
+synthetic_project_key_assignment,True,REDACT_OR_BLOCK,PASS,200,157.63,0,FN

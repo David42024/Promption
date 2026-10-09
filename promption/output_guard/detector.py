@@ -60,6 +60,16 @@ def _value_span(match: re.Match) -> tuple[int, int] | None:
         return match.span(0)
 
 
+def _strip_trailing_punct(text: str, span: tuple[int, int]) -> tuple[int, int]:
+    start, end = span
+    val = text[start:end]
+    if val.startswith("<") and val.endswith(">"):
+        return start, end
+    while end > start and text[end - 1] in ")}]>,.;:\n\r\t ":
+        end -= 1
+    return start, end
+
+
 def scan(text: str) -> list[Finding]:
     """Devuelve findings ordenados; nunca incluye el valor en claro salvo spans."""
     text = text or ""
@@ -67,8 +77,13 @@ def scan(text: str) -> list[Finding]:
     for name, cat, sev, rx, conf, whole, validator in _COMPILED:
         for m in rx.finditer(text):
             span = m.span(0) if whole else (_value_span(m) or m.span(0))
+            raw_value = text[span[0]:span[1]]
+            if _is_placeholder(raw_value):
+                continue
+            if not whole:
+                span = _strip_trailing_punct(text, span)
             value = text[span[0]:span[1]]
-            if _is_placeholder(value):
+            if len(value) < 4 or _is_placeholder(value):
                 continue
             if validator and not _VALIDATORS[validator](value):
                 continue
