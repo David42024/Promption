@@ -47,7 +47,7 @@ from .policy_engine import (
 )
 from .lib.shop import SECRET_MARKERS, build_system_prompt
 from .security_state import get_security_state, update_security_state
-from .scope import get_scope_guard
+from .scope import get_scope_guard, begin_scope_request
 from promption.tools.runtime import capabilities, web_search, web_open, WEB_ROLES
 from .conversation import store
 from .capabilities import (
@@ -826,6 +826,8 @@ async def _chat_internal(
         request_id = uuid.uuid4().hex
     t_start = time.perf_counter()
     ctx = ExecutionContext(request_id=request_id, t_start=t_start)
+    begin_scope_request(request_id, tenant_id=str(getattr(settings, "tenant_id", "")),
+                        conversation_id=conversation_id or "")
     _request_review_cache.set({})
     _request_eval_counts.set(ctx.eval_counts)
 
@@ -1009,8 +1011,8 @@ async def _chat_internal(
                  "Promption Shop y las funciones autorizadas para tu cuenta.")
         if scope.classification == "UNCERTAIN":
             reply = ("No pude determinar si la solicitud está dentro del alcance del asistente. "
-                     "Aclara qué necesitas hacer en Promption Shop.") if scope.status != 503 else (
-                     "No pude verificar el alcance de la solicitud. Inténtalo nuevamente.")
+                     "Aclara qué necesitas hacer en Promption Shop.") if scope.reason == "ambiguous" else (
+                     "No pude completar la verificación del alcance. Inténtalo nuevamente.")
         return _make_response(ctx, blocked=True, reply=reply, scope=scope.to_dict(),
             reason="out_of_scope" if scope.classification == "OUT_OF_SCOPE" else scope.reason,
             block_type="scope", role=primary_role, security_classification=security_classification,
@@ -1294,7 +1296,8 @@ async def _chat_internal(
                         _report_progress("Verificando alcance de la herramienta…")
                         ctx.eval_counts["scope"] += 1
                         t_tool_scope = time.perf_counter()
-                        operation_scope = await _call_get_scope_guard().check(request.text,
+                        operation_scope = await _call_get_scope_guard(timeout_seconds=budget.remaining_for_step(
+                            settings.llm_provider_timeout_seconds, "tool_scope")).check(request.text,
                             system_prompt=system_prompt,
                             identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
                             messages=security_messages, tool={"name": name, "input": args,
@@ -1484,8 +1487,9 @@ async def _chat_internal(
             label = scope.get("classification")
             reason = scope.get("reason")
             if label in {"OUT_OF_SCOPE", "UNCERTAIN"} and reason in {
-                "topic_outside_scope", "system_limit", "ambiguous", "scope_unavailable", "invalid_scope_response"}:
-                _scope_decision.set(ScopeDecision(label, reason, 403 if label == "OUT_OF_SCOPE" else 503))
+                "topic_outside_scope", "system_limit", "ambiguous", "scope_unavailable", "invalid_scope_response", "scope_timeout", "scope_truncated"}:
+                _scope_decision.set(ScopeDecision(label, reason, 504 if reason == "scope_timeout" else
+                    403 if label == "OUT_OF_SCOPE" or reason in {"ambiguous", "scope_truncated"} else 503))
             return _make_response(ctx, blocked=True, block_type="scope", reason=exc.code.lower(),
                 reply=("La revisión de alcance bloqueó la operación propuesta. Reformula la solicitud.")
                     if exc.code == "OUT_OF_SCOPE" else

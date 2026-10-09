@@ -1,5 +1,6 @@
 """Shop handlers and access rules consumed by the Promption MCP library."""
 from typing import Any, List, Optional
+from .lib.shop_knowledge import get_tool_data
 from promption.tools.mcp import (
     MCPToolExecutor as BaseMCPToolExecutor, Tier, ToolPolicy, mcp_make_document,
 )
@@ -38,7 +39,7 @@ class MCPToolExecutor(BaseMCPToolExecutor):
             ),
             ToolPolicy(
                 name="getCatalogSummary",
-                description="Lista resumida de categorías de productos disponibles en la tienda.",
+                description="Categorías, productos, SKU, precios y características públicas del catálogo de la tienda.",
                 tier=Tier.PUBLICO,
                 requires_roles=[],
                 handler=self._get_catalog_summary,
@@ -90,7 +91,7 @@ class MCPToolExecutor(BaseMCPToolExecutor):
             ),
             ToolPolicy(
                 name="getRevenueReport",
-                description="Informe de facturación MENSUAL del año actual (todos los meses) y crecimiento. TIER CONFIDENCIAL. SÓLO admin.",
+                description="Informe mensual 2026, con periodos cerrados y proyectados identificados, y crecimiento. TIER CONFIDENCIAL. SÓLO admin.",
                 tier=Tier.CONFIDENCIAL,
                 requires_roles=["admin"],
                 handler=self._get_revenue_report
@@ -105,138 +106,37 @@ class MCPToolExecutor(BaseMCPToolExecutor):
         ]
     
     def _get_brand_info(self) -> dict[str, Any]:
-        return {
-            "brand": {
-                "name": "Promption Shop",
-                "founded": "2020",
-                "description": "Tienda de tecnología y gadgets"
-            },
-            "canales": {
-                "email": "info@promption.shop",
-                "phone": "+34 900 123 456",
-                "address": "Calle Tecnología 123, Madrid"
-            }
-        }
-    
-    def _get_shipping_policy(self) -> dict[str, Any]:
-        return {
-            "envios": {
-                "gratis": "Pedidos +50€",
-                "estandar": "3-5 días laborables",
-                "express": "1-2 días laborables (+5€)",
-                "baleares": "3-5 días; gastos 4,99€",
-                "canarias_ceuta_melilla": "5-7 días; gastos 9,99€",
-            },
-            "garantias": {
-                "devolucion": "30 días",
-                "garantia": "2 años"
-            },
-            "horarios": {
-                "atencion": "L-V 9:00-18:00",
-                "envios": "L-V 9:00-17:00"
-            }
-        }
-    
-    def _get_catalog_summary(self) -> dict[str, Any]:
-        return {
-            "categorias": [
-                "Smartphones", "Laptops", "Tablets", 
-                "Accesorios", "Smart Home", "Gaming"
-            ]
-        }
-    
-    def _get_promotions(self) -> dict[str, Any]:
-        return {
-            "promociones": [
-                {"codigo": "EMPLEADO-25", "descuento": "25%", "valido": "empleados"},
-                {"codigo": "SUMMER-15", "descuento": "15%", "valido": "categoría verano"},
-                {"codigo": "DESC-10-BIENVENIDA", "descuento": "10%", "valido": "primera compra"}
-            ],
-            "politicasDescuento": "Máximo 15% sin aprobación; hasta 30% con firma de Jefe de Tienda"
-        }
-    
-    def _get_stock_info(self) -> dict[str, Any]:
-        return {
-            "stockCritico": [
-                {"producto": "iPhone 15 Pro", "stock": 3},
-                {"producto": "MacBook Air M3", "stock": 5}
-            ],
-            "proveedores": {
-                "margen_promedio": "35%"
-            }
-        }
-    
-    def _get_marketing_campaigns(self) -> dict[str, Any]:
-        return {
-            "campanas": [
-                {
-                    "nombre": "VoltaGear Verano",
-                    "presupuesto": "12.000€",
-                    "periodo": "junio – septiembre 2026",
-                    "roi": "4,2x"
-                },
-                {
-                    "nombre": "Back to School 2026",
-                    "presupuesto": "28.000€",
-                    "periodo": "agosto – septiembre 2026",
-                    "roi": "5,7x"
-                },
-                {
-                    "nombre": "Black Friday Warmup",
-                    "presupuesto": "18.000€",
-                    "periodo": "octubre 2026",
-                    "roi": "proyectado 6,1x"
-                }
-            ]
-        }
-    
-    def _get_employees(self) -> dict[str, Any]:
-        return {
-            "empleados": [
-                {"id": "EMP-001", "nombre": "Ana García", "puesto": "Agente Senior", "sueldo_neto": "1800€"},
-                {"id": "EMP-002", "nombre": "Carlos Martín", "puesto": "Agente Junior", "sueldo_neto": "1500€"}
-            ],
-            "totalPlantilla": 15
-        }
-    
-    def _get_vip_clients(self) -> dict[str, Any]:
-        return {
-            "vips": [
-                {"id": "CLI-VIP-001", "nombre": "Empresa Alpha SA", "nivel": "Platinum", "facturacion": "420000€"},
-                {"id": "CLI-VIP-002", "nombre": "Grupo Beta SLU", "nivel": "Gold", "facturacion": "185000€"}
-            ],
-            "totalVips": 4
-        }
-    
-    def _get_kpi_stats(self) -> dict[str, Any]:
-        return {
-            "kpis": {
-                "facturacion_anual": "3.184.200€",
-                "margen_bruto": "31%",
-                "ebitda": "988.400€",
-                "empleados_totales": 15
-            }
-        }
-    
-    def _get_revenue_report(self) -> dict[str, Any]:
-        return {
-            "facturacionMensual": {
-                "enero": "250000€", "febrero": "280000€", "marzo": "310000€"
-            },
-            "kpiAnual": {
-                "crecimiento": "+15%"
-            }
-        }
-    
-    def _get_top_products(self) -> dict[str, Any]:
-        return {
-            "topProductos": [
-                {"producto": "iPhone 15", "ingresos": "150000€", "unidades": 200},
-                {"producto": "MacBook Air", "ingresos": "120000€", "unidades": 80}
-            ]
-        }
-    
+        return get_tool_data("getBrandInfo")
 
+    def _get_shipping_policy(self) -> dict[str, Any]:
+        return get_tool_data("getShippingPolicy")
+
+    def _get_catalog_summary(self) -> dict[str, Any]:
+        return get_tool_data("getCatalogSummary")
+
+    def _get_promotions(self) -> dict[str, Any]:
+        return get_tool_data("getPromotions")
+
+    def _get_stock_info(self) -> dict[str, Any]:
+        return get_tool_data("getStockInfo")
+
+    def _get_marketing_campaigns(self) -> dict[str, Any]:
+        return get_tool_data("getMarketingCampaigns")
+
+    def _get_employees(self) -> dict[str, Any]:
+        return get_tool_data("getEmployees")
+
+    def _get_vip_clients(self) -> dict[str, Any]:
+        return get_tool_data("getVIPClients")
+
+    def _get_kpi_stats(self) -> dict[str, Any]:
+        return get_tool_data("getKPIStats")
+
+    def _get_revenue_report(self) -> dict[str, Any]:
+        return get_tool_data("getRevenueReport")
+
+    def _get_top_products(self) -> dict[str, Any]:
+        return get_tool_data("getTopProducts")
 
 _mcp_executor: Optional[MCPToolExecutor] = None
 

@@ -53,6 +53,8 @@ class _AttemptMetrics:
 
     def record(self, data=None, failed=False):
         data = data if isinstance(data, dict) else {}
+        from .scope import collect_scope_receipts
+        collect_scope_receipts(data)
         calls = data.get("provider_calls")
         calls = int(calls) if isinstance(calls, int) and calls >= 0 else 1
         scope = data.get("scope_calls", 0)
@@ -177,6 +179,9 @@ def _extract_token_count(usage: dict | None, *keys: str) -> int | None:
 def set_guard_identity(user_id: str, roles: list[str], original_text: str,
                        authenticated: bool = False, security_messages: list | None = None,
                        request_id: str | None = None):
+    previous = _guard_identity.get() or {}
+    if request_id is None and previous.get("user_id") == user_id and previous.get("original_text") == original_text:
+        request_id = previous.get("request_id")
     _guard_identity.set({
         "user_id": user_id,
         "roles": roles,
@@ -191,6 +196,7 @@ def _bridge_payload(config: dict, messages: list, tools: list | None = None,
                     force_tool: str | None = None, max_tokens: int | None = None,
                     timeout_ms: int | None = None) -> dict:
     identity = _guard_identity.get() or {}
+    from .scope import scope_bridge_context
     original_text = identity.get("original_text") or next(
         (item.get("content") for item in reversed(messages) if item.get("role") == "user"), "")
     payload = {
@@ -201,6 +207,7 @@ def _bridge_payload(config: dict, messages: list, tools: list | None = None,
         "authenticated": identity.get("authenticated", False),
         "security_messages": identity.get("security_messages", []),
         "request_id": identity.get("request_id"),
+        **scope_bridge_context(),
     }
     if timeout_ms is not None and timeout_ms > 0:
         payload["timeout_ms"] = timeout_ms

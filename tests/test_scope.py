@@ -56,7 +56,7 @@ def test_scope_timeout_and_cancellation():
         await asyncio.sleep(10)
     async def run():
         result = await AsyncScopeGuard(never, timeout_seconds=0.01).check("Catálogo", system_prompt=SYSTEM)
-        assert result.reason == "scope_unavailable" and result.status == 503
+        assert result.reason == "scope_timeout" and result.status == 504
         task = asyncio.create_task(AsyncScopeGuard(never).check("Catálogo", system_prompt=SYSTEM))
         await asyncio.sleep(0)
         task.cancel()

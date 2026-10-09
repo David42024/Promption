@@ -60,7 +60,9 @@ export function createPromption(config) {
     try { decision = validateScopeDecision(await config.scopeEvaluator(request)); }
     catch (error) {
       if (options.signal?.aborted) throw error;
-      decision = { classification: "UNCERTAIN", reason: "scope_unavailable", allowed: false, status: 503 };
+      const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
+      decision = { classification: "UNCERTAIN", reason: timedOut ? "scope_timeout" : "scope_unavailable",
+        allowed: false, status: timedOut ? 504 : 503 };
     }
     options.signal?.throwIfAborted();
     config.onDecision?.({ direction: "input", allowed: decision.allowed,

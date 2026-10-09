@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { GUEST_USER } from "../../../lib/shop.js";
 import { readSessionToken } from "../../../lib/session.js";
-import { visibleDocs } from "../../../lib/docs.js";
 
 export const maxDuration = 300;
 const CHAT_API_URL = (process.env.CHAT_API_URL || process.env.NEXT_PUBLIC_CHAT_API_URL || "").replace(/\/$/, "");
@@ -98,9 +97,7 @@ export async function POST(req) {
         context: {
           channel: "demo-chat",
           conversation_id: id,
-          documents: user.authenticated
-            ? visibleDocs(user.roles).map(({ id, title, tier }) => ({ id, title, tier }))
-            : [],
+          documents: [],
         },
       }),
     });

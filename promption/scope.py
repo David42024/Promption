@@ -30,29 +30,30 @@ def _validated(result) -> ScopeDecision:
     data = result.to_dict() if isinstance(result, ScopeDecision) else result
     reasons = {"IN_SCOPE": {"in_scope"},
                "OUT_OF_SCOPE": {"topic_outside_scope", "system_limit"},
-               "UNCERTAIN": {"ambiguous"}}
-    if not isinstance(data, dict) or data.get("reason") not in reasons.get(data.get("classification"), set()):
-        model = data.get("model") if isinstance(data, dict) else None
-        calls = int(data.get("provider_calls", 0)) if isinstance(data, dict) and str(data.get("provider_calls", "")).isdigit() else 0
-        return ScopeDecision("UNCERTAIN", "invalid_scope_response", 503, model=model, provider_calls=calls)
+               "UNCERTAIN": {"ambiguous", "scope_timeout", "scope_unavailable", "scope_truncated", "invalid_scope_response"}}
+    if (not isinstance(data, dict) or not isinstance(data.get("classification"), str)
+            or not isinstance(data.get("reason"), str)
+            or data["reason"] not in reasons.get(data["classification"], set())):
+        return _validated({**(data if isinstance(data, dict) else {}),
+                           "classification": "UNCERTAIN", "reason": "invalid_scope_response"})
     label = data["classification"]
     model = data.get("model")
-    calls = int(data.get("provider_calls", 1)) if "provider_calls" in data else 0
+    value = data.get("provider_calls", 0)
+    calls = value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
     usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
     def _tok(k1, k2=None):
         v = usage.get(k1) if usage else data.get(k1)
         if v is None and k2:
             v = usage.get(k2) if usage else data.get(k2)
-        try:
-            return int(v) if v is not None else None
-        except (ValueError, TypeError):
-            return None
+        return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else None
     p_tok = _tok("prompt_tokens", "input_tokens")
     c_tok = _tok("completion_tokens", "output_tokens")
     t_tok = _tok("total_tokens")
     r_tok = _tok("reasoning_tokens")
     return ScopeDecision(
-        label, data["reason"], 200 if label == "IN_SCOPE" else 403,
+        label, data["reason"], (200 if label == "IN_SCOPE" else
+                              504 if data["reason"] == "scope_timeout" else
+                              503 if data["reason"] in {"scope_unavailable", "invalid_scope_response"} else 403),
         model=model, provider_calls=calls,
         prompt_tokens=p_tok, completion_tokens=c_tok, total_tokens=t_tok, reasoning_tokens=r_tok
     )
@@ -120,8 +121,11 @@ class AsyncScopeGuard(ScopeGuard):
         try:
             async def evaluate():
                 request = _request(text, system_prompt, messages, identity, tool)
+                request["timeout"] = self.timeout_seconds
                 result = self.evaluator(request)
                 return await result if inspect.isawaitable(result) else result
             return _validated(await asyncio.wait_for(evaluate(), self.timeout_seconds))
+        except (asyncio.TimeoutError, TimeoutError):
+            return ScopeDecision("UNCERTAIN", "scope_timeout", 504)
         except Exception:
             return ScopeDecision("UNCERTAIN", "scope_unavailable", 503)

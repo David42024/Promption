@@ -194,6 +194,23 @@ app), con un límite de 30 segundos. Añaden llamadas y latencia de clasificaci�
 No requieren nuevas variables de entorno. Esta revisión semántica es probabilística;
 las reglas de inyección, ACL y Output Guard siguen aplicándose aunque indique `IN_SCOPE`.
 
+Los motivos operativos de alcance son `scope_timeout` (504), `scope_unavailable`
+(503), `scope_truncated` (403) e `invalid_scope_response` (503). `ambiguous` (403)
+indica incertidumbre sobre la consulta y permite pedir aclaración; un fallo operativo
+no se presenta como ambigüedad. Los errores conservan llamadas y tokens observados;
+los tokens ausentes siguen siendo `null`.
+
+El módulo Node.js `@promption/ai-sdk/scope-receipts` proporciona `issueScopeReceipt`,
+`verifyScopeReceipt` y `withScopeReceipts`. Shop lo usa para reutilizar evaluaciones
+equivalentes mediante comprobantes HMAC emitidos por
+el puente y válidos durante 120 segundos. El comprobante vincula texto, política,
+modelo, identidad, roles, historial, herramienta y argumentos, tenant, conversación
+y solicitud. Se transporta solo entre servidores mediante `CHAT_SERVICE_TOKEN` y
+no se guarda en el historial ni en los logs. Los comprobantes caducados o alterados
+obligan a evaluar otra vez; una reutilización reporta cero llamadas nuevas y no
+vuelve a sumar los tokens de la evaluación original. No sustituye la autorización
+MCP ni Output Guard. El endpoint de alcance no renueva el comprobante al reutilizarlo.
+
 En Python, `ScopeGuard(evaluator)` y `AsyncScopeGuard(evaluator)` reciben un
 evaluador propio. Este obtiene un diccionario con `text`, `system_prompt`, `messages`,
 `identity` y, si corresponde, `tool`. Devuelve `classification` y `reason` con los

@@ -86,6 +86,7 @@ export async function POST(request) {
     controller.abort(new DOMException("The operation timed out.", "TimeoutError"));
   }, timeoutMs) : null;
 
+  const scopeReceipts = [];
   let scopeCalls = 0;
   let generationCalls = 0;
   const aggregator = new MetricsAggregator();
@@ -99,7 +100,7 @@ export async function POST(request) {
     ));
     aggregator.addCall({
       callType: "scope",
-      calls: 1,
+      calls: decision?.provider_calls === 0 ? 0 : 1,
       promptTokens: typeof u?.prompt_tokens === "number" ? u.prompt_tokens : null,
       completionTokens: typeof u?.completion_tokens === "number" ? u.completion_tokens : null,
       totalTokens: typeof u?.total_tokens === "number" ? u.total_tokens : null,
@@ -119,7 +120,10 @@ export async function POST(request) {
     const model = wrapLanguageModel({
       model: trackingGenerationModel,
       middleware: promptionMiddleware(identity, body.original_text, controller.signal, body.security_messages,
-        trackingScopeModel, scopeProviderOptions, { onScope }),
+        trackingScopeModel, scopeProviderOptions, { onScope,
+          scopeReceipts: body.scope_receipts, scopeBinding: body.scope_binding, scopeModelId, requestId,
+          onScopeReceipt: receipt => { if (scopeReceipts.length < 32) scopeReceipts.push(receipt); },
+          systemPrompt: body.scope_system_prompt || undefined }),
     });
     const tools = Object.fromEntries(body.tools.map(spec => [
       spec.function.name,
@@ -230,6 +234,7 @@ export async function POST(request) {
       finish_reason: finishReason,
       truncated: finishReason === "length",
       request_id: requestId,
+      scope_receipts: scopeReceipts,
       provider_calls: summary.provider_calls,
       scope_calls: summary.scope_calls,
       generation_calls: summary.generation_calls,

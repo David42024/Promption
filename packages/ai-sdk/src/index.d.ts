@@ -56,6 +56,7 @@ export interface ScopeDecision {
   usage?: ScopeUsage | null;
   model?: string | null;
   provider_calls?: number;
+  reused?: boolean;
 }
 export interface ScopeRequest {
   text: string;
@@ -66,7 +67,7 @@ export interface ScopeRequest {
   signal?: AbortSignal;
   providerOptions?: Record<string, unknown>;
 }
-export type ScopeEvaluator = (request: ScopeRequest) => Promise<Pick<ScopeDecision, "classification" | "reason"> & { usage?: ScopeUsage | null; allowed?: boolean; status?: number }>;
+export type ScopeEvaluator = (request: ScopeRequest) => Promise<Pick<ScopeDecision, "classification" | "reason"> & { usage?: ScopeUsage | null; allowed?: boolean; status?: number; provider_calls?: number; reused?: boolean }>;
 export interface GuardRequest {
   text: string;
   direction: Direction;

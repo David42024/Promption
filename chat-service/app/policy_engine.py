@@ -197,6 +197,34 @@ class PolicyEngine(BasePolicyEngine):
                          output_excluded_policy_ids=OUTPUT_GUARD_OWNED_POLICIES,
                          allow_unmatched=True)
 
+    def classify_all(self, text: str, *, output: bool = False) -> tuple[ResourcePolicy, ...]:
+        """Keep conceptual mentions distinct from access to company records."""
+        normalized = normalize_text(text)
+        if output:
+            safe_refusal = re.fullmatch(
+                r"(?:no (?:puedo|tengo permiso para) (?:compartir|mostrar|consultar) "
+                r"(?:sueldos(?: de empleados)?|nominas|datos confidenciales|informacion confidencial"
+                r"|(?:el )?listado de clientes vip|(?:el )?stock interno|(?:la )?facturacion mensual"
+                r"|(?:los )?proveedores de la empresa)"
+                r"|(?:necesitas|se requiere) (?:el )?rol admin para consultar (?:nominas|sueldos))"
+                r"[.! ]*", normalized)
+            if safe_refusal:
+                return ()
+        else:
+            clauses = re.split(r"[;.!?¿¡\n]+", normalized)
+            normalized = "; ".join(
+                "" if re.fullmatch(
+                    r"(?:que (?:significa|es)|define|explica (?:el )?concepto de) "
+                    r"(?:el |un |una )?(?:stock|inventario|proveedor|salario|sueldo|nomina)",
+                    clause.strip()) else clause
+                for clause in clauses)
+            if not re.search(r"\b(nuestro|empresa|interno|contrato|factura)\b", normalized):
+                normalized = re.sub(
+                    r"\bproveedor de internet(?= para (?:conectar|configurar|instalar) "
+                    r"(?:este|mi|el|un) (?:router|producto|dispositivo)\b)",
+                    "servicio de internet", normalized)
+        return super().classify_all(normalized, output=output)
+
 
 def authorization_message(decision: PolicyDecision) -> str:
     """Return a stable user-facing refusal without invoking an LLM."""
