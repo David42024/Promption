@@ -1,0 +1,44 @@
+  ▲ Next.js 14.2.35
+  - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/21) ...
+   Generating static pages (5/21) 
+   Generating static pages (10/21) 
+   Generating static pages (15/21) 
+ ✓ Generating static pages (21/21)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    7.43 kB         154 kB
+├ ○ /_not-found                          873 B          88.2 kB
+├ ○ /admin                               10.1 kB         106 kB
+├ ○ /admin/estadisticas                  3.54 kB        99.6 kB
+├ ○ /admin/rendimiento                   9.01 kB         105 kB
+├ ƒ /api/admin/filter-state              0 B                0 B
+├ ƒ /api/admin/filter-toggle             0 B                0 B
+├ ƒ /api/admin/log-events                0 B                0 B
+├ ƒ /api/admin/log-stats                 0 B                0 B
+├ ƒ /api/admin/model-metrics             0 B                0 B
+├ ƒ /api/ai/scope                        0 B                0 B
+├ ƒ /api/ai/turn                         0 B                0 B
+├ ƒ /api/chat                            0 B                0 B
+├ ƒ /api/docs                            0 B                0 B
+├ ƒ /api/filter-status                   0 B                0 B
+├ ƒ /api/login                           0 B                0 B
+├ ƒ /api/login/status                    0 B                0 B
+├ ƒ /chat                                5.75 kB         152 kB
+└ ○ /login                               1.92 kB          98 kB
++ First Load JS shared by all            87.3 kB
+  ├ chunks/117-440a2084f7673f42.js       31.7 kB
+  ├ chunks/fd9d1056-a9394cb017d46d98.js  53.6 kB
+  └ other shared chunks (total)          1.96 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

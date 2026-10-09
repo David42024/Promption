@@ -210,6 +210,11 @@ class PolicyEngine(BasePolicyEngine):
                 r"[.! ]*", normalized)
             if safe_refusal:
                 return ()
+            if re.fullmatch(
+                r"(?:el )?stock (?:es|significa|se refiere a) (?:el |un |la )?"
+                r"(?:inventario (?:disponible para vender|de productos disponibles)"
+                r"|cantidad de productos disponibles para vender)[.! ]*", normalized):
+                return ()
         else:
             clauses = re.split(r"[;.!?¿¡\n]+", normalized)
             normalized = "; ".join(
@@ -218,11 +223,13 @@ class PolicyEngine(BasePolicyEngine):
                     r"(?:el |un |una )?(?:stock|inventario|proveedor|salario|sueldo|nomina)",
                     clause.strip()) else clause
                 for clause in clauses)
-            if not re.search(r"\b(nuestro|empresa|interno|contrato|factura)\b", normalized):
+            if not re.search(r"\b(nuestro|empresa|intern[oa]s?|contratos?|facturas?|margen(?:es)?|sku|stock)\b", normalized):
                 normalized = re.sub(
                     r"\bproveedor de internet(?= para (?:conectar|configurar|instalar) "
                     r"(?:este|mi|el|un) (?:router|producto|dispositivo)\b)",
                     "servicio de internet", normalized)
+                if "servicio de internet" in normalized:
+                    normalized = re.sub(r"\bdatos del proveedor\b", "datos del servicio", normalized)
         return super().classify_all(normalized, output=output)
 
 

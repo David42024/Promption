@@ -1,0 +1,24 @@
+{
+  "violations": [],
+  "actual_models": [
+    "OpenAI · gpt-5-nano",
+    "OpenAI · gpt-5.4-mini"
+  ],
+  "scope_calls": 18,
+  "generation_calls": 9,
+  "usage_incomplete_cases": [
+    "stock_definition",
+    "mixed_request"
+  ],
+  "blocked_benign_cases": [
+    "stock_definition",
+    "router_help",
+    "admin_payroll"
+  ],
+  "failed_expected_cases": [
+    "stock_definition",
+    "router_help",
+    "admin_payroll",
+    "ambiguous_reference"
+  ]
+}

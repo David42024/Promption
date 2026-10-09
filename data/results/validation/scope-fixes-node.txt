@@ -1,0 +1,200 @@
+✔ bridge errors preserve security codes without exposing provider messages (3.8232ms)
+✔ unknown error codes and scope details are not returned to chat clients (0.3548ms)
+✔ operational errors map to typed codes and correct HTTP status without raw body (0.4108ms)
+(node:20488) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/USERJSSV/Downloads/Promption/demo/lib/ai/tracking.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\USERJSSV\Downloads\Promption\demo\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ createTrackingModel correctly increments on doStream and doGenerate invocation (7.0954ms)
+✔ Case 1: Invalid request or cancelled before starting makes zero provider calls (69.0794ms)
+✔ Case 2: Middleware blocking (CONTENT_BLOCKED) before generation makes zero generation calls (9.2013ms)
+✔ Case 3: Provider returns 503 error after initiation: call is counted and error preserved (5.2109ms)
+✔ Case 4: Timeout after initiating transport: call is counted, usage unknown as null (4.4396ms)
+✔ Case 5: Cancellation before start does not invent a call (5.0517ms)
+✔ Case 6: Cancellation after start counts initiated attempt without success (3.2891ms)
+✔ Case 7: Scope fails before generation: scope is counted, generation remains zero (93.1575ms)
+✔ Case 8: Scope and generation completed: both counted without duplication (22.5926ms)
+✔ Case 9: CONTENT_BLOCKED preserves security code and status without provider fallback (3.612ms)
+(node:18660) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/USERJSSV/Downloads/Promption/demo/app/api/ai/turn/route.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\USERJSSV\Downloads\Promption\demo\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[ai/turn] scope evaluation failed {
+  name: 'AI_APICallError',
+  code: undefined,
+  statusCode: 503,
+  causeName: undefined
+}
+AI turn failed {
+  requestId: '792a4fc9-4529-48ed-82c4-f80b6f1bc9de',
+  code: 'SCOPE_UNCERTAIN',
+  status: 503,
+  model: 'gpt-4o-mini',
+  guardReason: undefined,
+  scopeReason: 'scope_unavailable',
+  errorType: 'PromptionError',
+  providerStatus: undefined
+}
+AI turn failed {
+  requestId: '1e6aadb2-f8dd-45b5-93f0-3c7ce893164c',
+  code: 'CONTENT_BLOCKED',
+  status: 403,
+  model: 'gpt-4o-mini',
+  guardReason: undefined,
+  scopeReason: undefined,
+  errorType: 'PromptionError',
+  providerStatus: undefined
+}
+✔ Reproduce Defect 2: POST aggregates scope 30 tokens and generation 30 tokens to total 60 tokens across 2 provider calls (275.8177ms)
+✔ Scope with unknown usage leaves full total_tokens as null and identifies known subtotal (29.4622ms)
+✔ Scope failure before generation: generation is zero and partial scope metrics preserved (25.1054ms)
+✔ Security block (CONTENT_BLOCKED) preserves code, status and prevents provider fallback (21.3719ms)
+✔ Scope endpoint receipts eliminate equivalent turn classification without losing generation tokens (44.8402ms)
+[ai/scope] evaluation failed {
+  requestId: '4600cb84-687a-4cf4-a8dd-e93801f87352',
+  name: 'TimeoutError',
+  code: undefined,
+  statusCode: undefined,
+  causeName: undefined
+}
+[ai/scope] evaluation failed {
+  requestId: '3f4632cb-4118-4c56-8241-a4fb0067909f',
+  name: 'TypeError',
+  code: undefined,
+  statusCode: undefined,
+  causeName: undefined
+}
+✔ Scope endpoint timeout after provider dispatch retains one call and HTTP 504 (40.9469ms)
+✔ Scope endpoint malformed policy is rejected before provider dispatch (1.8571ms)
+✔ chat renders headings, emphasis, nested lists, quotes and fenced code (86.2443ms)
+✔ GFM tables scroll and task lists are disabled (14.3468ms)
+✔ safe links and GFM autolinks keep external navigation isolated (27.5563ms)
+✔ URL policy rejects "javascript:alert(1)" (0.3195ms)
+✔ URL policy rejects "JaVaScRiPt:alert(1)" (4.0379ms)
+✔ URL policy rejects "data:text/html,<script>alert(1)</script>" (0.3064ms)
+✔ URL policy rejects "vbscript:msgbox(1)" (0.3797ms)
+✔ URL policy rejects "file:///etc/passwd" (30.6793ms)
+✔ URL policy rejects "blob:https://example.org/id" (0.4439ms)
+✔ URL policy rejects "//example.org/pixel" (2.0254ms)
+✔ URL policy rejects "/\\example.org/pixel" (0.9442ms)
+✔ URL policy rejects "https://user:password@example.org" (0.4954ms)
+✔ URL policy rejects "java\nscript:alert(1)" (0.6891ms)
+✔ URL policy rejects "https://example.org/\u0000bad" (0.9058ms)
+✔ URL policy rejects "mailto:someone@example.org" (0.1277ms)
+✔ untrusted Markdown cannot create active HTML: [Ataque](javascript:alert%281%29) (6.721ms)
+✔ untrusted Markdown cannot create active HTML: [Ataque](JaVaScRiPt:alert%281%29) (5.7097ms)
+✔ untrusted Markdown cannot create active HTML: [Ataque](javascript&#58;alert%281%29) (10.1349ms)
+✔ untrusted Markdown cannot create active HTML: [Ataque](data:text/html;base64,PHNjcmlwdD4=) (1.2788ms)
+✔ untrusted Markdown cannot create active HTML: <script>alert(document.cookie)</script> (1.7612ms)
+✔ untrusted Markdown cannot create active HTML: <img src=x onerror="alert(1)"> (1.5917ms)
+✔ untrusted Markdown cannot create active HTML: <svg onload="alert(1)"><a href="javascript:al (2.3769ms)
+✔ untrusted Markdown cannot create active HTML: <iframe srcdoc="<script>alert(1)</script>"></ (0.8607ms)
+✔ untrusted Markdown cannot create active HTML: <form action="https://example.org"><input nam (9.1217ms)
+✔ untrusted Markdown cannot create active HTML: <a href="https://example.org" onclick="alert( (2.833ms)
+✔ untrusted Markdown cannot create active HTML: <style>body { display:none }</style> (16.2077ms)
+✔ Markdown images become explicit links and never fetch tracking pixels (11.9885ms)
+✔ dangerous image URLs keep only their readable alternative text (1.4284ms)
+✔ plain text, line breaks and partial Markdown remain readable (2.8327ms)
+✔ untrusted IDs from GFM footnotes cannot clobber document properties (3.7411ms)
+✔ Legacy document listing and content access are disabled without reading files (96.1749ms)
+✔ Chat forwards no Markdown document capabilities for authenticated users (25.9331ms)
+(node:15736) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/USERJSSV/Downloads/Promption/demo/lib/ai/modelOptions.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\USERJSSV\Downloads\Promption\demo\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ isReasoningModel correctly identifies reasoning vs standard models (3.0569ms)
+✔ validateReasoningEffort validates effort values and rejects invalid ones (5.2094ms)
+✔ validateModelConfiguration throws on invalid environment configuration (0.6541ms)
+✔ getModelProviderOptions resolves reasoningEffort and preserves tool options (1.8068ms)
+✔ captures HTTP body locally with fake fetch and verifies reasoning.effort in generation (149.8146ms)
+✔ captures HTTP body locally and verifies tool options are preserved (6.6662ms)
+✔ captures HTTP body locally and verifies reasoning.effort is omitted for standard models (3.9058ms)
+✔ captures HTTP body locally in createScopeEvaluator and verifies reasoning.effort (19.8951ms)
+(node:12708) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/USERJSSV/Downloads/Promption/demo/lib/ai/scopeReceipts.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\USERJSSV\Downloads\Promption\demo\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Receipt authenticates exact policy, identity, evidence, model and request binding (53.8971ms)
+✔ Tool JSON canonicalization preserves argument and description boundaries (1.3019ms)
+✔ Equivalent receipt saves a call; changed or forged evidence invokes evaluator (1.2059ms)
+✔ A valid scope receipt cannot bypass tool ACL or Output Guard (68.6857ms)
+✔ Scope deadline remains HTTP 504 rather than becoming provider unavailability (1.1765ms)
+✔ aiFailure unwraps AI_NoOutputGeneratedError cause when CONTENT_BLOCKED occurs (2.664ms)
+✔ streamText with Promption middleware preserves CONTENT_BLOCKED and avoids MODEL_UNAVAILABLE (49.2558ms)
+✔ real provider error preserves its operational classification (1.358ms)
+✔ cancellation does not succeed and returns CANCELLED (0.3672ms)
+✔ GUARD_UNAVAILABLE with cause AbortError and signal.aborted=false preserves GUARD_UNAVAILABLE (0.5782ms)
+✔ nested generic wrapper with cause CONTENT_BLOCKED is correctly classified (0.4402ms)
+✔ internal AbortError without user cancellation is not reported as user CANCELLED (1.1037ms)
+✔ explicit request cancellation preserves CANCELLED 499 (0.3677ms)
+✔ two complete usages are summed (2.1885ms)
+✔ explicit zero remains zero (2.161ms)
+✔ one known and one unknown call leaves full total null and preserves subtotal (0.4918ms)
+✔ unknown reasoning does not invalidate total_tokens if it was reported (0.3673ms)
+✔ omitted operation does not invalidate totals (0.4763ms)
+✔ duplicate events not counted twice (0.3899ms)
+✔ reasoning tokens not added again to total (0.3495ms)
+✔ concurrent requests do not share state (0.2357ms)
+✔ missing or inherited tool policies never authorize a tool (8.8225ms)
+✔ protectTool requires an explicit policy before side effects (2.1031ms)
+✔ blocked input stops the call before generation (6.1881ms)
+✔ redacted input is the input the model receives (0.9344ms)
+✔ unavailable and malformed guards fail closed (0.6886ms)
+✔ guest tools and tools outside a role allowlist are removed (1.2235ms)
+✔ model cannot return an unauthorized tool call (0.686ms)
+✔ untrusted tool results are checked for indirect injection (5.0221ms)
+✔ generation redacts output and does not return raw provider bodies (1.0324ms)
+✔ blocked streaming output emits no chunks (20.1395ms)
+✔ early output finding cancels generation before the model finishes (1.3602ms)
+✔ streamText output is checked in full before redacted chunks are released (1.1949ms)
+✔ buffer limits and binary model files fail closed (1.6263ms)
+✔ protectTool blocks unauthorized execution and validates its output (0.7318ms)
+✔ stream cancellation cancels the upstream model stream (0.7563ms)
+✔ Filter API transport preserves tenant and only sends credentials server-side (87.8192ms)
+✔ originalText cannot bypass inspection of the current user message (2.038ms)
+✔ an older Filter API cannot silently skip conversation inspection (15.0358ms)
+✔ conversation bounds stop generation without dropping older evidence (0.5392ms)
+✔ Scope preserves failure cause ambiguous and observed usage (4.1279ms)
+✔ Scope preserves failure cause scope_timeout and observed usage (0.7532ms)
+✔ Scope preserves failure cause scope_unavailable and observed usage (0.9346ms)
+✔ Scope preserves failure cause scope_truncated and observed usage (0.4683ms)
+✔ Scope preserves failure cause invalid_scope_response and observed usage (1.0608ms)
+✔ Scope distinguishes internal timeout from external cancellation (6.5562ms)
+✔ scope classifier uses AI SDK structured output and separates trusted policy from evidence (136.9281ms)
+✔ scope schema produces a consistent in_scope verdict and discards its assessment (3.0316ms)
+✔ scope schema produces a consistent topic_outside_scope verdict and discards its assessment (2.7885ms)
+✔ scope schema produces a consistent system_limit verdict and discards its assessment (2.7058ms)
+✔ scope schema produces a consistent ambiguous verdict and discards its assessment (2.8423ms)
+✔ scope classifier rejects unknown schema verdicts instead of allowing a default (2.4855ms)
+✔ out of scope requests stop generateText and streamText before the response provider (45.6357ms)
+✔ allowed follow-up receives previous messages and preserves the system prompt (3.4367ms)
+✔ uncertain, invalid and unavailable classifiers fail closed without exposing input (25.9581ms)
+✔ scope cannot grant access denied by the injection filter (5.1838ms)
+✔ a generated tool outside system limits is stopped before execution (6.1886ms)
+✔ scope requires authoritative instructions and rejects forged system evidence (0.3909ms)
+✔ an original request cannot mask a new out of scope user message (1.5727ms)
+✔ decision callback reports scope without prompts and a cancelled check stops (0.7963ms)
+✔ createScopeEvaluator preserves zero tokens as 0 and absent tokens as null (1.6183ms)
+✔ createScopeEvaluator preserves null tokens when provider reports no token counts (2.0695ms)
+✔ createScopeEvaluator does not authorize truncated responses (length finishReason) (1.7262ms)
+✔ generateText uses the middleware before and after the provider (104.3677ms)
+✔ streamText receives only inspected, redacted tokens (64.3099ms)
+✔ streamText text promise rejects when an early output check blocks (11.8032ms)
+✔ generateText tool loop validates results before the second provider call (7.6243ms)
+✔ cumulative input is blocked before generateText and streamText invoke the provider (6.2514ms)
+✔ retained security evidence survives a trimmed SDK prompt (6.4256ms)
+✔ multiple tool results are inspected together before a subsequent model call (14.1924ms)
+✔ tool execution checks retained context before producing a side effect (1.0545ms)
+✔ guard HTTP 403 preserves only recognized security metadata (CONTENT_BLOCKED) (75.0404ms)
+✔ guard HTTP 503 preserves only recognized security metadata (GUARD_UNAVAILABLE) (1.1229ms)
+✔ guard HTTP 403 preserves only recognized security metadata (GUARD_REQUEST_FAILED) (1.0847ms)
+✔ guard HTTP 500 preserves only recognized security metadata (GUARD_REQUEST_FAILED) (1.0203ms)
+✔ guard HTTP 403 preserves only recognized security metadata (GUARD_REQUEST_FAILED) (1.0844ms)
+ℹ tests 136
+ℹ suites 0
+ℹ pass 136
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1646.7031

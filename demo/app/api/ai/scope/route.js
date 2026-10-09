@@ -57,6 +57,7 @@ export async function POST(request) {
     }, { headers: { 'x-request-id': requestId } });
   } catch (error) {
     console.error('[ai/scope] evaluation failed', {
+      requestId,
       name: typeof error?.name === 'string' ? error.name : 'UnknownError',
       code: typeof error?.code === 'string' ? error.code.slice(0, 80) : undefined,
       statusCode: Number.isInteger(error?.statusCode) ? error.statusCode : undefined,

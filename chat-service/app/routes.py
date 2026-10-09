@@ -729,7 +729,7 @@ class ExecutionContext:
         if stage in self.stages:
             self.stages[stage]["status"] = status
             if latency_ms is not None:
-                self.stages[stage]["latency_ms"] = round(latency_ms, 2)
+                self.stages[stage]["latency_ms"] = round((self.stages[stage]["latency_ms"] or 0) + latency_ms, 2)
 
     def build_metrics(self, actions: list | None = None, audit: list | None = None) -> dict:
         total_lat = (time.perf_counter() - self.t_start) * 1000
@@ -956,6 +956,13 @@ async def _chat_internal(
                 block_type="filter_unavailable",
                 security_classification="UNCERTAIN",
             )
+
+    if not any(message.get("role") == "user" for message in security_messages[:-1]) and re.fullmatch(
+        r"(?:haz|repite|continua con) (?:lo de antes|lo anterior|eso)[.!? ]*", normalize_text(request.text)):
+        return _make_response(ctx, blocked=True,
+            reply="No tengo una solicitud anterior en esta conversación. ¿Qué necesitas consultar o hacer?",
+            reason="ambiguous", block_type="scope", role=primary_role,
+            filter_layers=filter_result.layers if filter_result else None)
 
     policy_decision = policy_engine.evaluate(request.text, user_roles)
     policy_info = PolicyInfo(**policy_decision.to_dict())
@@ -1186,9 +1193,10 @@ async def _chat_internal(
             reply = getattr(llm_response, "text", "") or getattr(llm_response, "reply", "")
             model_name = getattr(llm_response, "model", "llm")
         else:
-            executed_signatures: set[str] = set()
+            executed_signatures: set[str] = {f"{name}:{{}}" for name, _ in authorized_contexts}
             last_turn_signatures: list[str] = []
-            executed_tool_cache: dict[str, Any] = {}
+            executed_tool_cache: dict[str, Any] = {f"{name}:{{}}": result for name, result in authorized_contexts}
+            executed_tool_tiers = {item.tool: item.tier for item in audit if item.allowed}
             executed_actions_cache: dict[str, Any] = {}
             guard_reserve = 0.5 if security_state["output_guard_enabled"] else 0.0
             max_turns = max(1, settings.max_tool_turns)
@@ -1279,6 +1287,7 @@ async def _chat_internal(
                                                     for call in calls]})
                 for call in calls:
                     name = call["name"]
+                    tool_tier = executed_tool_tiers.get(name, "publico")
                     ctx.eval_counts["tool"] += 1
                     allowed_names = {spec["function"]["name"] for spec in tool_specs}
                     try:
@@ -1303,6 +1312,7 @@ async def _chat_internal(
                             messages=security_messages, tool={"name": name, "input": args,
                                 "description": next(spec["function"].get("description", "")
                                     for spec in tool_specs if spec["function"]["name"] == name)})
+                        ctx.record_stage("scope", "executed", (time.perf_counter() - t_tool_scope) * 1000)
                         op_calls = getattr(operation_scope, "provider_calls", 1 if getattr(operation_scope, "model", None) else 0)
                         ctx.record_scope_call(
                             op_calls,
@@ -1315,7 +1325,8 @@ async def _chat_internal(
                         if not operation_scope.allowed:
                             _scope_decision.set(operation_scope)
                             raise ScopeBlocked(operation_scope)
-                        if tool_sig in executed_signatures and name in {"make_document", "attach_existing_document"}:
+                        if tool_sig in executed_signatures and (name in {"make_document", "attach_existing_document"}
+                            or any(tool_name == name for tool_name, _ in authorized_contexts)):
                             result = executed_tool_cache[tool_sig]
                         elif call_id in executed_tool_cache:
                             result = executed_tool_cache[call_id]
@@ -1416,6 +1427,7 @@ async def _chat_internal(
                                 raise ValueError("Permiso de herramienta denegado")
                             result = executed["result"]
                             tool_tier = executed["audit"].get("tier", "publico")
+                            executed_tool_tiers[name] = tool_tier
                             if tool_tier in {"interno", "confidencial"}:
                                 highest_tier = tool_tier
                                 tool_specs = [spec for spec in tool_specs if spec["function"]["name"]

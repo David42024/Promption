@@ -3,6 +3,9 @@ from urllib.parse import urljoin
 from contextvars import ContextVar
 
 import httpx
+import logging
+
+logger = logging.getLogger(__name__)
 
 from promption import AsyncScopeGuard
 from .config import settings
@@ -69,6 +72,11 @@ async def _evaluate(request: dict) -> dict:
     if not isinstance(data, dict):
         return {"classification": "UNCERTAIN", "reason": "invalid_scope_response", "provider_calls": 0}
     if response.status_code >= 400:
+        logger.warning("Scope evaluation failed request_id=%s http_status=%s reason=%s",
+                       req_id, response.status_code,
+                       data.get("reason") if data.get("reason") in {
+                           "scope_unavailable", "scope_timeout", "scope_truncated", "invalid_scope_response"}
+                       else "scope_unavailable")
         allowed_error_reasons = {"scope_unavailable", "scope_timeout", "scope_truncated", "invalid_scope_response"}
         return {**data, "classification": "UNCERTAIN",
                 "reason": data.get("reason") if data.get("reason") in allowed_error_reasons else "scope_unavailable"}
