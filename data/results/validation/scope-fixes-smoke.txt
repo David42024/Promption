@@ -1,0 +1,16 @@
+2026-10-08 22:18:41,954 | INFO     | pif | ML backend: lightweight
+2026-10-08 22:18:41,956 | INFO     | pif | DEBUG: Using LightMLFilter (TF-IDF + LogisticRegression)
+2026-10-08 22:18:42,167 | INFO     | pif | HeuristicFilter initialized with 60 rules (threshold=0.80)
+2026-10-08 22:18:43,567 | INFO     | pif | API inicializada (config: C:\Users\USERJSSV\Downloads\Promption)
+2026-10-08 22:18:43,622 | WARNING  | pif | No API credentials configured and PROMPTION_DEMO_MODE is disabled. Protected API requests will be rejected (401). Set PROMPTION_API_KEYS='tenant:key' or PROMPTION_DEMO_MODE=true for local demo.
+API health 200
+2026-10-08 22:18:47,997 | INFO     | pif | HeuristicFilter initialized with 60 rules (threshold=0.80)
+2026-10-08 22:18:48,986 | INFO     | pif | Label overrides: 20 filas corregidas (C:\Users\USERJSSV\Downloads\Promption\data\processed\label_overrides.csv)
+2026-10-08 22:18:48,994 | INFO     | pif | Quarantine: 29 filas excluidas (C:\Users\USERJSSV\Downloads\Promption\data\processed\quarantine.csv)
+2026-10-08 22:18:49,026 | INFO     | pif | Loaded 661 samples for benchmark from 'test' partition.
+2026-10-08 22:18:49,029 | INFO     | pif | Loading lightweight TF-IDF + LogisticRegression model from C:\Users\USERJSSV\Downloads\Promption\models\lightweight_classifier.pkl�
+2026-10-08 22:18:49,247 | INFO     | pif | Lightweight model loaded successfully.
+2026-10-08 22:18:49,247 | INFO     | pif | Model type: tfidf_logistic_regression
+2026-10-08 22:18:49,247 | INFO     | pif | Max features: 10000
+2026-10-08 22:18:55,162 | INFO     | pif | Benchmark complete: 661 rows, ASR 1.0 -> 0.19205298013245034
+Proxy benchmark rows 661

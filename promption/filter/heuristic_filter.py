@@ -47,7 +47,8 @@ class HeuristicFilter:
         self.max_matches = int(scoring.get("max_matches", 5))
         self._benign: list[dict] = []
         for rule in cfg.get("benign", []) or []:
-            self._benign.append({"name": rule["name"], "regex": re.compile(rule["pattern"], re.IGNORECASE)})
+            self._benign.append({"name": rule["name"], "regex": re.compile(rule["pattern"], re.IGNORECASE),
+                "applies_to_roles": frozenset(r.lower() for r in rule.get("applies_to_roles", []))})
         logger.info("HeuristicFilter initialized with %d rules (threshold=%.2f)", len(self._rules), self.threshold)
 
     # ------------------------------------------------------------------ public
@@ -73,7 +74,7 @@ class HeuristicFilter:
             if len(matches) >= self.max_matches:
                 break
 
-        benign = [b["name"] for b in self._benign if b["regex"].search(text)]
+        benign = [b["name"] for b in self._benign if (not b["applies_to_roles"] or user_roles & b["applies_to_roles"]) and b["regex"].fullmatch(text)]
         if matches:
             score = max(m["severity_score"] for m in matches)
             signal = "malicious"

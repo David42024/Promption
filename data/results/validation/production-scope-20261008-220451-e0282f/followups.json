@@ -1,0 +1,156 @@
+[
+  {
+    "case": "concept_output",
+    "http": 422,
+    "data": {
+      "detail": [
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "user_id"
+          ],
+          "msg": "Field required",
+          "input": {
+            "text": "El stock es el inventario disponible para vender.",
+            "direction": "output",
+            "user": {
+              "id": "validation-followup-2da9a3eb",
+              "roles": [
+                "customer"
+              ],
+              "authenticated": true,
+              "name": "Validation",
+              "email": "validation@example.com"
+            }
+          }
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "roles"
+          ],
+          "msg": "Field required",
+          "input": {
+            "text": "El stock es el inventario disponible para vender.",
+            "direction": "output",
+            "user": {
+              "id": "validation-followup-2da9a3eb",
+              "roles": [
+                "customer"
+              ],
+              "authenticated": true,
+              "name": "Validation",
+              "email": "validation@example.com"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "case": "safe_refusal",
+    "http": 422,
+    "data": {
+      "detail": [
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "user_id"
+          ],
+          "msg": "Field required",
+          "input": {
+            "text": "No puedo compartir sueldos de empleados.",
+            "direction": "output",
+            "user": {
+              "id": "validation-followup-2da9a3eb",
+              "roles": [
+                "customer"
+              ],
+              "authenticated": true,
+              "name": "Validation",
+              "email": "validation@example.com"
+            }
+          }
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "roles"
+          ],
+          "msg": "Field required",
+          "input": {
+            "text": "No puedo compartir sueldos de empleados.",
+            "direction": "output",
+            "user": {
+              "id": "validation-followup-2da9a3eb",
+              "roles": [
+                "customer"
+              ],
+              "authenticated": true,
+              "name": "Validation",
+              "email": "validation@example.com"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "case": "stream_public_price",
+    "http": 200,
+    "lines": [
+      "data: {\"type\": \"status\", \"stage\": \"Revisando solicitud…\"}",
+      "",
+      "data: {\"type\": \"status\", \"stage\": \"Revisando alcance de la solicitud…\"}",
+      "",
+      "data: {\"type\": \"result\", \"data\": {\"blocked\": true, \"reply\": \"No pude determinar si la solicitud está dentro del alcance del asistente. Aclara qué necesitas hacer en Promption Shop.\", \"leaked\": false, \"audit\": [], \"actions\": [], \"guard\": \"SKIPPED\", \"filter_enabled\": true, \"output_guard_enabled\": true, \"filter_skipped\": false, \"output_guard_skipped\": false, \"role\": \"customer\", \"model\": \"\", \"filter_layers\": {\"heuristic\": {\"blocked\": false, \"score\": 0.5, \"signal\": \"unknown\", \"matched_rules\": [], \"threshold\": 0.8, \"benign_matched\": []}, \"ml\": {\"available\": true, \"blocked\": false, \"probability\": 0.496003062857322, \"threshold\": 0.66, \"status\": \"SUCCESS\", \"error_code\": null, \"state\": \"HEALTHY\"}, \"ensemble\": {\"score\": 0.496003062857322, \"decision\": \"GUARDED\", \"requires_output_guard\": true, \"heuristic_band\": \"MEDIUM\", \"ml_band\": \"MEDIUM\", \"decision_low_threshold\": 0.33, \"decision_high_threshold\": 0.66, \"benign_matched\": []}, \"classification\": {\"label\": \"UNCERTAIN\", \"requires_review\": true, \"ml_benign_threshold\": 0.33, \"ml_malicious_threshold\": 0.66}, \"conversation\": {\"blocked\": false, \"requires_output_guard\": true, \"matched_rules\": [], \"message_count\": 1, \"tool_message_count\": 0, \"reason\": \"conversation_checked\"}}, \"reason\": \"ambiguous\", \"confidence\": null, \"block_type\": \"scope\", \"policy\": null, \"security_classification\": \"UNCERTAIN\", \"scope\": {\"classification\": \"UNCERTAIN\", \"reason\": \"ambiguous\", \"status\": 403, \"model\": \"gpt-5-nano\", \"provider_calls\": 1, \"prompt_tokens\": 1789, \"completion_tokens\": 71, \"total_tokens\": 1860, \"reasoning_tokens\": 0, \"allowed\": false}, \"requested_model\": \"\", \"fallback_count\": 0, \"fallback_reason\": null, \"eval_counts\": {\"input\": 1, \"conversation\": 0, \"scope\": 1, \"tool\": 0, \"output\": 0, \"deduplicated\": 0}, \"request_id\": \"5cc01584cdea4e42819fe5391bfd2189\", \"execution_metrics\": {\"request_id\": \"5cc01584cdea4e42819fe5391bfd2189\", \"requested_model\": \"none\", \"effective_model\": \"none\", \"scope_model\": \"gpt-5-nano\", \"call_type\": \"chat\", \"generation_calls\": 0, \"scope_calls\": 1, \"provider_calls\": 1, \"failed_calls\": 0, \"fallback_count\": 0, \"fallback_reason\": null, \"prompt_tokens\": 1789, \"completion_tokens\": 71, \"total_tokens\": 1860, \"reasoning_tokens\": 0, \"known_usage\": {\"prompt_tokens\": 1789, \"completion_tokens\": 71, \"total_tokens\": 1860, \"reasoning_tokens\": 0}, \"usage_coverage\": {\"calls_total\": 1, \"calls_with_usage\": 1, \"calls_without_usage\": 0, \"is_complete\": true, \"fields\": {\"prompt_tokens\": true, \"completion_tokens\": true, \"total_tokens\": true, \"reasoning_tokens\": true}}, \"filter_status\": \"executed\", \"output_guard_status\": \"skipped\", \"stages\": {\"input_filter\": {\"status\": \"executed\", \"latency_ms\": 136.25}, \"conversation_guard\": {\"status\": \"skipped\", \"latency_ms\": null}, \"scope\": {\"status\": \"executed\", \"latency_ms\": 2221.12}, \"generation\": {\"status\": \"skipped\", \"latency_ms\": null}, \"tools\": {\"status\": \"skipped\", \"latency_ms\": null}, \"output_guard\": {\"status\": \"skipped\", \"latency_ms\": null}}, \"stage_latencies_ms\": {\"input_filter\": 136.25, \"scope\": 2221.12}, \"total_latency_ms\": 2357.87}}}",
+      ""
+    ]
+  },
+  {
+    "case": "concept_output_corrected",
+    "http": 403,
+    "data": {
+      "detail": {
+        "code": "CONTENT_BLOCKED",
+        "direction": "output",
+        "reason": "insufficient_scope"
+      }
+    }
+  },
+  {
+    "case": "safe_refusal_corrected",
+    "http": 200,
+    "data": {
+      "allowed": true,
+      "text": "No puedo compartir sueldos de empleados.",
+      "action": "PASS",
+      "reason": "",
+      "requires_output_guard": false,
+      "conversation_checked": false,
+      "scope": null
+    }
+  },
+  {
+    "case": "stream_catalog_explicit",
+    "http": 200,
+    "lines": [
+      "data: {\"type\": \"status\", \"stage\": \"Revisando solicitud…\"}",
+      "",
+      "data: {\"type\": \"status\", \"stage\": \"Revisando alcance de la solicitud…\"}",
+      "",
+      "data: {\"type\": \"status\", \"stage\": \"Preparando respuesta…\"}",
+      "",
+      "data: {\"type\": \"status\", \"stage\": \"Generando respuesta…\"}",
+      "",
+      "data: {\"type\": \"status\", \"stage\": \"Verificando respuesta…\"}",
+      "",
+      "data: {\"type\": \"result\", \"data\": {\"blocked\": false, \"reply\": \"No pude adjuntar un archivo en esta respuesta. Inténtalo nuevamente.\", \"leaked\": false, \"audit\": [{\"tool\": \"getCatalogSummary\", \"allowed\": true, \"result\": null, \"reason\": null, \"tier\": \"publico\"}], \"actions\": [], \"guard\": \"PASS\", \"filter_enabled\": true, \"output_guard_enabled\": true, \"filter_skipped\": false, \"output_guard_skipped\": false, \"role\": \"customer\", \"model\": \"OpenAI · gpt-5-nano\", \"filter_layers\": {\"heuristic\": {\"blocked\": false, \"score\": 0.5, \"signal\": \"unknown\", \"matched_rules\": [], \"threshold\": 0.8, \"benign_matched\": []}, \"ml\": {\"available\": true, \"blocked\": false, \"probability\": 0.4971412537883965, \"threshold\": 0.66, \"status\": \"SUCCESS\", \"error_code\": null, \"state\": \"HEALTHY\"}, \"ensemble\": {\"score\": 0.4971412537883965, \"decision\": \"GUARDED\", \"requires_output_guard\": true, \"heuristic_band\": \"MEDIUM\", \"ml_band\": \"MEDIUM\", \"decision_low_threshold\": 0.33, \"decision_high_threshold\": 0.66, \"benign_matched\": []}, \"classification\": {\"label\": \"UNCERTAIN\", \"requires_review\": true, \"ml_benign_threshold\": 0.33, \"ml_malicious_threshold\": 0.66}, \"conversation\": {\"blocked\": false, \"requires_output_guard\": true, \"matched_rules\": [], \"message_count\": 1, \"tool_message_count\": 0, \"reason\": \"conversation_checked\"}}, \"reason\": null, \"confidence\": null, \"block_type\": null, \"policy\": {\"allowed\": true, \"matched\": true, \"policy_id\": \"public.catalog\", \"resource\": \"product_catalog\", \"tier\": \"publico\", \"tool_names\": [\"getCatalogSummary\"], \"required_roles\": [], \"confidence\": 0.88, \"reason\": \"Roles authorized for every matched resource\"}, \"security_classification\": \"UNCERTAIN\", \"scope\": {\"classification\": \"IN_SCOPE\", \"reason\": \"in_scope\", \"status\": 200, \"model\": \"gpt-5-nano\", \"provider_calls\": 1, \"prompt_tokens\": 1793, \"completion_tokens\": 63, \"total_tokens\": 1856, \"reasoning_tokens\": 0, \"allowed\": true}, \"requested_model\": \"OpenAI · gpt-5-nano\", \"fallback_count\": 0, \"fallback_reason\": null, \"eval_counts\": {\"input\": 1, \"conversation\": 1, \"scope\": 1, \"tool\": 1, \"output\": 1, \"deduplicated\": 1}, \"request_id\": \"8247061527ad4240a6f2b55e4e38ce22\", \"execution_metrics\": {\"request_id\": \"8247061527ad4240a6f2b55e4e38ce22\", \"requested_model\": \"OpenAI · gpt-5-nano\", \"effective_model\": \"OpenAI · gpt-5-nano\", \"scope_model\": \"gpt-5-nano\", \"call_type\": \"tool\", \"generation_calls\": 1, \"scope_calls\": 2, \"provider_calls\": 3, \"failed_calls\": 0, \"fallback_count\": 0, \"fallback_reason\": null, \"prompt_tokens\": 7456, \"completion_tokens\": 196, \"total_tokens\": 7652, \"reasoning_tokens\": 0, \"known_usage\": {\"prompt_tokens\": 7456, \"completion_tokens\": 196, \"total_tokens\": 7652, \"reasoning_tokens\": 0}, \"usage_coverage\": {\"calls_total\": 3, \"calls_with_usage\": 3, \"calls_without_usage\": 0, \"is_complete\": true, \"fields\": {\"prompt_tokens\": true, \"completion_tokens\": true, \"total_tokens\": true, \"reasoning_tokens\": true}}, \"filter_status\": \"executed\", \"output_guard_status\": \"executed\", \"stages\": {\"input_filter\": {\"status\": \"executed\", \"latency_ms\": 72.71}, \"conversation_guard\": {\"status\": \"skipped\", \"latency_ms\": null}, \"scope\": {\"status\": \"executed\", \"latency_ms\": 1306.32}, \"generation\": {\"status\": \"executed\", \"latency_ms\": 3945.91}, \"tools\": {\"status\": \"executed\", \"latency_ms\": 1.33}, \"output_guard\": {\"status\": \"executed\", \"latency_ms\": 80.95}}, \"stage_latencies_ms\": {\"input_filter\": 72.71, \"scope\": 1306.32, \"generation\": 3945.91, \"tools\": 1.33, \"output_guard\": 80.95}, \"total_latency_ms\": 6258.94}}}",
+      ""
+    ]
+  }
+]

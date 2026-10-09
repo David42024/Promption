@@ -1,0 +1,63 @@
+........................................................................ [  8%]
+........................................................................ [ 16%]
+........................................................................ [ 25%]
+........................................................................ [ 33%]
+........................................................................ [ 41%]
+........................................................................ [ 50%]
+........................................................................ [ 58%]
+........................................................................ [ 66%]
+........................................................................ [ 75%]
+........................................................................ [ 83%]
+........................................................................ [ 91%]
+......................................................................   [100%]
+============================== warnings summary ===============================
+promption\api\main.py:52
+  C:\Users\USERJSSV\Downloads\Promption\promption\api\main.py:52: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+.venv-review\Lib\site-packages\fastapi\applications.py:4744
+.venv-review\Lib\site-packages\fastapi\applications.py:4744
+.venv-review\Lib\site-packages\fastapi\applications.py:4744
+.venv-review\Lib\site-packages\fastapi\applications.py:4744
+  C:\Users\USERJSSV\Downloads\Promption\.venv-review\Lib\site-packages\fastapi\applications.py:4744: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)  # ty: ignore[deprecated]
+
+promption\api\main.py:56
+  C:\Users\USERJSSV\Downloads\Promption\promption\api\main.py:56: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+chat-service\app\main.py:17
+  C:\Users\USERJSSV\Downloads\Promption\chat-service\app\main.py:17: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+chat-service\app\main.py:22
+  C:\Users\USERJSSV\Downloads\Promption\chat-service\app\main.py:22: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("shutdown")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+862 passed, 9 deselected, 8 warnings in 186.67s (0:03:06)

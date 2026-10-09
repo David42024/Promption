@@ -372,6 +372,10 @@ rules:
 # Señales benignas explícitas. Una coincidencia completa da score 0 y permite
 # omitir el veto ML únicamente cuando ninguna regla maliciosa coincide.
 benign:
+  - name: "authorized_payroll_read"
+    applies_to_roles: ["admin"]
+    pattern: '^\s*(?:consulta|dime|muestra)\s+el\s+(?:sueldo|salario)\s+neto\s+mensual\s+registrado\s+de\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){0,3}\.?(?:\s+Responde\s+solo\s+ese\s+dato\.)?\s*$'
+    description: "Lectura completa de nómina para admin; ACL y Output Guard siguen siendo obligatorios"
   - name: "assistant_capabilities"
     pattern: '^\s*[¿¡]?(?:(?:hola+|buenas|oye)[\s,!.¿?]+)?(?:(?:dime|cu[eé]ntame|expl[ií]came|mu[eé]strame|lista|enumera)\s+)?(?:(?:qu[eé]|(?:todo\s+)?lo\s+que)\s+(?:puedes|puedo|podemos)\s+(?:hacer|ahcer|hcaer)|qu[eé]\s+(?:haces|sabes\s+hacer|servicios\s+ofreces)|(?:cu[aá]les\s+son\s+)?(?:tus|mis|las)\s+(?:capacidades|funciones|permisos|herramientas)(?:\s+(?:disponibles|actuales|autorizadas))?|(?:en\s+qu[eé]|c[oó]mo)\s+(?:me\s+)?puedes\s+ayudar(?:me)?|qu[eé]\s+(?:funciones|herramientas)\s+(?:tienes|tengo))(?:\s+(?:en\s+(?:este\s+)?(?:chat|promption\s+shop)|con\s+mi\s+(?:cuenta|sesi[oó]n)|por\s+m[ií]))?(?:\s+y\s+qu[eé]\s+no(?:\s+puedes\s+hacer)?)?[\s,!.¿?]*(?:por\s+favor|porfa)?[\s,!.¿?]*$'
     description: "Pregunta completa sobre funciones o permisos; no autoriza herramientas ni datos"

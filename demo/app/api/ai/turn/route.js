@@ -246,7 +246,7 @@ export async function POST(request) {
     });
   } catch (error) {
     const { code, status, reason, scope } = aiFailure(error, { signal: request.signal, aborted: request.signal?.aborted });
-    console.warn("AI turn failed", { code, status, model: body.model,
+    console.warn("AI turn failed", { requestId, code, status, model: body.model,
       guardReason: reason, scopeReason: scope?.reason,
       errorType: error.name, providerStatus: error.statusCode });
 
