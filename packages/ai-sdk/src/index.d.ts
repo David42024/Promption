@@ -11,11 +11,51 @@ export interface ConversationMessage {
   tool_name?: string;
 }
 export type Direction = "input" | "output";
+export interface ScopeUsage {
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  reasoning_tokens?: number | null;
+}
+export interface KnownUsage {
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  reasoning_tokens: number | null;
+}
+export interface UsageCoverage {
+  calls_total: number;
+  calls_with_usage: number;
+  calls_without_usage: number;
+  is_complete: boolean;
+  fields: {
+    prompt_tokens: boolean;
+    completion_tokens: boolean;
+    total_tokens: boolean;
+    reasoning_tokens: boolean;
+  };
+}
+export interface ExecutionMetrics {
+  provider_calls: number;
+  generation_calls: number;
+  scope_calls: number;
+  failed_calls: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  reasoning_tokens: number | null;
+  known_usage: KnownUsage;
+  usage_coverage: UsageCoverage;
+  [key: string]: unknown;
+}
 export interface ScopeDecision {
   classification: "IN_SCOPE" | "OUT_OF_SCOPE" | "UNCERTAIN";
   reason: string;
   allowed: boolean;
   status: number;
+  usage?: ScopeUsage | null;
+  model?: string | null;
+  provider_calls?: number;
 }
 export interface ScopeRequest {
   text: string;
@@ -26,7 +66,7 @@ export interface ScopeRequest {
   signal?: AbortSignal;
   providerOptions?: Record<string, unknown>;
 }
-export type ScopeEvaluator = (request: ScopeRequest) => Promise<Pick<ScopeDecision, "classification" | "reason">>;
+export type ScopeEvaluator = (request: ScopeRequest) => Promise<Pick<ScopeDecision, "classification" | "reason"> & { usage?: ScopeUsage | null; allowed?: boolean; status?: number }>;
 export interface GuardRequest {
   text: string;
   direction: Direction;
@@ -95,3 +135,33 @@ export function createPromption(options: PromptionOptions): {
   middleware(options: MiddlewareOptions): LanguageModelMiddleware;
   protectTool<T extends { execute?: (...args: any[]) => any }>(definition: T, options: ProtectToolOptions): T;
 };
+export class MetricsAggregator {
+  generationCalls: number;
+  scopeCalls: number;
+  failedCalls: number;
+  constructor();
+  addCall(options?: {
+    callType?: string;
+    calls?: number;
+    promptTokens?: number | null;
+    completionTokens?: number | null;
+    totalTokens?: number | null;
+    reasoningTokens?: number | null;
+    hasUsage?: boolean | null;
+    failed?: boolean;
+    eventId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): boolean;
+  summary(): {
+    provider_calls: number;
+    generation_calls: number;
+    scope_calls: number;
+    failed_calls: number;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+    reasoning_tokens: number | null;
+    known_usage: KnownUsage;
+    usage_coverage: UsageCoverage;
+  };
+}

@@ -149,6 +149,14 @@ class LLMResponse(BaseModel):
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
     total_tokens: Optional[int] = None
+    reasoning_tokens: Optional[int] = None
+    provider_calls: Optional[int] = None
+    generation_calls: Optional[int] = None
+    scope_calls: Optional[int] = None
+    failed_calls: int = 0
+    known_usage: Optional[Dict[str, Optional[int]]] = None
+    usage_coverage: Optional[Dict[str, Any]] = None
+    usage_events: Optional[List[Dict[str, Any]]] = None
 
 
 class MCPToolCall(BaseModel):

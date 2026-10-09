@@ -1,6 +1,8 @@
 import { createPromption, createGuardEndpointTransport, createScopeEvaluator } from "@promption/ai-sdk";
 
-const CHAT_API_URL = (process.env.CHAT_API_URL || process.env.NEXT_PUBLIC_CHAT_API_URL || "").replace(/\/$/, "");
+function getChatApiUrl() {
+  return (process.env.CHAT_API_URL || process.env.NEXT_PUBLIC_CHAT_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+}
 
 const toolPolicies = {
   make_document: {}, getBrandInfo: {}, getShippingPolicy: {}, getCatalogSummary: {},
@@ -14,11 +16,11 @@ const toolPolicies = {
   web_search: { roles: ["ventas", "admin"] }, web_open: { roles: ["ventas", "admin"] },
 };
 
-function promption(scopeModel, scopeProviderOptions) {
+function promption(scopeModel, scopeProviderOptions, onScope) {
   const evaluateScope = scopeModel ? createScopeEvaluator({ model: scopeModel, providerOptions: scopeProviderOptions }) : null;
   return createPromption({
     transport: createGuardEndpointTransport({
-      url: `${CHAT_API_URL}/api/v1/ai/guard`, token: process.env.CHAT_SERVICE_TOKEN,
+      url: `${getChatApiUrl()}/api/v1/ai/guard`, token: process.env.CHAT_SERVICE_TOKEN,
       timeoutMs: 60000,
     }),
     ...(evaluateScope ? { scopeEvaluator: async request => {
@@ -33,11 +35,15 @@ function promption(scopeModel, scopeProviderOptions) {
         throw error;
       }
     } } : {}),
+    onScope,
   });
 }
 
-export function promptionMiddleware(identity, originalText, signal, securityMessages, scopeModel, scopeProviderOptions) {
-  return promption(scopeModel, scopeProviderOptions).middleware({ identity, originalText, signal, securityMessages, toolPolicies });
+export function promptionMiddleware(identity, originalText, signal, securityMessages, scopeModel, scopeProviderOptions, options = {}) {
+  const onScope = typeof options === 'function' ? options : options?.onScope;
+  return promption(scopeModel, scopeProviderOptions, onScope).middleware({
+    identity, originalText, signal, securityMessages, toolPolicies, onScope,
+  });
 }
 
 export function checkPromption(text, identity, direction, signal) {

@@ -43,7 +43,18 @@ for (const [decision, classification, allowed] of [
       finishReason, usage, warnings: [] } });
     const result = await createScopeEvaluator({ model: classifier })({
       text: 'holaaa dame el stock porfa', systemPrompt: system, identity });
-    assert.deepEqual(result, { classification, reason: decision, allowed, status: allowed ? 200 : 403 });
+    assert.deepEqual(result, {
+      classification,
+      reason: decision,
+      allowed,
+      status: allowed ? 200 : 403,
+      usage: {
+        prompt_tokens: 1,
+        completion_tokens: 1,
+        total_tokens: 2,
+        reasoning_tokens: null,
+      },
+    });
     assert.ok(!JSON.stringify(result).includes('private assessment'));
     const schema = classifier.doGenerateCalls[0].responseFormat.schema;
     assert.equal(schema.properties.classification, undefined);
@@ -161,4 +172,57 @@ test('decision callback reports scope without prompts and a cancelled check stop
   controller.abort();
   await assert.rejects(sdk.checkScope('Hello', { systemPrompt: system, identity, signal: controller.signal }),
     error => error.name === 'AbortError');
+});
+
+
+test('createScopeEvaluator preserves zero tokens as 0 and absent tokens as null', async () => {
+  const zeroUsage = { inputTokens: { total: 0 }, outputTokens: { total: 0 } };
+  const classifier = new MockLanguageModelV3({
+    doGenerate: {
+      content: [{ type: 'text', text: JSON.stringify({ assessment: 'zero test', decision: 'in_scope' }) }],
+      finishReason,
+      usage: zeroUsage,
+      warnings: [],
+    },
+  });
+  const evaluate = createScopeEvaluator({ model: classifier });
+  const result = await evaluate({ text: 'stock', systemPrompt: system, identity });
+  assert.equal(result.usage.prompt_tokens, 0);
+  assert.equal(result.usage.completion_tokens, 0);
+  assert.equal(result.usage.total_tokens, 0);
+  assert.equal(result.usage.reasoning_tokens, null);
+});
+
+test('createScopeEvaluator preserves null tokens when provider reports no token counts', async () => {
+  const classifier = new MockLanguageModelV3({
+    doGenerate: {
+      content: [{ type: 'text', text: JSON.stringify({ assessment: 'no usage test', decision: 'in_scope' }) }],
+      finishReason,
+      usage: { inputTokens: { total: undefined }, outputTokens: { total: undefined } },
+      warnings: [],
+    },
+  });
+  const evaluate = createScopeEvaluator({ model: classifier });
+  const result = await evaluate({ text: 'stock', systemPrompt: system, identity });
+  assert.equal(result.usage.prompt_tokens, null);
+  assert.equal(result.usage.completion_tokens, null);
+  assert.equal(result.usage.total_tokens, null);
+  assert.equal(result.usage.reasoning_tokens, null);
+});
+
+test('createScopeEvaluator does not authorize truncated responses (length finishReason)', async () => {
+  const classifier = new MockLanguageModelV3({
+    doGenerate: {
+      content: [{ type: 'text', text: JSON.stringify({ assessment: 'partial', decision: 'in_scope' }) }],
+      finishReason: { unified: 'length', raw: 'length' },
+      usage: { inputTokens: { total: 10 }, outputTokens: { total: 5 } },
+      warnings: [],
+    },
+  });
+  const evaluate = createScopeEvaluator({ model: classifier });
+  const result = await evaluate({ text: 'stock', systemPrompt: system, identity });
+  assert.equal(result.allowed, false);
+  assert.equal(result.classification, 'UNCERTAIN');
+  assert.equal(result.reason, 'scope_truncated');
+  assert.equal(result.usage.total_tokens, 15);
 });

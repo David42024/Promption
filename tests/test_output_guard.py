@@ -132,3 +132,110 @@ def test_known_secret_blocks_even_when_split_without_format(caplog):
     assert result.categories == ["known_secret"]
     assert value not in caplog.text
     assert guard_response("Respuesta pública normal.", protected_values=[value]).action == Action.PASS
+
+
+def test_sk_project_key_isolated():
+    fake_proj_key = "sk-proj-AbCdEf1234567890XyZ_9876543210-abcdef"
+    res = guard_response(f"Mi token es {fake_proj_key} para OpenAI")
+    assert res.action in (Action.BLOCK, Action.REDACT)
+    assert fake_proj_key not in (res.redacted_response or "")
+    if res.action == Action.REDACT:
+        assert "[REDACTED]" in res.redacted_response
+
+
+def test_sk_project_key_assignment():
+    fake_proj_key = "sk-proj-AbCdEf1234567890XyZ_9876543210-abcdef"
+    for prefix in ["OPENAI_API_KEY", "API_KEY", "api_key", "OPENAI_KEY"]:
+        res = guard_response(f"{prefix}={fake_proj_key}")
+        assert res.action in (Action.BLOCK, Action.REDACT), f"Failed for {prefix}="
+        assert fake_proj_key not in (res.redacted_response or "")
+
+        res_colon = guard_response(f"{prefix}: '{fake_proj_key}'")
+        assert res_colon.action in (Action.BLOCK, Action.REDACT), f"Failed for {prefix}:"
+        assert fake_proj_key not in (res_colon.redacted_response or "")
+
+
+def test_sk_project_key_json_and_code_block():
+    fake_proj_key = "sk-proj-AbCdEf1234567890XyZ_9876543210-abcdef"
+    json_text = f'{{"OPENAI_API_KEY": "{fake_proj_key}"}}'
+    res_json = guard_response(json_text)
+    assert res_json.action in (Action.BLOCK, Action.REDACT)
+    assert fake_proj_key not in (res_json.redacted_response or "")
+
+    code_block = f"```bash\nexport OPENAI_API_KEY={fake_proj_key}\n```"
+    res_code = guard_response(code_block)
+    assert res_code.action in (Action.BLOCK, Action.REDACT)
+    assert fake_proj_key not in (res_code.redacted_response or "")
+
+
+def test_legacy_sk_key_still_protected():
+    fake_legacy_key = "sk-1234567890abcdefABCDEF1234567890"
+    res = guard_response(f"Clave antigua: {fake_legacy_key}")
+    assert res.action in (Action.BLOCK, Action.REDACT)
+    assert fake_legacy_key not in (res.redacted_response or "")
+
+
+def test_admin_mode_does_not_pass_credentials():
+    fake_proj_key = "sk-proj-AbCdEf1234567890XyZ_9876543210-abcdef"
+    res_admin = guard_response(f"OPENAI_API_KEY={fake_proj_key}", admin_mode=True)
+    assert res_admin.action != Action.PASS
+    assert fake_proj_key not in (res_admin.redacted_response or "")
+
+
+def test_conceptual_and_placeholders_pass():
+    assert guard_response("¿Qué es OPENAI_API_KEY y para qué se usa?").action == Action.PASS
+    assert guard_response("Define la variable api_key en tu entorno.").action == Action.PASS
+    assert guard_response("OPENAI_API_KEY=<YOUR_API_KEY>").action == Action.PASS
+    assert guard_response('{"OPENAI_API_KEY": "<YOUR_OPENAI_API_KEY>"}').action == Action.PASS
+
+
+def test_logs_never_contain_sk_proj(caplog):
+    fake_proj_key = "sk-proj-UniqueFictitiousTokenToVerifyNoLeak12345"
+    with caplog.at_level(logging.INFO, logger="pif"):
+        guard_response(f"OPENAI_API_KEY={fake_proj_key}")
+    assert fake_proj_key not in caplog.text
+
+
+def test_endpoint_output_guard_sk_proj(monkeypatch):
+    from fastapi.testclient import TestClient
+    from promption.api.main import app
+
+    monkeypatch.setenv("PROMPTION_ADMIN_API_KEYS", "platform:pk-admin-test-token-output-guard")
+    client = TestClient(app)
+    fake_proj_key = "sk-proj-AbCdEf1234567890XyZ_9876543210-abcdef"
+    resp = client.post(
+        "/api/v1/output-guard",
+        headers={"X-Promption-API-Key": "pk-admin-test-token-output-guard"},
+        json={"text": f"La clave es {fake_proj_key}", "user_id": "u1", "roles": ["customer"]},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["action"] in ("BLOCK", "REDACT")
+    assert fake_proj_key not in (data.get("redacted_response") or "")
+
+
+def test_sk_proj_trailing_underscore_and_delimiter_defect():
+    """Reproduces defect 1: credentials ending in underscore or dash must not return PASS or leave remnants."""
+    cases = [
+        "sk-proj-AbCdEf0123456789_",
+        "sk-proj-AbCdEf0123456789-",
+        "sk-AbCdEf0123456789_",
+        "OPENAI_API_KEY=sk-proj-AbCdEf0123456789_",
+        'API_KEY: "sk-proj-AbCdEf0123456789_"',
+        '{"api_key": "sk-proj-AbCdEf0123456789_"}',
+        "(sk-proj-AbCdEf0123456789_)",
+        "[sk-proj-AbCdEf0123456789_]",
+        "sk-proj-AbCdEf0123456789_.",
+    ]
+    for text in cases:
+        res = guard_response(text)
+        assert res.action in (Action.BLOCK, Action.REDACT), f"Expected REDACT or BLOCK for: {text!r}, got {res.action}"
+        if res.action == Action.REDACT:
+            # Entire credential must be redacted; no trailing _ or - left
+            assert "AbCdEf0123456789" not in res.redacted_response
+            assert "AbCdEf0123456789_" not in res.redacted_response
+            assert "AbCdEf0123456789-" not in res.redacted_response
+            assert "[REDACTED]_" not in res.redacted_response
+            assert "[REDACTED]-" not in res.redacted_response
+
+

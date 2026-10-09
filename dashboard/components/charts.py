@@ -335,7 +335,16 @@ def plot_latency_breakdown(df: pd.DataFrame) -> go.Figure:
     ml_mean = float(pd.to_numeric(df.get("ml_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
     scope_mean = float(pd.to_numeric(df.get("scope_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
     og_mean = float(pd.to_numeric(df.get("output_guard_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
-    llm_mean = float(pd.to_numeric(df.get("llm_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna().mean() or 0.0)
+
+    # Avoid mixing fast early blocks or non-executed calls into LLM generation latency
+    llm_series = pd.to_numeric(df.get("generation_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna()
+    if llm_series.empty:
+        if "generation_executed" in df.columns:
+            gen_mask = pd.to_numeric(df["generation_executed"], errors="coerce").fillna(0).astype(int) == 1
+            llm_series = pd.to_numeric(df.loc[gen_mask, "llm_latency_ms"], errors="coerce").dropna()
+        else:
+            llm_series = pd.to_numeric(df.get("llm_latency_ms", pd.Series(dtype=float)), errors="coerce").dropna()
+    llm_mean = float(llm_series.mean() or 0.0)
     
     names = ["Heurística", "ML", "Alcance", "Output Guard", "Generación LLM"]
     vals = [round(heur_mean, 2), round(ml_mean, 2), round(scope_mean, 2), round(og_mean, 2), round(llm_mean, 2)]

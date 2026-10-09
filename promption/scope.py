@@ -11,6 +11,12 @@ class ScopeDecision:
     classification: Literal["IN_SCOPE", "OUT_OF_SCOPE", "UNCERTAIN"]
     reason: str
     status: int = 200
+    model: str | None = None
+    provider_calls: int = 0
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    reasoning_tokens: int | None = None
 
     @property
     def allowed(self) -> bool:
@@ -26,9 +32,30 @@ def _validated(result) -> ScopeDecision:
                "OUT_OF_SCOPE": {"topic_outside_scope", "system_limit"},
                "UNCERTAIN": {"ambiguous"}}
     if not isinstance(data, dict) or data.get("reason") not in reasons.get(data.get("classification"), set()):
-        return ScopeDecision("UNCERTAIN", "invalid_scope_response", 503)
+        model = data.get("model") if isinstance(data, dict) else None
+        calls = int(data.get("provider_calls", 0)) if isinstance(data, dict) and str(data.get("provider_calls", "")).isdigit() else 0
+        return ScopeDecision("UNCERTAIN", "invalid_scope_response", 503, model=model, provider_calls=calls)
     label = data["classification"]
-    return ScopeDecision(label, data["reason"], 200 if label == "IN_SCOPE" else 403)
+    model = data.get("model")
+    calls = int(data.get("provider_calls", 1)) if "provider_calls" in data else 0
+    usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+    def _tok(k1, k2=None):
+        v = usage.get(k1) if usage else data.get(k1)
+        if v is None and k2:
+            v = usage.get(k2) if usage else data.get(k2)
+        try:
+            return int(v) if v is not None else None
+        except (ValueError, TypeError):
+            return None
+    p_tok = _tok("prompt_tokens", "input_tokens")
+    c_tok = _tok("completion_tokens", "output_tokens")
+    t_tok = _tok("total_tokens")
+    r_tok = _tok("reasoning_tokens")
+    return ScopeDecision(
+        label, data["reason"], 200 if label == "IN_SCOPE" else 403,
+        model=model, provider_calls=calls,
+        prompt_tokens=p_tok, completion_tokens=c_tok, total_tokens=t_tok, reasoning_tokens=r_tok
+    )
 
 
 def _request(text, system_prompt, messages, identity, tool):
