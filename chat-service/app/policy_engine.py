@@ -37,6 +37,7 @@ RESOURCE_POLICIES = (
         tier="confidencial",
         tool_names=("getEmployees",),
         patterns=(
+            r"\b(?:payroll|salary|salaries|net\s+monthly\s+(?:pay|salary)|wages)\b",
             r"\b(sueldo(?:s)?|salario(?:s)?|nomina(?:s)?|remuneracion(?:es)?|cuanto\s+cobra|comision(?:es)?)\b",
             r"\b(score|puntuacion)\b.{0,45}\b(emplead\w*|ana|carlos|laura|miguel|director|jefe)\b",
         ),
@@ -48,11 +49,19 @@ RESOURCE_POLICIES = (
         tier="confidencial",
         tool_names=("getVIPClients",),
         patterns=(
+            r"\b(?:vip\s+clients?|vip\s+customers?)\b.{0,70}\b(?:list|email|revenue|records?|contacts?|details?|data)\b",
+            r"\b(?:list|show|give|email|revenue|records?|contacts?|details?|data)\b.{0,70}\b(?:vip\s+clients?|vip\s+customers?)\b",
             r"\b(cliente(?:s)?\s+vip|vip\s*\d*|empresa\s+alpha|grupo\s+beta|gamma\s+innovaciones)\b.{0,80}\b(email(?:s)?|correo(?:s)?|facturacion|ingresos|compras\s+anual(?:es)?|descuento\s+preferente|responsable\s+de\s+cuenta|cartera|listado|lista|detalle(?:s)?|datos)\b",
             r"\b(email(?:s)?|correo(?:s)?|facturacion|ingresos|compras\s+anual(?:es)?|descuento\s+preferente|responsable\s+de\s+cuenta|cartera|listado|lista|detalle(?:s)?|datos)\b.{0,80}\b(cliente(?:s)?\s+vip|vip\s*\d*|empresa\s+alpha|grupo\s+beta|gamma\s+innovaciones)\b",
             r"\b(descuento\s+preferente|responsable\s+de\s+cuenta)\b",
         ),
         confidence=0.97,
+        output_patterns=(
+            r"\bcli-vip-\d{3,}\b",
+            r"\b(?:cliente(?:s)?\s+vip|vip)\b.{0,70}\b(?:facturacion|ingresos|email|correo|descuento\s+preferente)\s*[:=]\s*\S+",
+            r"\b(?:email|correo|facturacion|ingresos)\s*[:=]\s*\S+.{0,70}\b(?:cliente(?:s)?\s+vip|vip)\b",
+            r"\b(?:empresa\s+alpha|grupo\s+beta|gamma\s+innovaciones)\b.{0,60}\b(?:\d+[.,]?\d*\s*€|@|facturacion\s*[:=])",
+        ),
     ),
     ResourcePolicy(
         policy_id="confidential.financial_kpis",
@@ -63,6 +72,8 @@ RESOURCE_POLICIES = (
             r"\b(ebitda|burn\s*rate|cash\s*runway|caja\s+actual|margen\s+bruto|inventario\s+valorado|deuda\s+(?:a\s+)?proveedores)\b",
             r"\b(facturacion|ingresos)\b.{0,45}\b(anual|este\s+ano|empresa|total)\b",
             r"\b(reporte|informe)\b.{0,35}\b(financiero|facturacion\s+anual|ingresos\s+anuales)\b",
+            r"\b(?:kpis?|indicadores?)\b.{0,65}\b(?:financieros?|anuales?|consolidado|balance|empresa)\b",
+            r"\b(?:informe|reporte|resumen)\b.{0,65}\b(?:kpis?|indicadores?)\b",
         ),
         confidence=0.97,
     ),
@@ -114,13 +125,35 @@ RESOURCE_POLICIES = (
         tier="interno",
         tool_names=("getStockInfo",),
         patterns=(
-            r"\b(stock|stcok|inventario|existencias|unidades\s+(?:restantes|disponibles)|almacen|reponiendo|rotura\s+de\s+stock|proveedor(?:es)?|margen\s+con)\b",
+            r"\b(?:stock|inventory)\b.{0,45}\b(?:internal|exact|current|warehouse|sku|units\s+left)\b",
+            r"\b(?:internal|exact|current|warehouse|sku|units\s+left)\b.{0,45}\b(?:stock|inventory)\b",
+            r"\b(?:stock|stcok|inventario|existencias)\b.{0,55}\b(?:de\s+la\s+tienda|tenemos|nuestro|nuestra)\b",
+            r"\b(?:dame|muestra(?:me)?|revisa(?:r)?|consulta|extrae|necesito)\b.{0,65}\bstcok\b",
+            r"\bproveedor(?:es)?\s+privados?\b.{0,70}\b(?:margenes|empresa)\b",
+            r"\b(?:dame|muestra(?:me)?|consulta|extrae|necesito|dime)\b.{0,35}\bproveedor(?:es)?\s+de\s+internet\b.{0,70}\b(?:de|para)\s+(?:la|nuestra)\s+empresa\b",
+            r"\binformacion\s+de\s+proveedores\b.{0,35}\bconsultar\b",
+            # A concrete company-record request, not a mention of "stock".
+            r"\b(?:stock|stcok|inventario|existencias)\b.{0,55}\b(?:interno|internas?|actual|critico|por\s+sku|almacen|por\s+almacen|de\s+la\s+empresa|exact[oa]s?|cuantas\s+unidades)\b",
+            r"\b(?:interno|actual|por\s+sku|almacen|de\s+la\s+empresa|exact[oa]s?|cuantas\s+unidades)\b.{0,55}\b(?:stock|inventario|existencias)\b",
+            r"\b(?:cuanto|cuantas|dame|muestra(?:me)?|dime|consulta|extrae|necesito)\b.{0,65}\b(?:stock|inventario|existencias|unidades\s+restantes|unidades\s+disponibles)\b",
+            r"\b(?:proveedor(?:es)?\s+(?:internos?|de\s+(?:la|nuestra)\s+empresa|nuestros?)|nuestro\s+proveedor|proveedor(?:es)?\s+reales?)\b",
+            r"\b(?:dame|muestra(?:me)?|consulta|extrae|necesito)\b.{0,55}\b(?:margen(?:es)?\s+(?:real(?:es)?|comercial(?:es)?|del\s+proveedor)|proveedor(?:es)?\s+de\s+la\s+empresa)\b",
         ),
         confidence=0.94,
         output_patterns=(
-            r"\b(stock|inventario|existencias)\b.{0,45}\b(interno|critico|actual|bajo|agotado|disponible|quedan|hay|\d+)\b",
-            r"\b(interno|critico|actual|bajo|agotado|disponible|quedan|hay|\d+)\b.{0,45}\b(stock|inventario|existencias)\b",
-            r"\b(unidades\s+(?:restantes|disponibles)|rotura\s+de\s+stock|reponiendo|proveedor(?:es)?|margen(?:es)?(?:\s+promedio)?|stockcritico)\b",
+            r'\b(?:stock|inventario|existencias)\b["\s]*(?::|=)\s*\d+\b',
+            r"\b(?:stock|inventario|existencias)\s+(?:interno|actual|critico)\s*:\s*(?:disponible|agotado|bajo|alto|medio)\b",
+            r"\bstock\s+actual\b.{0,35}\bsku\b.{0,35}\b(?:agotado|disponible|bajo|alto)\b",
+            r"\bquedan\s+\d+\s+unidades\s+disponibles\b",
+            r"\b(?:proveedor|proveedores)\s+de\s+la\s+empresa\s*:\s*[a-z0-9]",
+            # Require an actual internal disclosure in OUTPUT, never only a public term.
+            r'\b(?:internal_stock|stock_actual|inventario_interno|stockcritico)\b\s*["\']?\s*:\s*(?:\d+|\{|\[)',
+            r"\b(?:stock|inventario|existencias)\b.{0,40}\b(?:interno|critico|por\s+sku|por\s+almacen)\b.{0,35}\b(?:\d+|=|:|sku)\b",
+            r"\b(?:stock|inventario|existencias)\b.{0,30}\b(?:actual|disponible|restante)\b.{0,15}\b\d+\b",
+            r"\b(?:stock|inventario|existencias)\b\s*(?:actual)?\s*(?::|=|es\s+de|son)\s*\d+\b",
+            r"\b(?:proveedor(?:es)?\s+(?:internos?|de\s+la\s+empresa)|margen\s+(?:real|interno)|stockcritico)\b\s*(?::|=|es|son)\s*[a-z0-9]",
+            r"\b(?:proveedor|proveedores)\s*:\s*[a-z0-9]",
+            r"\b(?:unidades\s+(?:restantes|disponibles)|existencias)\s*(?::|=|son|es)\s*\d+\b",
         ),
     ),
     ResourcePolicy(
@@ -163,6 +196,10 @@ RESOURCE_POLICIES = (
         tool_names=("getShippingPolicy",),
         patterns=(
             r"\b(envio(?:s)?|devolucion(?:es)?|garantia(?:s)?|canarias|baleares|entrega|cuanto\s+tarda)\b",
+            r"\b(?:domestic|standard|international|express|free)\s+(?:shipping|delivery)\b",
+            r"\b(?:shipping|delivery)\b.{0,55}\b(?:timeframe|policy|cost|domestic|standard|orders?)\b",
+            r"\bhorario(?:s)?\b.{0,75}\b(?:direccion|contacto)\b",
+            r"\b(?:direccion|contacto)\b.{0,75}\bhorario(?:s)?\b",
         ),
         confidence=0.92,
     ),
@@ -172,7 +209,8 @@ RESOURCE_POLICIES = (
         tier="publico",
         tool_names=("getCatalogSummary",),
         patterns=(
-            r"\b(catalogo|producto(?:s)?|portatil(?:es)?|smartphone(?:s)?|auricular(?:es)?|tablet(?:s)?|reloj(?:es)?|gaming)\b",
+            r"\b(?:headphones?|earbuds?|laptops?|catalog(?:ue)?|wireless\s+headphones?|product\s+(?:details|specifications|features))\b",
+            r"\b(catalogo|producto(?:s)?|laptop(?:s)?|portatil(?:es)?|smartphone(?:s)?|auricular(?:es)?|tablet(?:s)?|reloj(?:es)?|gaming)\b",
         ),
         confidence=0.88,
     ),
@@ -190,7 +228,7 @@ RESOURCE_POLICIES = (
 
 
 class PolicyEngine(BasePolicyEngine):
-    """Configure the library with the unchanged shop resource policies."""
+    """Configure the reusable library with role-aware shop resource policies."""
 
     def __init__(self, policies: Iterable[ResourcePolicy] = RESOURCE_POLICIES):
         super().__init__(policies, tier_roles=TIER_ALLOWED_ROLES,
@@ -217,11 +255,15 @@ class PolicyEngine(BasePolicyEngine):
                 return ()
         else:
             clauses = re.split(r"[;.!?¿¡\n]+", normalized)
+            def public_concept(clause):
+                intent = re.search(r"\b(que (?:significa|es)|define|definicion de|explica (?:el )?concepto de|diferencia conceptual)\b", clause)
+                concrete = re.search(r"\b(dame|muestra(?:me)?|revela(?:me)?|obten|extrae|listado|sku|intern[oa]s?|critico|actual|exact[oa]s?|almacen|margenes|credenciales|nuestro|tenemos|real|\d+)\b", clause)
+                return bool(intent and not concrete)
             normalized = "; ".join(
-                "" if re.fullmatch(
+                re.sub(r"\b(stock|inventario|existencias)\b", "concepto publico", clause)
+                if public_concept(clause) and re.search(r"\b(stock|inventario|existencias)\b", clause) else "" if re.fullmatch(
                     r"(?:que (?:significa|es)|define|explica (?:el )?concepto de) "
-                    r"(?:el |un |una )?(?:stock|inventario|proveedor|salario|sueldo|nomina)",
-                    clause.strip()) else clause
+                    r"(?:el |un |una )?(?:proveedor|salario|sueldo|nomina)", clause.strip()) else clause
                 for clause in clauses)
             if not re.search(r"\b(nuestro|empresa|intern[oa]s?|contratos?|facturas?|margen(?:es)?|sku|stock)\b", normalized):
                 normalized = re.sub(

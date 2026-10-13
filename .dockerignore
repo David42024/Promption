@@ -1,5 +1,6 @@
 # Python
 .venv/
+.venv-review/
 venv/
 env/
 __pycache__/
@@ -21,6 +22,10 @@ data/processed/*
 !data/processed/split_manifest.json
 !data/processed/translation_links.json
 data/embeddings*.npy
+data/embeddings*.metadata.json
+data/results/backups/
+data/results/spanish-retrain-*/
+data/results/validation/
 data/pdf_payloads/
 data/audio_payloads/
 data/results/history/

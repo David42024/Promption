@@ -22,7 +22,24 @@ def _secret_entropy_ok(value: str) -> bool:
     )
 
 
-_VALIDATORS = {"entropy": _entropy_ok, "secret_entropy": _secret_entropy_ok}
+def _credential_like(value: str) -> bool:
+    """Avoid classifying ordinary prose after 'clave:' as a password.
+
+    This is an additional condition, not a replacement for fixed-prefix
+    secret formats and the protected-values exact match.
+    """
+    if len(value) < 12:
+        return False
+    return any(c.isalpha() for c in value) and any(c.isdigit() for c in value) and (
+        "_" in value or "-" in value or any(c.isupper() for c in value)
+    )
+
+
+_VALIDATORS = {
+    "entropy": _entropy_ok,
+    "secret_entropy": _secret_entropy_ok,
+    "credential_like": _credential_like,
+}
 
 def _norm(entry: tuple) -> tuple:
     name, cat, sev, pat, conf, whole = entry[:6]

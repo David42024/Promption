@@ -160,7 +160,7 @@ class BenchmarkRunner:
         "heuristic_executed", "heuristic_decision", "heuristic_error",
         "ml_executed", "ml_status", "ml_decision", "ml_error",
         "scope_executed", "scope_decision", "scope_latency_ms", "scope_error",
-        "policy_decision",
+        "ensemble_decision", "requires_output_guard", "policy_decision",
         "output_guard_executed", "output_guard_action", "output_guard_latency_ms", "output_guard_error",
         "layer_error",
         # Resultado
@@ -175,7 +175,7 @@ class BenchmarkRunner:
         "provider_error", "timeout", "cancelled",
         # LLM
         "requested_model", "actual_model",
-        "provider_calls", "fallback_count",
+        "provider_calls", "provider_retries", "fallback_count",
         "prompt_tokens", "completion_tokens", "total_tokens",
         "generation_latency_ms", "total_latency_ms",
     ]
@@ -230,11 +230,19 @@ class BenchmarkRunner:
             "benign_non_secret_interventions": 0,
         }
         token_stats = {"input": 0, "output": 0, "total": 0, "calls": 0, "attempted_calls": 0}
+        known_tokens = {"input": 0, "output": 0, "total": 0}
+        complete_tokens = {name: True for name in known_tokens}
+        accounted_attempts = 0
 
         def record_llm_call(response):
-            token_stats["input"] += int(getattr(response, "input_tokens", 0) or 0)
-            token_stats["output"] += int(getattr(response, "output_tokens", 0) or 0)
-            token_stats["total"] += int(getattr(response, "total_tokens", 0) or 0)
+            nonlocal accounted_attempts
+            accounted_attempts += getattr(response, "provider_calls", 1) or 0
+            for name, attribute in (("input", "input_tokens"), ("output", "output_tokens"), ("total", "total_tokens")):
+                value = getattr(response, attribute, None)
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                    known_tokens[name] += value
+                else:
+                    complete_tokens[name] = False
             token_stats["calls"] += 1
 
         def evaluate_guard(response_text: str, is_attack: bool):
@@ -281,14 +289,24 @@ class BenchmarkRunner:
                 try:
                     sc_res = self.opts.scope_evaluator(row["prompt"], row=row)
                     scope_lat = (time.perf_counter() - t_sc0) * 1000
-                    sc_dec = sc_res.get("decision", "ALLOWED") if isinstance(sc_res, dict) else str(sc_res)
-                    scope_decision = "BLOCKED" if sc_dec.upper() in ("BLOCKED", "DENIED") else "ALLOWED"
+                    sc_dec = sc_res.get("decision", "UNCERTAIN") if isinstance(sc_res, dict) else str(sc_res)
+                    sc_normalized = str(sc_dec).upper()
+                    if sc_normalized in ("BLOCKED", "DENIED"):
+                        scope_decision = "BLOCKED"
+                    elif sc_normalized in ("ALLOWED", "PASS"):
+                        scope_decision = "ALLOWED"
+                    else:
+                        # Unexpected/ambiguous scope result is not an authorization grant.
+                        scope_decision = "UNCERTAIN"
                 except Exception as sc_exc:
                     scope_lat = (time.perf_counter() - t_sc0) * 1000
                     scope_decision = "UNCERTAIN"
                     scope_err = str(sc_exc)
 
-            policy_decision = "BLOCKED" if (res.blocked or scope_decision == "BLOCKED") else "ALLOWED"
+            # Preserve the three-state ensemble decision. Scope failures/unknown
+            # results deny generation instead of silently authorizing the request.
+            scope_denied = scope_executed and scope_decision != "ALLOWED"
+            policy_decision = "BLOCKED" if scope_denied else res.decision
 
             no_filter = np.nan
             with_filter = None
@@ -307,6 +325,18 @@ class BenchmarkRunner:
             protected_cancelled = 0
             actual_model = requested_model
             provider_calls = 0
+            provider_retries = 0
+
+            def account_internal_attempts(response_or_error):
+                # The client may retry empty, token-budget-exhausted output.
+                # Count underlying HTTP attempts rather than just generate() calls.
+                nonlocal provider_calls, provider_retries
+                internal_attempts = max(1, int(getattr(response_or_error, "provider_calls", 1) or 1))
+                extra = internal_attempts - 1
+                provider_calls += extra
+                provider_retries += extra
+                token_stats["attempted_calls"] += extra
+
             row_input_tokens = None
             row_output_tokens = None
             row_total_tokens = None
@@ -328,6 +358,7 @@ class BenchmarkRunner:
                 token_stats["attempted_calls"] += 1
                 try:
                     r0 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
+                    account_internal_attempts(r0)
                     actual_model = getattr(r0, "model", requested_model) or requested_model
                     if getattr(r0, "ok", True) and getattr(r0, "text", "").strip():
                         record_llm_call(r0)
@@ -344,6 +375,7 @@ class BenchmarkRunner:
                         resp_raw = "(Respuesta invalida o vacia)"
                     llm_lat = getattr(r0, "latency_ms", np.nan)
                 except Exception as exc:
+                    account_internal_attempts(exc)
                     logger.warning("LLM call without filter failed: %s", exc)
                     no_filter = np.nan
                     secret_leaked_without_filter = np.nan
@@ -356,7 +388,7 @@ class BenchmarkRunner:
                         baseline_cancelled = 1
 
                 # 2. Con filtro (recorrido protegido r1, solo si pasó filtros de entrada y alcance)
-                if res.blocked or scope_decision == "BLOCKED":
+                if res.blocked or scope_denied:
                     with_filter = 0.0
                     secret_leaked_before = np.nan
                     secret_leaked_after = np.nan
@@ -367,6 +399,7 @@ class BenchmarkRunner:
                     token_stats["attempted_calls"] += 1
                     try:
                         r1 = self.ollama.generate(clean, system=SYSTEM_PROMPT)
+                        account_internal_attempts(r1)
                         actual_model = getattr(r1, "model", actual_model) or actual_model
                         if getattr(r1, "ok", True) and getattr(r1, "text", "").strip():
                             record_llm_call(r1)
@@ -391,6 +424,7 @@ class BenchmarkRunner:
                         r1_lat = getattr(r1, "latency_ms", 0.0)
                         llm_lat = max(llm_lat or 0.0, r1_lat) if llm_lat == llm_lat else r1_lat
                     except Exception as exc:
+                        account_internal_attempts(exc)
                         logger.warning("LLM call with filter failed: %s", exc)
                         with_filter = np.nan
                         secret_leaked_before = np.nan
@@ -406,7 +440,7 @@ class BenchmarkRunner:
             elif is_attack:
                 # Sin LLM: proxy determinista explícito (solo con use_llm=False)
                 no_filter = 1.0
-                blocked_input = bool(res.blocked or scope_decision == "BLOCKED")
+                blocked_input = bool(res.blocked or scope_denied)
                 with_filter = 0.0 if blocked_input else 1.0
                 resp_raw = "(proxy determinista)"
                 resp_filt = "(bloqueado por el filtro)" if blocked_input else "(proxy determinista)"
@@ -414,7 +448,7 @@ class BenchmarkRunner:
                 secret_leaked_before = np.nan
                 secret_leaked_after = np.nan
 
-            elif use_llm and not res.blocked and scope_decision != "BLOCKED":
+            elif use_llm and not res.blocked and not scope_denied:
                 generation_executed = 1
                 provider_calls += 1
                 no_filter = 0.0
@@ -422,6 +456,7 @@ class BenchmarkRunner:
                 token_stats["attempted_calls"] += 1
                 try:
                     r1 = self.ollama.generate(row["prompt"], system=SYSTEM_PROMPT)
+                    account_internal_attempts(r1)
                     actual_model = getattr(r1, "model", requested_model) or requested_model
                     if getattr(r1, "ok", True) and getattr(r1, "text", "").strip():
                         record_llm_call(r1)
@@ -441,6 +476,7 @@ class BenchmarkRunner:
                         protected_provider_error = 1
                     llm_lat = getattr(r1, "latency_ms", np.nan)
                 except Exception as exc:
+                    account_internal_attempts(exc)
                     logger.warning("Benign LLM call failed: %s", exc)
                     resp_raw = resp_filt = f"(Error de generacion: {exc.__class__.__name__})"
                     protected_provider_error = 1
@@ -467,11 +503,11 @@ class BenchmarkRunner:
                 secret_leaked_after = np.nan
 
             final_blocked = 1 if (
-                res.blocked or scope_decision == "BLOCKED" or (guard_action is not None and guard_action == Action.BLOCK)
+                res.blocked or scope_denied or (guard_action is not None and guard_action == Action.BLOCK)
             ) else 0
 
             block_reason = "input_filter" if res.blocked else (
-                "scope" if scope_decision == "BLOCKED" else (
+                "scope" if scope_denied else (
                     "output_guard" if (guard_action is not None and guard_action != Action.PASS) else "none"
                 )
             )
@@ -481,8 +517,10 @@ class BenchmarkRunner:
             timeout_occ = int(baseline_timeout or protected_timeout)
             cancelled_occ = int(baseline_cancelled or protected_cancelled)
 
+            # Offline proxy output is never a delivered LLM response.
             response_delivered = 1 if (
-                final_blocked == 0 and resp_filt and not protected_provider_error and resp_filt != BLOCK_MESSAGE
+                use_llm and final_blocked == 0 and resp_filt and not protected_provider_error
+                and resp_filt != BLOCK_MESSAGE
             ) else 0
 
             if is_attack:
@@ -503,7 +541,7 @@ class BenchmarkRunner:
                     secret_leaked_with_protection = np.nan
                     protection_evaluable = False
                 # 4. Bloqueo válido antes de generar (filtro de entrada o alcance) -> evaluable, false (0.0)
-                elif res.blocked or scope_decision == "BLOCKED":
+                elif res.blocked or scope_denied:
                     secret_leaked_with_protection = 0.0
                     protection_evaluable = True
                 # 5. Generación válida protegida inspeccionada sin fuga -> evaluable, false (0.0)
@@ -512,7 +550,7 @@ class BenchmarkRunner:
                     protection_evaluable = True
                 # 6. Modo proxy sin LLM
                 elif not use_llm:
-                    blocked_input = bool(res.blocked or scope_decision == "BLOCKED")
+                    blocked_input = bool(res.blocked or scope_denied)
                     secret_leaked_with_protection = 0.0 if blocked_input else np.nan
                     protection_evaluable = blocked_input
 
@@ -524,10 +562,18 @@ class BenchmarkRunner:
             partition = str(row.get("partition", self.opts.partition or "test"))
             manifest_hash = str(row.get("manifest_hash", self.opts.manifest_hash or "N/A"))
 
-            # ML metadata
-            ml_executed = res.ml is not None
-            ml_status = "SUCCESS" if ml_executed else ("SKIPPED" if not self.opts.use_ml else "UNAVAILABLE")
-            ml_dec = "BLOCKED" if (res.ml and res.ml.blocked) else ("ALLOWED" if ml_executed else None)
+            # Record the actual ML path, not a synthetic status inferred from
+            # whether a result exists (which loses failed/skipped distinctions).
+            ml_meta = res.merged_features if isinstance(res.merged_features, dict) else {}
+            ml_executed = bool(ml_meta.get("ml_attempted", res.ml is not None))
+            ml_status = ml_meta.get("ml_status") or (
+                "SUCCESS" if res.ml is not None else
+                ("SKIPPED_USER_DISABLED" if not self.opts.use_ml else "UNAVAILABLE")
+            )
+            ml_error_code = ml_meta.get("ml_error_code")
+            ml_dec = "BLOCKED" if (res.ml and res.ml.blocked) else (
+                "ALLOWED" if res.ml is not None else None
+            )
 
             rows.append({
                 # 21 columnas base obligatorias
@@ -564,17 +610,19 @@ class BenchmarkRunner:
                 "ml_executed": ml_executed,
                 "ml_status": ml_status,
                 "ml_decision": ml_dec,
-                "ml_error": None,
+                "ml_error": ml_error_code,
                 "scope_executed": scope_executed,
                 "scope_decision": scope_decision,
                 "scope_latency_ms": scope_lat,
                 "scope_error": scope_err,
+                "ensemble_decision": res.decision,
+                "requires_output_guard": bool(res.requires_output_guard),
                 "policy_decision": policy_decision,
                 "output_guard_executed": guard_executed,
                 "output_guard_action": guard_action,
                 "output_guard_latency_ms": guard_lat_ms,
                 "output_guard_error": None,
-                "layer_error": scope_err or None,
+                "layer_error": scope_err or ml_error_code or None,
                 "final_blocked": final_blocked,
                 "block_reason": block_reason,
                 "generation_executed": generation_executed,
@@ -596,6 +644,7 @@ class BenchmarkRunner:
                 "requested_model": requested_model,
                 "actual_model": actual_model,
                 "provider_calls": provider_calls,
+                "provider_retries": provider_retries,
                 "fallback_count": 0,
                 "prompt_tokens": row_input_tokens,
                 "completion_tokens": row_output_tokens,
@@ -619,6 +668,10 @@ class BenchmarkRunner:
         metrics["input_decisions"] = decision_counts
         metrics["input_decisions_by_label"] = decisions_by_label
         metrics["output_guard"] = guard_stats
+        for name in known_tokens:
+            token_stats[name] = known_tokens[name] if complete_tokens[name] and accounted_attempts == token_stats["attempted_calls"] else None
+        token_stats["known_usage"] = known_tokens
+        token_stats["usage_complete"] = all(complete_tokens.values()) and accounted_attempts == token_stats["attempted_calls"]
         metrics["tokens"] = token_stats
         metrics["by_dataset"] = by_dataset(out_df)
         metrics["by_attack_type"] = by_attack_type(out_df)

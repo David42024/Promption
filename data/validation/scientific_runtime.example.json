@@ -1,0 +1,15 @@
+{
+  "provider": "openai",
+  "model": "gpt-5-nano",
+  "tool_model": "gpt-5-nano",
+  "parameters": {},
+  "backend_version": "declarar version efectiva",
+  "sdk_version": "declarar version efectiva",
+  "next_version": "declarar version efectiva",
+  "mcp_data_sha256": "REEMPLAZAR_POR_SHA256_REAL",
+  "tenant_id": "tenant123.unitru",
+  "storage_backend": "sqlite",
+  "sqlite_db_path": "REEMPLAZAR_POR_RUTA_ABSOLUTA_DE_BD_DEDICADA",
+  "baseline_max_seconds": 900,
+  "deployment_attestation": "Adjuntar configuracion no secreta del proceso dedicado"
+}

@@ -7,6 +7,7 @@ import pandas as pd
 
 from promption.utils.config import load_config
 from promption.utils.logger import logger
+from promption.training.spanish_corpus import SOURCE as SPANISH_TRAIN_SOURCE
 
 SYNTH_SOURCES = {
     "redteam_synth", "hard_negative", "translated_es", "translated_es2",
@@ -15,6 +16,15 @@ SYNTH_SOURCES = {
 
 def create_splits(df: pd.DataFrame, seed: int = 42, test_frac: float = 0.15, val_frac: float = 0.15, external_sources: set = None) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Return train, val, test, external indices strictly stratified by label and language without group leakage."""
+    if "partition_scheme" in df and df.partition_scheme.eq("reviewed_connected_v1").all():
+        if "split" not in df or "group_id" not in df:
+            raise ValueError("Corrected partition schema is incomplete")
+        partitions = df["split"].replace({"validation": "val"})
+        if not partitions.isin(["train", "val", "test", "external"]).all():
+            raise ValueError("Invalid corrected partition")
+        if df.assign(split=partitions).groupby("group_id").split.nunique().gt(1).any():
+            raise ValueError("Corrected family crosses partitions")
+        return tuple(np.flatnonzero(partitions.eq(name).to_numpy()) for name in ("train", "val", "test", "external"))
     rng = np.random.RandomState(seed)
     if "group_id" not in df.columns:
         df["group_id"] = [str(i) for i in range(len(df))]
@@ -28,7 +38,9 @@ def create_splits(df: pd.DataFrame, seed: int = 42, test_frac: float = 0.15, val
     # Any group with at least one record from an external source belongs entirely to external
     grp_sources = df.groupby("group_id")["source"].unique().to_dict()
     ext_groups = {g for g, srcs in grp_sources.items() if any(str(s) in external_sources for s in srcs)}
-    int_groups = set(grp_sources.keys()) - ext_groups
+    train_only_groups = {g for g, srcs in grp_sources.items()
+                         if all(str(s) == SPANISH_TRAIN_SOURCE for s in srcs)} - ext_groups
+    int_groups = set(grp_sources.keys()) - ext_groups - train_only_groups
 
     ext_idx = np.flatnonzero(df["group_id"].isin(ext_groups).to_numpy())
 
@@ -63,9 +75,13 @@ def create_splits(df: pd.DataFrame, seed: int = 42, test_frac: float = 0.15, val
         val_parts.extend(indices[n_train:n_train + n_val])
         test_parts.extend(indices[n_train + n_val:])
 
-    train_groups = set(g_info.iloc[train_parts]["group_id"])
+    train_groups = set(g_info.iloc[train_parts]["group_id"]) | train_only_groups
     val_groups = set(g_info.iloc[val_parts]["group_id"])
     test_groups = set(g_info.iloc[test_parts]["group_id"])
+
+    translated_groups = set(df.loc[df.source.eq("translated_train_es_v1"), "group_id"])
+    if not translated_groups.issubset(train_groups):
+        raise ValueError("Spanish training translations include a holdout family")
 
     tr_idx = np.flatnonzero(df["group_id"].isin(train_groups).to_numpy())
     v_idx = np.flatnonzero(df["group_id"].isin(val_groups).to_numpy())

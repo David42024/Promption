@@ -31,6 +31,7 @@ from promption.training.split import create_splits, save_manifest
 from promption.training.artifacts import file_sha256, preserve_records
 from promption.utils.config import load_config
 from promption.utils.logger import logger
+from promption.training.spanish_translation import SOURCE
 
 _CONF = load_config()
 
@@ -94,17 +95,20 @@ def train_lightweight_model(df: pd.DataFrame, max_features: int = 10000) -> tupl
     return vectorizer, classifier, y
 
 
-def evaluate_model(vectorizer, classifier, df: pd.DataFrame, y_true):
+def evaluate_model(vectorizer, classifier, df: pd.DataFrame, y_true, threshold: float | None = None):
     """Evaluate the lightweight model."""
     X_test = vectorizer.transform(df["prompt"].tolist())
     
-    y_pred = classifier.predict(X_test)
-    y_proba = classifier.predict_proba(X_test)[:, 1]
+    threshold = float(threshold if threshold is not None else
+                      _CONF.get("ensemble", {}).get("decision_high_threshold", 0.66))
+    pos_idx = int(np.flatnonzero(classifier.classes_ == 1)[0])
+    y_proba = classifier.predict_proba(X_test)[:, pos_idx]
+    y_pred = (y_proba >= threshold).astype(int)
     
     acc = accuracy_score(y_true, y_pred)
     f1 = f1_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, zero_division=0)
+    recall = recall_score(y_true, y_pred, zero_division=0)
     
     try:
         auc = roc_auc_score(y_true, y_proba)
@@ -120,7 +124,7 @@ def evaluate_model(vectorizer, classifier, df: pd.DataFrame, y_true):
     logger.info("Recall: %.4f", recall)
     logger.info("ROC AUC: %.4f", auc)
     logger.info("=" * 60)
-    logger.info("\nClassification Report:\n%s", classification_report(y_true, y_pred))
+    logger.info("\nClassification Report:\n%s", classification_report(y_true, y_pred, zero_division=0))
     logger.info("=" * 60)
     
     # Estimar tamaño del modelo en disco
@@ -130,13 +134,37 @@ def evaluate_model(vectorizer, classifier, df: pd.DataFrame, y_true):
     
     logger.info("Estimated model size: %.2f MB", size_mb)
     
+    # Métricas por idioma
+    lang_metrics = {}
+    if "lang" in df.columns:
+        for lang in ("en", "es"):
+            mask = df["lang"].to_numpy() == lang
+            if mask.sum() >= 2 and len(set(y_true[mask])) > 1:
+                lang_acc = accuracy_score(y_true[mask], y_pred[mask])
+                lang_f1 = f1_score(y_true[mask], y_pred[mask], zero_division=0)
+                lang_precision = precision_score(y_true[mask], y_pred[mask], zero_division=0)
+                lang_recall = recall_score(y_true[mask], y_pred[mask], zero_division=0)
+                lang_fpr = float(np.mean(y_pred[mask][np.asarray(y_true[mask]) == 0])) if np.any(y_true[mask] == 0) else None
+                lang_metrics[lang] = {
+                    "n": int(mask.sum()),
+                    "accuracy": float(lang_acc),
+                    "f1": float(lang_f1),
+                    "precision": float(lang_precision),
+                    "recall": float(lang_recall),
+                    "FPR": lang_fpr
+                }
+    
     return {
         "accuracy": acc,
         "f1": f1,
         "precision": precision,
         "recall": recall,
         "auc": auc,
-        "size_mb": size_mb
+        "size_mb": size_mb,
+        "decision_threshold": threshold,
+        "false_positive_rate": float(np.mean(y_pred[np.asarray(y_true) == 0]))
+            if np.any(np.asarray(y_true) == 0) else None,
+        "language_metrics": lang_metrics
     }
 
 
@@ -196,6 +224,12 @@ def train(data_path: str | None = None, out_path: str | Path | None = None,
         "seed": int(_CONF["model"].get("random_state", 42)),
         "metrics": metrics,
         "val_metrics": val_metrics,
+        "training_distribution": train_df.groupby(["lang", "label"]).size()
+            .reset_index(name="count").to_dict(orient="records"),
+        "augmentation_source": "spanish_curated_train_v1" if
+            train_df["source"].eq("spanish_curated_train_v1").any() else None,
+        "translation_source": SOURCE if train_df["source"].eq(SOURCE).any() else None,
+        "translation_rows": int(train_df["source"].eq(SOURCE).sum()) if train_df["source"].eq(SOURCE).any() else None,
     }
     target.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     results = Path(_CONF["paths"]["results"])

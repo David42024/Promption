@@ -29,11 +29,14 @@ class ConversationDecision:
     message_count: int = 0
     tool_message_count: int = 0
     reason: str = "conversation_checked"
+    first_veto_layer: str | None = None
+    first_veto_reason: str | None = None
 
     def metadata(self) -> dict:
         return {"blocked": self.blocked, "requires_output_guard": self.requires_output_guard,
                 "matched_rules": self.matched_rules, "message_count": self.message_count,
-                "tool_message_count": self.tool_message_count, "reason": self.reason}
+                "tool_message_count": self.tool_message_count, "reason": self.reason,
+                "first_veto_layer": self.first_veto_layer, "first_veto_reason": self.first_veto_reason}
 
 
 def normalize_content(text: str) -> str:
@@ -170,10 +173,16 @@ class ConversationGuard:
         for text in views:
             heuristic = self.input_filter.heuristic.analyze(text, roles=roles)
             if heuristic.blocked:
+                if decision.first_veto_layer is None:
+                    decision.first_veto_layer = "heuristic"
+                    decision.first_veto_reason = heuristic.matched_rules[0]["name"] if heuristic.matched_rules else "heuristic_veto"
                 decision.blocked = True
                 decision.matched_rules.extend(rule["name"] for rule in heuristic.matched_rules)
             for name, pattern in self.rules:
                 if pattern.search(text):
+                    if decision.first_veto_layer is None:
+                        decision.first_veto_layer = "conversation_guard"
+                        decision.first_veto_reason = name
                     decision.blocked = True
                     decision.matched_rules.append(name)
         if not decision.blocked and views:
@@ -183,6 +192,8 @@ class ConversationGuard:
             decision.blocked |= result.blocked
             decision.requires_output_guard |= result.requires_output_guard
             if result.blocked:
+                decision.first_veto_layer = "ml" if result.ml and result.ml.blocked else "ensemble"
+                decision.first_veto_reason = "conversation_ml" if result.ml and result.ml.blocked else "ensemble_veto"
                 decision.matched_rules.extend(rule["name"] for rule in result.heuristic.matched_rules)
                 if result.ml and result.ml.blocked:
                     decision.matched_rules.append("conversation_ml")

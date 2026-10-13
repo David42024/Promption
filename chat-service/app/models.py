@@ -198,6 +198,7 @@ class ChatResponse(BaseModel):
     blocked: bool = False
     reply: str = ""
     leaked: bool = False
+    leak_assessment: str = "not_evaluated"
     audit: List[MCPToolCall] = Field(default_factory=list)
     actions: List[Dict[str, Any]] = Field(default_factory=list)
     guard: str = "SKIPPED"
@@ -211,6 +212,9 @@ class ChatResponse(BaseModel):
     reason: Optional[str] = None  # Campo para el frontend cuando está bloqueado
     confidence: Optional[float] = None  # Campo para el frontend cuando está bloqueado
     block_type: Optional[str] = None
+    guard_direction: Optional[Literal["input", "output"]] = None
+    guard_reason: Optional[str] = None
+    guard_policy_id: Optional[str] = None
     policy: Optional[PolicyInfo] = None
     security_classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
     scope: Optional[Dict[str, Any]] = None

@@ -6,6 +6,9 @@ import { trustedAIRequest } from "../../../../lib/ai/trusted.js";
 import { aiFailure } from "../../../../lib/ai/errors.mjs";
 import { getModelProviderOptions, validateModelConfiguration } from "../../../../lib/ai/modelOptions.js";
 import { MetricsAggregator } from "../../../../lib/ai/metrics.js";
+import { providerUsage } from "../../../../lib/ai/providerUsage.js";
+
+import { finalContentText } from "../../../../lib/ai/finalContent.js";
 
 export const maxDuration = 300;
 export const runtime = "nodejs";
@@ -116,7 +119,9 @@ export async function POST(request) {
     const scopeModelId = process.env.OPENAI_MODEL;
     const scopeProviderOptions = getModelProviderOptions(scopeModelId);
     const trackingScopeModel = createTrackingModel(provider(scopeModelId), () => { scopeCalls++; });
-    const trackingGenerationModel = createTrackingModel(provider(body.model), () => { generationCalls++; });
+    const trackingGenerationModel = createTrackingModel(provider(body.model), () => { generationCalls++; }, usage => {
+      aggregator.addCall({ callType: 'generation', calls: 1, ...providerUsage(usage), eventId: `generation-provider-${generationCalls}` });
+    });
     const model = wrapLanguageModel({
       model: trackingGenerationModel,
       middleware: promptionMiddleware(identity, body.original_text, controller.signal, body.security_messages,
@@ -154,7 +159,7 @@ export async function POST(request) {
     let text, toolCalls, finishReason, rawUsage;
     try {
       [text, toolCalls, finishReason, rawUsage] = await Promise.all([
-        result.text, result.toolCalls, result.finishReason,
+        Promise.resolve(result.content).then(parts => parts === undefined ? result.text : finalContentText(parts)), result.toolCalls, result.finishReason,
         Promise.resolve(result.usage).catch(() => null),
       ]);
     } catch (err) {
@@ -166,7 +171,7 @@ export async function POST(request) {
       aggregator.addCall({ callType: "scope", calls: 1, hasUsage: false });
     }
 
-    if (generationCalls > 0) {
+    if (generationCalls > aggregator.generationCalls) {
       const inputTok = rawUsage?.inputTokens ?? rawUsage?.promptTokens ?? null;
       const outputTok = rawUsage?.outputTokens ?? rawUsage?.completionTokens ?? null;
       const totalTok = rawUsage?.totalTokens ?? null;
@@ -179,7 +184,7 @@ export async function POST(request) {
       ));
       aggregator.addCall({
         callType: "generation",
-        calls: generationCalls,
+        calls: generationCalls - aggregator.generationCalls,
         promptTokens: typeof inputTok === "number" ? inputTok : null,
         completionTokens: typeof outputTok === "number" ? outputTok : null,
         totalTokens: typeof totalTok === "number" ? totalTok : null,
@@ -245,9 +250,9 @@ export async function POST(request) {
       headers: { "x-request-id": requestId },
     });
   } catch (error) {
-    const { code, status, reason, scope } = aiFailure(error, { signal: request.signal, aborted: request.signal?.aborted });
+    const { code, status, reason, scope, direction, policyId } = aiFailure(error, { signal: request.signal, aborted: request.signal?.aborted });
     console.warn("AI turn failed", { requestId, code, status, model: body.model,
-      guardReason: reason, scopeReason: scope?.reason,
+      guardReason: reason, scopeReason: scope?.reason, direction, policyId,
       errorType: error.name, providerStatus: error.statusCode });
 
     while (aggregator.scopeCalls < scopeCalls) {
@@ -261,12 +266,14 @@ export async function POST(request) {
     return Response.json({
       error: status === 403 ? "Promption bloqueó la respuesta" : "No se pudo generar la respuesta",
       code, ...(reason ? { reason } : {}), ...(scope ? { scope } : {}),
+      ...(direction ? { direction } : {}), ...(policyId ? { policy_id: policyId } : {}),
       provider_calls: errSummary.provider_calls,
       scope_calls: errSummary.scope_calls,
       generation_calls: errSummary.generation_calls,
       usage: null,
       known_usage: errSummary.known_usage,
       usage_coverage: errSummary.usage_coverage,
+      failed_calls: errSummary.failed_calls,
       request_id: requestId,
     }, { status, headers: { "x-request-id": requestId } });
   } finally {

@@ -17,6 +17,10 @@ app = FastAPI(
 @app.on_event("startup")
 def _startup_chat_service_validation() -> None:
     validate_chat_service_configuration()
+    from .security_state import _store
+    state = _store.backend.get_state()
+    if not state.get("filter_enabled", True) or not state.get("output_guard_enabled", True):
+        _store.update("reset", None, "startup_security_restore")
 
 
 @app.on_event("shutdown")

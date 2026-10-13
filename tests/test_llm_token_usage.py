@@ -16,7 +16,7 @@ class _Response:
         }
 
 
-def test_openai_compatible_client_captures_hidden_reasoning_tokens(monkeypatch):
+def test_openai_compatible_client_does_not_invent_reasoning_tokens(monkeypatch):
     monkeypatch.setattr("src.llm.openai_client.requests.post", lambda *args, **kwargs: _Response())
     client = OpenAICompatibleClient(
         host="https://example.test/v1",
@@ -28,5 +28,5 @@ def test_openai_compatible_client_captures_hidden_reasoning_tokens(monkeypatch):
 
     assert response.input_tokens == 15
     assert response.output_tokens == 1
-    assert response.reasoning_tokens == 56
+    assert response.reasoning_tokens is None
     assert response.total_tokens == 72

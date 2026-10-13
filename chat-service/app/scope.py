@@ -4,6 +4,7 @@ from contextvars import ContextVar
 
 import httpx
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -56,21 +57,54 @@ async def _evaluate(request: dict) -> dict:
     req_id = context["request_id"] if context else request.get("request_id") or ""
     if context:
         context["system_prompt"] = request["system_prompt"]
-    async with asyncio.timeout(timeout):
-        response = await client.post(url, json={
+    started = time.perf_counter()
+    attempts = 0
+    def diagnostic(status=None, error_type=None):
+        return {"component": "scope_bridge", "http_status": status,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                "request_id": req_id, "attempts": attempts, "error_type": error_type,
+                "recovered": attempts > 1 and error_type is None}
+    try:
+        async with asyncio.timeout(timeout):
+            payload = {
             "text": request["text"], "system_prompt": request["system_prompt"],
             "messages": request["messages"], "identity": request["identity"],
             **({"tool": request["tool"]} if "tool" in request else {}),
             **({"request_id": req_id} if req_id else {}),
             "timeout_ms": max(1, int(timeout * 1000) - min(250, int(timeout * 100))),
             **(scope_bridge_context() if context else {}),
-        }, headers={"X-Chat-Service-Token": settings.chat_service_token, "X-Request-ID": req_id}, timeout=timeout)
+            }
+            for attempt in range(2):
+                attempts += 1
+                try:
+                    response = await client.post(url, json=payload,
+                        headers={"X-Chat-Service-Token": settings.chat_service_token, "X-Request-ID": req_id},
+                        timeout=max(0.001, timeout - (time.perf_counter() - started)))
+                    break
+                except (httpx.ConnectError, httpx.ConnectTimeout):
+                    if attempt or time.perf_counter() - started >= timeout - 0.05:
+                        raise
+                    await asyncio.sleep(0.05)
+    except (TimeoutError, httpx.TimeoutException):
+        logger.warning("Scope classifier timed out request_id=%s", req_id)
+        return {"classification": "UNCERTAIN", "reason": "scope_timeout", "provider_calls": 0,
+                "provider_calls_known": False, "diagnostics": diagnostic(error_type="timeout")}
+    except httpx.RequestError as exc:
+        logger.warning("Scope classifier transport error request_id=%s exception=%s", req_id, type(exc).__name__)
+        return {"classification": "UNCERTAIN", "reason": "scope_unavailable", "provider_calls": 0,
+                "provider_calls_known": isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)),
+                "diagnostics": diagnostic(error_type=type(exc).__name__)}
     try:
         data = response.json()
     except (ValueError, TypeError):
-        return {"classification": "UNCERTAIN", "reason": "invalid_scope_response", "provider_calls": 0}
+        return {"classification": "UNCERTAIN", "reason": "invalid_scope_response", "provider_calls": 0,
+                "provider_calls_known": False, "diagnostics": diagnostic(response.status_code, "invalid_json")}
     if not isinstance(data, dict):
-        return {"classification": "UNCERTAIN", "reason": "invalid_scope_response", "provider_calls": 0}
+        return {"classification": "UNCERTAIN", "reason": "invalid_scope_response", "provider_calls": 0,
+                "provider_calls_known": False, "diagnostics": diagnostic(response.status_code, "invalid_contract")}
+    data["diagnostics"] = diagnostic(response.status_code)
+    if not isinstance(data.get("provider_calls"), int):
+        data["provider_calls_known"] = False
     if response.status_code >= 400:
         logger.warning("Scope evaluation failed request_id=%s http_status=%s reason=%s",
                        req_id, response.status_code,

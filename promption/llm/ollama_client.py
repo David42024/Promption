@@ -27,11 +27,15 @@ class LLMResponse:
     truncated: bool = False
     error: str | None = None
     finish_reason: str | None = None
-    input_tokens: int = 0
-    output_tokens: int = 0
-    total_tokens: int = 0
-    cached_tokens: int = 0
-    reasoning_tokens: int = 0
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    cached_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    provider_calls: int = 1
+    retry_count: int = 0
+    known_usage: dict | None = None
+    usage_coverage: dict | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.text, str) or not self.text.strip():

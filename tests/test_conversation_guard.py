@@ -187,6 +187,7 @@ def test_conversation_api_rejects_forged_system_origin_and_oversized_evidence(mo
 
 
 def test_chat_blocks_tool_fragment_before_the_next_model_call(monkeypatch):
+    monkeypatch.setattr(routes, "tools_for_request", lambda specs, **kwargs: specs)
     class FakeTools:
         tools = []
         async def available(self, roles, authenticated):
@@ -248,6 +249,7 @@ def test_aliases_defined_together_are_resolved_in_later_turns(guard):
 
 
 def test_generated_arguments_cannot_complete_attack_before_tool_side_effect(monkeypatch):
+    monkeypatch.setattr(routes, "tools_for_request", lambda specs, **kwargs: specs)
     class FakeTools:
         tools = []
         async def available(self, roles, authenticated):

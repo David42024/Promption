@@ -191,7 +191,7 @@ def test_document_action_requires_confirmation_for_confidential_scope(monkeypatc
 
     monkeypatch.setattr(routes, "get_filter_client", lambda: Filter())
     monkeypatch.setattr(routes, "get_llm_client", lambda: LLM())
-    request = ChatRequest(text="Dame el reporte mensual de facturación", user=User(
+    request = ChatRequest(text="Genera un archivo con el reporte mensual de facturación", user=User(
         id="a1", name="Admin", email="a@example.com", roles=["admin"], authenticated=True))
     response = asyncio.run(routes.chat(request))
     assert response.actions[0]["type"] == "attachment"

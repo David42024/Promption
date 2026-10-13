@@ -1,0 +1,16 @@
+{
+  "model": "gpt-5-nano",
+  "provider_calls": 73,
+  "rows": 1319,
+  "selected_rows": 1812,
+  "errors": 10,
+  "known_usage": {
+    "prompt_tokens": 235643,
+    "completion_tokens": 331154,
+    "total_tokens": 566797
+  },
+  "usage_complete": true,
+  "total_tokens": 566797,
+  "elapsed_seconds": 810.063000000082,
+  "source_manifest_hash": "997ad0b07e2ff8aca25f88f096f1bec65ff7792f2ab341a1de8cc402e33894c2"
+}

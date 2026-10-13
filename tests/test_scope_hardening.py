@@ -199,6 +199,7 @@ def test_initial_mcp_read_is_reused_but_scope_and_output_guards_still_run(monkey
     from test_chat_capabilities import configure, Filter, request
     from app import routes
     from app.mcp_tools import MCPToolExecutor
+    monkeypatch.setattr(routes, "tools_for_request", lambda specs, **kwargs: specs)
     client = Filter()
     configure(monkeypatch, client)
     executor = MCPToolExecutor()

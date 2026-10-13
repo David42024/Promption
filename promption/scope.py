@@ -2,7 +2,7 @@
 import asyncio
 import inspect
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Callable, Literal
 
 
@@ -17,6 +17,8 @@ class ScopeDecision:
     completion_tokens: int | None = None
     total_tokens: int | None = None
     reasoning_tokens: int | None = None
+    provider_calls_known: bool = True
+    diagnostics: dict = field(default_factory=dict)
 
     @property
     def allowed(self) -> bool:
@@ -55,7 +57,10 @@ def _validated(result) -> ScopeDecision:
                               504 if data["reason"] == "scope_timeout" else
                               503 if data["reason"] in {"scope_unavailable", "invalid_scope_response"} else 403),
         model=model, provider_calls=calls,
-        prompt_tokens=p_tok, completion_tokens=c_tok, total_tokens=t_tok, reasoning_tokens=r_tok
+        prompt_tokens=p_tok, completion_tokens=c_tok, total_tokens=t_tok, reasoning_tokens=r_tok,
+        provider_calls_known=data.get("provider_calls_known", True) is True,
+        diagnostics={k: v for k, v in (data.get("diagnostics") if isinstance(data.get("diagnostics"), dict) else {}).items()
+                     if k in {"component", "http_status", "duration_ms", "request_id", "attempts", "error_type", "recovered"}}
     )
 
 

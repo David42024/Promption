@@ -39,6 +39,10 @@ def _read_csv(path: Path, required: tuple[str, ...]) -> pd.DataFrame:
 
 
 def load_raw_data(data_dir: str | None = None) -> pd.DataFrame:
+    reviewed = _CONF["paths"].get("reviewed_dataset")
+    if data_dir is None and reviewed:
+        from promption.training.reviewed_dataset import load_reviewed_dataset
+        return load_reviewed_dataset(Path(reviewed))
     raw = Path(data_dir or _CONF["paths"]["raw_data"])
     mal = _read_csv(raw / "malicious_prompts.csv", MAL_COLS)
     ben = _read_csv(raw / "benign_prompts.csv", BEN_COLS)
@@ -66,14 +70,44 @@ def load_raw_data(data_dir: str | None = None) -> pd.DataFrame:
     ben["attack_type"] = "benign"
     ben["source"] = ben["source"].fillna("local").astype(str)
 
-    df = pd.concat([mal, ben], ignore_index=True)
+    frames = [mal, ben]
+    augmentation_path = raw / "spanish_augmentation.csv"
+    if augmentation_path.exists():
+        from promption.training.spanish_corpus import SOURCE
+        augmentation = pd.read_csv(augmentation_path, encoding="utf-8")
+        required = {"prompt", "label", "dataset", "attack_type", "category", "source", "lang", "family_id"}
+        if not required.issubset(augmentation.columns):
+            raise ValueError("Spanish augmentation is missing required provenance columns")
+        if (not augmentation["label"].isin([0, 1]).all()
+                or not augmentation["source"].eq(SOURCE).all()
+                or not augmentation["lang"].eq("es").all()
+                or augmentation[["prompt", "family_id"]].isna().any().any()
+                or augmentation["family_id"].str.strip().eq("").any()
+                or augmentation.groupby("family_id")["label"].nunique().gt(1).any()):
+            raise ValueError("Invalid Spanish augmentation labels or family provenance")
+        frames.append(augmentation[list(required)])
+    df = pd.concat(frames, ignore_index=True)
     df["prompt"] = df["prompt"].astype(str).str.strip()
     df = df[df["prompt"].str.len() > 0].drop_duplicates(subset=["prompt"], keep="first").reset_index(drop=True)
-    df["lang"] = df["prompt"].map(detect_lang)
+    detected = df["prompt"].map(detect_lang)
+    if "lang" in df.columns:
+        df["lang"] = df["lang"].where(df["lang"].isin(["es", "en"]), detected)
+    else:
+        df["lang"] = detected
     df["group_id"] = _resolve_group_ids(df)
+    translations_path = raw / "spanish_translations.csv"
+    if translations_path.exists():
+        from promption.training.spanish_translation import validate_translations
+        translations = pd.read_csv(translations_path, encoding="utf-8")
+        origins = apply_quarantine(apply_label_overrides(df))
+        validate_translations(translations, origins)
+        df = pd.concat([df, translations], ignore_index=True)
+        if df.prompt.duplicated().any():
+            raise ValueError("Spanish translations duplicate an existing prompt")
     cols = ["prompt", "label", "attack_type", "category", "dataset", "source", "lang", "group_id"]
     if "family_id" in df.columns:
         cols.append("family_id")
+    cols.extend(c for c in ("original_prompt_sha256", "original_source", "translation_model") if c in df.columns)
     return df[cols]
 
 
@@ -102,6 +136,8 @@ def _resolve_group_ids(df: pd.DataFrame, processed_dir: str | None = None) -> pd
 
 
 def apply_quarantine(df: pd.DataFrame, processed_dir: str | None = None) -> pd.DataFrame:
+    if df.attrs.get("reviewed_authoritative"):
+        return df
     """Excluye filas en data/processed/quarantine.csv (ruido de etiqueta auditado)."""
     qpath = Path(processed_dir or _CONF["paths"]["processed_data"]) / "quarantine.csv"
     if not qpath.exists():
@@ -115,6 +151,8 @@ def apply_quarantine(df: pd.DataFrame, processed_dir: str | None = None) -> pd.D
 
 def apply_label_overrides(df: pd.DataFrame, processed_dir: str | None = None) -> pd.DataFrame:
     """Apply reviewed label corrections identified by prompt SHA-256."""
+    if df.attrs.get("reviewed_authoritative"):
+        return df
     path = Path(processed_dir or _CONF["paths"]["processed_data"]) / "label_overrides.csv"
     if not path.exists():
         return df
@@ -158,6 +196,8 @@ def load_training_data(processed_dir: str | None = None) -> pd.DataFrame:
     if not path.exists():
         path = prepare_training_data()
     df = pd.read_csv(path, encoding="utf-8")
+    if _CONF["paths"].get("reviewed_dataset") and processed_dir is None:
+        df.attrs["reviewed_authoritative"] = True
     if "lang" not in df.columns:  # CSVs generados antes de la columna lang
         df["lang"] = df["prompt"].map(detect_lang)
     df["group_id"] = _resolve_group_ids(df, processed_dir)

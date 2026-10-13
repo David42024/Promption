@@ -113,7 +113,9 @@ export function createPromption(config) {
     }
     config.onDecision?.({ direction: options.direction, allowed: result.allowed,
       action: result.action, userId: identity.userId });
-    if (!result.allowed) throw new PromptionError("CONTENT_BLOCKED", { direction: options.direction });
+    if (!result.allowed) throw new PromptionError("CONTENT_BLOCKED", { direction: options.direction,
+      reason: ['malicious_input', 'insufficient_scope', 'sensitive_output'].includes(result.reason) ? result.reason : undefined,
+      policyId: result.policy_id });
     return result.text;
   }
 

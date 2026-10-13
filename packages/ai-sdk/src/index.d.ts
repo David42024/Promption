@@ -125,7 +125,9 @@ export class PromptionError extends Error {
   status: number;
   direction?: Direction;
   scope?: ScopeDecision;
-  constructor(code: string, options?: { status?: number; direction?: Direction; cause?: unknown });
+  reason?: string;
+  policyId?: string;
+  constructor(code: string, options?: { status?: number; direction?: Direction; reason?: string; policyId?: string; cause?: unknown });
 }
 export function createFilterApiTransport(options: FilterApiOptions): GuardTransport;
 export function createGuardEndpointTransport(options: GuardEndpointOptions): GuardTransport;
