@@ -50,7 +50,9 @@ export function aiFailure(error, options = {}) {
       ? { classification: target.scope.classification, reason: target.scope.reason,
         allowed: target.scope.classification === 'IN_SCOPE',
         status: [200, 403, 503, 504].includes(target.scope.status) ? target.scope.status : status } : undefined;
-    return { code, status, reason, scope };
+    const direction = ['input', 'output'].includes(target.direction) ? target.direction : undefined;
+    const policyId = typeof target.policyId === 'string' && /^[a-zA-Z0-9_.-]{1,96}$/.test(target.policyId) ? target.policyId : undefined;
+    return { code, status, reason, scope, ...(direction ? { direction } : {}), ...(policyId ? { policyId } : {}) };
   }
 
   if (operationalCodes.has(target?.code)) {

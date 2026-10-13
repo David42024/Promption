@@ -80,7 +80,7 @@ class MetricsAggregator:
             total_tokens=total_tokens if total_tokens is not None else None,
             reasoning_tokens=reasoning_tokens if reasoning_tokens is not None else None,
             has_usage=bool(has_usage),
-            metadata=metadata or {},
+            metadata={**(metadata or {}), "failed": bool(failed)},
         )
         self._events[event_id] = evt
         return True
@@ -106,6 +106,36 @@ class MetricsAggregator:
         self.generation_calls += generation
         self.failed_calls += failed
         return True
+
+    def diagnostic_ledger(self, limit: int = 64) -> dict:
+        """Return bounded metadata-only evidence; remote summaries remain aggregates.
+
+        Never invent call identity or provider token consumption when an upstream
+        bridge reported only a summary. No prompts, tool arguments or secrets.
+        """
+        events = []
+        for event in list(self._events.values())[:limit]:
+            events.append({
+                "stage": event.call_type,
+                "attempts": event.provider_calls,
+                "failed": event.metadata.get("failed", False),
+                "known_fields": {name: getattr(event, name) is not None for name in
+                    ("prompt_tokens", "completion_tokens", "total_tokens", "reasoning_tokens")},
+            })
+        for remote in list(self._summaries.values())[:max(0, limit - len(events))]:
+            events.append({
+                "stage": "remote_summary",
+                "attempts": remote.get("provider_calls", 0),
+                "failed_attempts": remote.get("failed_calls", 0),
+                "usage_coverage": remote.get("usage_coverage", {}),
+                "individual_calls_available": False,
+                "transport_attempt": {key: value for key, value in remote.get("attempt_metadata", {}).items()
+                    if key in {"model", "operation", "request_id", "transport_started", "transport_completed",
+                               "transport_failed", "duration_ms"}},
+            })
+        return {"events": events,
+                "truncated": len(self._events) + len(self._summaries) > limit,
+                "individual_remote_attempts_missing": bool(self._summaries)}
 
     def summary(self) -> Dict[str, Any]:
         """Compute the metrics summary with totals, subtotals, and coverage breakdown."""

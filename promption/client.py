@@ -34,7 +34,16 @@ async def _post_with_rate_limit_retry(
     for attempt in range(3):
         if max_budget is not None and (asyncio.get_event_loop().time() - start) >= max_budget:
             raise FilterRateLimited("Rate limit retry budget exhausted")
-        response = await client.post(url, **kwargs)
+        try:
+            response = await client.post(url, **kwargs)
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError):
+            if attempt == 2:
+                raise
+            delay = 0.10 * (attempt + 1)
+            if max_budget is not None and (asyncio.get_event_loop().time() - start + delay) >= max_budget:
+                raise
+            await asyncio.sleep(delay)
+            continue
         if response.status_code != 429 or attempt == 2:
             return response
         delay = _retry_delay(response, attempt)
@@ -142,8 +151,8 @@ class FilterClient:
         except FilterRateLimited:
             raise
         except Exception as e:
-            logger.warning("Filter client error: %s", e)
-            raise Exception(f"Filter API error: {str(e)}")
+            logger.warning("Filter client error type=%s", type(e).__name__)
+            raise RuntimeError("Filter API unavailable or returned an invalid response") from e
     
     async def output_guard(
         self,

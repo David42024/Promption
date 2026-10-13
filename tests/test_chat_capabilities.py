@@ -210,11 +210,12 @@ def test_capabilities_never_bypass_input_or_output_guard(monkeypatch, input_bloc
 def test_guard_denial_reports_only_safe_direction_reason_and_policy_metadata(monkeypatch):
     client = Filter()
     configure(monkeypatch, client)
-    text = 'No puedo consultar el stock interno con esta sesión.'
+    text = 'Stock interno: 125 unidades.'
     with pytest.raises(HTTPException) as error:
         asyncio.run(routes.ai_guard(AIGuardRequest(text=text, user_id='guest', roles=['guest'], direction='output')))
     assert error.value.status_code == 403
-    assert error.value.detail == {'code': 'CONTENT_BLOCKED', 'direction': 'output', 'reason': 'insufficient_scope'}
+    assert error.value.detail == {'code': 'CONTENT_BLOCKED', 'direction': 'output',
+                                 'reason': 'insufficient_scope', 'policy_id': 'internal.stock'}
     assert client.events[0]['details']['policy_id'] == 'internal.stock'
     assert text not in str(client.events)
 

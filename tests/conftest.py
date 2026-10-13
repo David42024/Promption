@@ -9,10 +9,20 @@ if str(ROOT) not in sys.path:
 
 
 @pytest.fixture(autouse=True)
+def _isolate_auth_registry(monkeypatch, request):
+    """Offline tests must not inherit real credentials loaded from a developer's .env."""
+    if request.node.get_closest_marker('live_llm'):
+        return
+    for name in ('PROMPTION_API_KEYS', 'PIF_API_KEYS', 'PROMPTION_ADMIN_API_KEYS',
+                 'PROMPTION_API_KEY', 'PROMPTION_TENANT_ID', 'PROMPTION_DEMO_MODE'):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _reset_singletons():
     """The MLFilter is a process-wide singleton; reset between tests to avoid
     cross-test state (fake encoders vs real model)."""
-    from src.filter.ml_filter import MLFilter
+    from promption.filter.ml_filter import MLFilter
     from promption.filter.ml_filter_lightweight import LightMLFilter
     from promption.limiter import get_rate_limiter_backend
     MLFilter._instance = None

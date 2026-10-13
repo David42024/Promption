@@ -23,11 +23,13 @@ class GuardDecision:
     requires_output_guard: bool = False
     conversation_checked: bool = False
     scope: dict | None = None
+    policy_id: str | None = None
 
     def to_dict(self) -> dict:
         return {"allowed": self.allowed, "text": self.text, "action": self.action,
                 "reason": self.reason, "requires_output_guard": self.requires_output_guard,
-                "conversation_checked": self.conversation_checked, "scope": self.scope}
+                "conversation_checked": self.conversation_checked, "scope": self.scope,
+                "policy_id": self.policy_id}
 
 
 def _field(result: Any, key: str, default: Any = None) -> Any:
@@ -186,8 +188,10 @@ class AsyncGuardPipeline:
             raise ValueError("Guard direction and text are required")
         if self.policy:
             evaluate = self.policy.evaluate if direction == "input" else self.policy.evaluate_output
-            if not evaluate(text, identity.roles).allowed:
-                return GuardDecision(False, "", "BLOCK", "insufficient_scope", 403)
+            policy_decision = evaluate(text, identity.roles)
+            if not policy_decision.allowed:
+                return GuardDecision(False, "", "BLOCK", "insufficient_scope", 403,
+                                     policy_id=getattr(policy_decision, "policy_id", None))
         enabled = input_enabled if direction == "input" else output_enabled
         if not enabled and not (direction == "input" and self.scope_guard):
             return GuardDecision(True, text, "SKIPPED")

@@ -39,10 +39,16 @@ data/processed/*
 data/embeddings*.npy
 data/pdf_payloads/
 data/audio_payloads/
-data/results/history/
-data/results/plots/
-data/results/backups/
-# (payloads in data/raw y resultados de ejemplo se versionan)
+# Resultados de benchmark — todo el directorio (runs, logs, CSVs generados)
+data/results/
+
+# Backups y archivos comprimidos
+exports/
+*.rar
+*.zip
+*.7z
+*.tar
+*.gz
 
 # Tests / reports / logs
 .pytest_cache/
@@ -63,10 +69,68 @@ reports/*.md
 .DS_Store
 Thumbs.db
 
-# Env
+# Env and secrets
 .env
+.env.*
 *.env
+*.env.local
+*.local
+.secrets/
+secrets/
+*.secret
+*.secrets
+*.key
+*.token
+*.pem
+*.credentials
+credentials.json
+credentials.local.json
+data/validation/credentials.json
+config/secrets.yaml
+config/*.local.yaml
 
 # Frontend (demo Next.js)
 node_modules/
 .next/
+
+# Archivos de auditoria e informes temporales generados en la raiz
+ARTICLE_READY_RESULTS.md
+ATTACK_OUTCOME_REVIEW.csv
+AUDITORIA_OFFLINE_*.json
+BENIGN_RESPONSE_REVIEW.csv
+BLIND_REVIEW_PACKET.csv
+CAMBIOS_V*.diff
+CHANGELOG_CORRECTIONS.md
+CASOS_PRIORITARIOS_*.csv
+EFFICIENCY_RESULTS.csv
+EVALUACION_OFFLINE_*.csv
+EXPERIMENT_MANIFEST.json
+FINAL_VALIDATION_REPORT.md
+FINAL_VERDICT.md
+FUNCTIONAL_QUALITY_SUMMARY.md
+FUNCTIONAL_RESULTS.csv
+HOLDOUT_INVENTORY.csv
+HOLDOUT_READINESS.md
+INFORME_CORRECCIONES_*.md
+INFORME_MODIFICACIONES_*.md
+LIMITATIONS.md
+MANIFESTO_SHA256.json
+MANIFESTO_V*.json
+SECURITY_RESULTS.csv
+SHA256_CAMBIOS_V*.txt
+STATISTICAL_RESULTS.md
+TECHNICAL_ERRORS.csv
+
+# Directorios temporales de trabajo y runs con timestamp
+s/
+scratch/
+*-integration-*/
+*-v[0-9]-*/
+
+# Archivos scratch sueltos en la raiz
+scratch_*.txt
+scratch_*.json
+
+# Manifiestos de integridad (generados por el agente)
+MANIFIESTO_*.json
+

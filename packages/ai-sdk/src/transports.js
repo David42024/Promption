@@ -31,6 +31,7 @@ async function request(url, body, headers, config, signal) {
         direction: ["input", "output"].includes(detail?.direction) ? detail.direction : undefined,
         reason: ["malicious_input", "insufficient_scope", "sensitive_output"].includes(detail?.reason)
           ? detail.reason : undefined,
+        policyId: detail?.policy_id,
       });
     }
     return await response.json();

@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from promption import AsyncGuardPipeline, Identity, ScopeDecision, input_guard_decision, output_guard_decision
 from promption.conversation_guard import ConversationGuard, ConversationLimitError
 from promption.metrics_aggregator import MetricsAggregator
+from promption.outcomes import decision_outcome, TECHNICAL_REASONS
 from promption.client import FilterRateLimited
 from promption.llm.exceptions import (
     LLMConfigurationError,
@@ -46,6 +47,12 @@ from .policy_engine import (
     normalize_text,
 )
 from .lib.shop import SECRET_MARKERS, build_system_prompt
+from .attachment_claims import _FILE_CLAIM, _repair_unverified_attachment_reply
+from .confidentiality import assess_delivered_markers
+from .business_grounding import enforce_shipping_threshold
+from .tool_progress import verified_tool_fallback
+from .tool_selection import tools_for_request
+from .verified_answers import verified_simple_answer
 from .security_state import get_security_state, update_security_state
 from .scope import get_scope_guard, begin_scope_request
 from promption.tools.runtime import capabilities, web_search, web_open, WEB_ROLES
@@ -208,10 +215,6 @@ def _capabilities_csv(tool_specs: list[dict], business_policies: list) -> tuple[
     return output.getvalue(), highest_tier
 
 
-_FILE_CLAIM = re.compile(
-    r"(?i)\b(?:prepar[eé]|gener[eé]|adjunt[eé]|cre[eé]|listo|ya est[aá])\b"
-    r".{0,120}\b(?:archivo|documento|pdf|csv|txt|docx|excel|xlsx|word)\b"
-)
 
 
 def _report_progress(stage: str):
@@ -492,14 +495,21 @@ async def ai_guard(request: AIGuardRequest):
         messages=[message.model_dump() for message in request.messages])
     if not decision.allowed:
         code = "CONTENT_BLOCKED" if decision.status == 403 else "GUARD_UNAVAILABLE"
+        rule_ids = []
+        if request.direction == 'output' and decision.policy_id:
+            from promption.policies import normalize_text
+            normalized = normalize_text(request.text)
+            for policy in get_policy_engine().policies:
+                if policy.policy_id == decision.policy_id:
+                    rule_ids = [index for index, pattern in enumerate(policy.output_patterns or policy.patterns)
+                                if re.search(pattern, normalized)]
         await client.audit_event(event_type="ai_guard_denied",
             identity=Identity(user_id=request.user_id, roles=[role.value for role in request.roles]), level="WARNING",
             details={"direction": request.direction, "reason": decision.reason, "code": code,
-                     "policy_id": (get_policy_engine().evaluate_output(request.text,
-                         [role.value for role in request.roles]).policy_id
-                         if request.direction == "output" and decision.reason == "insufficient_scope" else None)})
+                     "policy_id": decision.policy_id, "rule_ids": rule_ids})
         raise HTTPException(status_code=decision.status,
-                            detail={"code": code, "direction": request.direction, "reason": decision.reason})
+                            detail={"code": code, "direction": request.direction, "reason": decision.reason,
+                                    "policy_id": decision.policy_id})
     return decision.to_dict()
 
 
@@ -507,8 +517,15 @@ async def ai_guard(request: AIGuardRequest):
 async def check_scope(request: ScopeCheckRequest):
     """Report semantic scope against application-owned instructions, never client policies."""
     user_roles = _user_roles(request.user)
+    request_policy = get_policy_engine().evaluate(request.text, user_roles)
+    if not request_policy.allowed:
+        # Scope evaluation is never a way to override the business ACL.
+        return ScopeDecision("OUT_OF_SCOPE", "system_limit", 403).to_dict()
+    active_policy = ({"policy_id": str(request_policy.policy_id), "tier": str(request_policy.tier),
+                      "tool_names": tuple(request_policy.tool_names)} if request_policy.allowed else None)
     system_prompt = build_system_prompt({"name": request.user.name, "id": request.user.id,
-                                         "roles": user_roles, "authenticated": request.user.authenticated})
+                                         "roles": user_roles, "authenticated": request.user.authenticated},
+                                        active_policy=active_policy)
     decision = await get_scope_guard().check(request.text, system_prompt=system_prompt,
         identity=Identity(request.user.id, tuple(user_roles), request.user.authenticated),
         messages=[message.model_dump() for message in request.messages])
@@ -580,8 +597,10 @@ class ExecutionContext:
             "input_filter": {"status": "skipped", "latency_ms": None},
             "conversation_guard": {"status": "skipped", "latency_ms": None},
             "scope": {"status": "skipped", "latency_ms": None},
+            "rbac": {"status": "skipped", "latency_ms": None},
             "generation": {"status": "skipped", "latency_ms": None},
             "tools": {"status": "skipped", "latency_ms": None},
+            "tool_guard": {"status": "skipped", "latency_ms": None},
             "output_guard": {"status": "skipped", "latency_ms": None},
         }
         self.eval_counts = {
@@ -598,6 +617,10 @@ class ExecutionContext:
         self.requested_model = None
         self.effective_model = None
         self.scope_model = None
+        self.provider_calls_unknown = False
+        self.first_veto_layer = None
+        self.first_veto_reason = None
+        self.tool_guard_events = []
         self.tools_executed = False
 
     @property
@@ -657,7 +680,9 @@ class ExecutionContext:
         r: int | None = None,
         failed: bool = False,
         event_id: str | None = None,
+        provider_calls_known: bool = True,
     ):
+        self.provider_calls_unknown |= not provider_calls_known
         has_usage = any(isinstance(x, int) for x in (p, c, t, r))
         self.aggregator.add_call(
             call_type="scope",
@@ -728,6 +753,7 @@ class ExecutionContext:
     def record_stage(self, stage: str, status: str, latency_ms: float | None = None):
         if stage in self.stages:
             self.stages[stage]["status"] = status
+            self.stages[stage]["executed"] = status != "skipped"
             if latency_ms is not None:
                 self.stages[stage]["latency_ms"] = round((self.stages[stage]["latency_ms"] or 0) + latency_ms, 2)
 
@@ -743,22 +769,43 @@ class ExecutionContext:
             "call_type": "tool" if has_tool else "chat",
             "generation_calls": summary["generation_calls"],
             "scope_calls": summary["scope_calls"],
-            "provider_calls": summary["provider_calls"],
+            "provider_calls": None if self.provider_calls_unknown else summary["provider_calls"],
+            "observed_provider_calls": summary["provider_calls"],
+            "provider_calls_known": not self.provider_calls_unknown,
             "failed_calls": summary["failed_calls"],
             "fallback_count": self.fallback_count,
             "fallback_reason": self.fallback_reason,
             "prompt_tokens": summary["prompt_tokens"],
             "completion_tokens": summary["completion_tokens"],
-            "total_tokens": summary["total_tokens"],
+            "total_tokens": None if self.provider_calls_unknown else summary["total_tokens"],
             "reasoning_tokens": summary["reasoning_tokens"],
             "known_usage": summary["known_usage"],
-            "usage_coverage": summary["usage_coverage"],
+            "usage_coverage": {**summary["usage_coverage"],
+                "is_complete": summary["usage_coverage"]["is_complete"] and not self.provider_calls_unknown,
+                "provider_calls_known": not self.provider_calls_unknown},
+            "call_ledger": self.aggregator.diagnostic_ledger(),
+            "tool_guard_events": self.tool_guard_events,
             "filter_status": self.stages["input_filter"]["status"],
             "output_guard_status": self.stages["output_guard"]["status"],
             "stages": self.stages,
             "stage_latencies_ms": {k: v["latency_ms"] for k, v in self.stages.items() if v["latency_ms"] is not None},
             "total_latency_ms": round(total_lat, 2),
         }
+
+
+async def _execute_mcp(ctx, executor, name, arguments, roles, *, authenticated):
+    """Record actual MCP authorization without exposing returned data."""
+    started = time.perf_counter()
+    try:
+        result = await executor.execute(name, arguments, roles, authenticated=authenticated)
+    except Exception:
+        ctx.record_stage("tool_guard", "failed", (time.perf_counter() - started) * 1000)
+        ctx.tool_guard_events.append({"tool": name, "outcome": "error"})
+        raise
+    allowed = result.get("audit", {}).get("allowed")
+    ctx.record_stage("tool_guard", "executed", (time.perf_counter() - started) * 1000)
+    ctx.tool_guard_events.append({"tool": name, "outcome": "allowed" if allowed is True else "blocked"})
+    return result
 
 
 def _make_response(
@@ -777,6 +824,7 @@ def _make_response(
     actions: list[dict] | None = None,
     filter_layers: dict | None = None,
     leaked: bool = False,
+    leak_assessment: str = "not_evaluated",
     role: str = "customer",
     model: str = "",
     filter_enabled: bool = True,
@@ -784,11 +832,36 @@ def _make_response(
     filter_skipped: bool = False,
     output_guard_skipped: bool = False,
 ) -> ChatResponse:
+    outcome_data = {"blocked": blocked, "reason": reason, "block_type": block_type, "scope": scope}
+    outcome = decision_outcome(outcome_data)
+    layer = {"conversation": "conversation_guard", "attack": "input_filter",
+             "scope": "scope", "authorization": "rbac", "output_guard": "output_guard",
+             "filter_unavailable": "input_filter", "model_guard": "generation"}.get(block_type)
+    if reason == "tool_access_denied":
+        layer = "tool_guard"
+    if layer and blocked:
+        ctx.stages[layer]["outcome"] = "error" if outcome == "TECHNICAL_FAILURE" else "blocked"
+    leaf_layers = {}
+    if isinstance(filter_layers, dict):
+        for name in ("heuristic", "ml", "ensemble"):
+            value = filter_layers.get(name)
+            if isinstance(value, dict):
+                status = str(value.get("status", "executed"))
+                executed = not status.startswith("SKIPPED") and status != "UNKNOWN"
+                leaf_layers[name] = {"executed": executed, "status": status,
+                    "raw_blocked": value.get("blocked"), "decision": value.get("decision"),
+                    "error_code": value.get("error_code")}
     metrics = ctx.build_metrics(actions=actions, audit=audit)
+    metrics.update(decision_outcome=outcome,
+                   first_veto_layer=(ctx.first_veto_layer or layer) if blocked and outcome != "TECHNICAL_FAILURE" else None,
+                   first_veto_reason=(ctx.first_veto_reason or reason) if blocked and outcome != "TECHNICAL_FAILURE" else None,
+                   technical_failure_stage=layer if outcome == "TECHNICAL_FAILURE" else None,
+                   input_layer_evidence=leaf_layers)
     return ChatResponse(
         blocked=blocked,
         reply=reply,
         leaked=leaked,
+        leak_assessment=leak_assessment,
         audit=audit or [],
         actions=actions or [],
         guard=guard,
@@ -868,7 +941,11 @@ async def _chat_internal(
         ctx.record_stage("input_filter", "running")
         try:
             contextual = _conversation_guard.analyze(security_messages, roles=user_roles, use_ml=False)
+            ctx.record_stage("conversation_guard", "executed", (time.perf_counter() - t_f) * 1000)
+            ctx.stages["conversation_guard"]["outcome"] = "blocked" if contextual.blocked else "allowed"
             if contextual.blocked:
+                ctx.first_veto_layer = getattr(contextual, "first_veto_layer", None)
+                ctx.first_veto_reason = getattr(contextual, "first_veto_reason", None)
                 ctx.record_stage("conversation_guard", "executed", (time.perf_counter() - t_f) * 1000)
                 ctx.record_stage("input_filter", "executed", (time.perf_counter() - t_f) * 1000)
                 return _make_response(ctx, blocked=True,
@@ -966,6 +1043,8 @@ async def _chat_internal(
 
     policy_decision = policy_engine.evaluate(request.text, user_roles)
     policy_info = PolicyInfo(**policy_decision.to_dict())
+    ctx.record_stage("rbac", "executed")
+    ctx.stages["rbac"]["outcome"] = "allowed" if policy_decision.allowed else "blocked"
     if not policy_decision.allowed:
         logger.warning(
             "Authorization denied user=%s roles=%s policy=%s tier=%s resource=%s",
@@ -990,8 +1069,11 @@ async def _chat_internal(
             security_classification=security_classification,
         )
 
+    active_policy = {"policy_id": str(policy_decision.policy_id), "tier": str(policy_decision.tier),
+                     "tool_names": tuple(policy_decision.tool_names)}
     system_prompt = build_system_prompt({"name": request.user.name, "id": request.user.id,
-                                         "roles": user_roles, "authenticated": request.user.authenticated})
+                                         "roles": user_roles, "authenticated": request.user.authenticated},
+                                        active_policy=active_policy)
     _report_progress("Revisando alcance de la solicitud…")
     scope_timeout = budget.remaining_for_step(settings.llm_provider_timeout_seconds, "scope_guard")
     sg = _call_get_scope_guard(timeout_seconds=scope_timeout)
@@ -1011,6 +1093,7 @@ async def _chat_internal(
         getattr(scope, "total_tokens", None),
         getattr(scope, "reasoning_tokens", None),
         event_id=f"scope-{ctx.scope_calls + 1}",
+        provider_calls_known=getattr(scope, "provider_calls_known", True),
     )
     _scope_decision.set(scope)
     if not scope.allowed:
@@ -1039,7 +1122,7 @@ async def _chat_internal(
             ctx.eval_counts["tool"] += 1
             ctx.tools_executed = True
             t_tool = time.perf_counter()
-            tool_response = await mcp_executor.execute(tool_name, {}, user_roles,
+            tool_response = await _execute_mcp(ctx, mcp_executor, tool_name, {}, user_roles,
                                                  authenticated=request.user.authenticated)
             ctx.record_stage("tools", "executed", (time.perf_counter() - t_tool) * 1000)
             tool_audit = tool_response.get("audit", {})
@@ -1118,19 +1201,32 @@ async def _chat_internal(
     permitted_specs = capabilities(user_roles, request.user.authenticated,
                                    await mcp_executor.available(user_roles, request.user.authenticated),
                                    authorized_docs)
-    tool_specs = permitted_specs
-    if (policy_decision.tier not in {"publico", "unclassified"} or history_protected or not filter_enabled
-        or not security_state["output_guard_enabled"]):
-        tool_specs = [spec for spec in tool_specs if spec["function"]["name"] not in {"web_search", "web_open"}]
+    normalized_request = normalize_text(request.text)
+    file_requested = bool(_FILE_REQUEST.search(normalized_request))
+    tool_specs = tools_for_request(
+        permitted_specs, policy_tools=policy_decision.tool_names,
+        fetched=(name for name, _ in authorized_contexts), file_requested=file_requested,
+        has_documents=bool(authorized_docs),
+        capabilities_question=is_capabilities_question(request.text),
+        web_requested=bool(re.search(r"\b(?:buscar|busca|consulta|search|look\s+up)\b.{0,35}\b(?:internet|web|online)\b", normalized_request)),
+        allow_interactive=not bool(authorized_contexts),
+        public_only=(policy_decision.tier in {"publico", "unclassified"}
+                     and not history_protected and filter_enabled
+                     and security_state["output_guard_enabled"]),
+    )
     model_id = None
     highest_tier = policy_decision.tier
     allowed_urls = set(re.findall(r"https://[^\s<>\"']+", request.text))
     reply = ""
-    normalized_request = normalize_text(request.text)
-    file_requested = bool(_FILE_REQUEST.search(normalized_request))
     if file_requested and any(model["id"] == "openai-tools" for model in getattr(llm_client, "models", [])):
         model_id = "openai-tools"
     forced_document = False
+    tool_no_progress = False
+    # Always defined, including greeting/capability responses without tool turns.
+    executed_tool_cache: dict[str, Any] = {f"{name}:{{}}": result for name, result in authorized_contexts}
+    direct_answer = verified_simple_answer(
+        request.text, policy_id=policy_decision.policy_id, roles=user_roles,
+        authenticated=request.user.authenticated, sources=authorized_contexts)
     try:
         capability_report = (
             file_requested and re.search(r"(?i)\b(?:xlsx|excel)\b", request.text)
@@ -1139,9 +1235,14 @@ async def _chat_internal(
         )
         if is_capabilities_question(request.text):
             await _review_conversation(security_messages, request, filter_client, filter_enabled)
-            reply = describe_capabilities(tool_specs,
+            reply = describe_capabilities(permitted_specs,
                 authenticated=request.user.authenticated and "guest" not in user_roles)
             model_name = "Promption"
+            ctx.effective_model = model_name
+        elif direct_answer is not None:
+            await _review_conversation(security_messages, request, filter_client, filter_enabled)
+            reply = direct_answer
+            model_name = "Promption / verified MCP"
             ctx.effective_model = model_name
         elif capability_report:
             _report_progress("Generando archivo…")
@@ -1161,7 +1262,7 @@ async def _chat_internal(
             _report_progress("Ejecutando herramienta MCP: make_document…")
             ctx.tools_executed = True
             ctx.eval_counts["tool"] += 1
-            executed = await mcp_executor.execute(
+            executed = await _execute_mcp(ctx, mcp_executor,
                 "make_document",
                 {"title": "Mis capacidades en Promption Shop", "content": content,
                  "format": "xlsx"},
@@ -1274,7 +1375,19 @@ async def _chat_internal(
                 current_turn_signatures = [_sig_for_call(c) for c in calls]
                 if current_turn_signatures and current_turn_signatures == last_turn_signatures:
                     logger.warning("Tool loop without progress detected: %s", current_turn_signatures)
-                    reply = turn["text"] or "No se pudieron obtener resultados adicionales con las herramientas solicitadas."
+                    # Tool execution remains bounded. This is a functional failure, not a security success.
+                    tool_no_progress = True
+                    available_evidence = list(authorized_contexts)
+                    # Repeated tool responses are verified against per-turn audit before reuse.
+                    for signature, value in executed_tool_cache.items():
+                        if not isinstance(signature, str) or ':' not in signature:
+                            continue
+                        candidate_name = signature.split(':', 1)[0]
+                        if any(item.allowed and item.tool == candidate_name for item in audit):
+                            available_evidence.append((candidate_name, value))
+                    reply = verified_tool_fallback(request.text, available_evidence) or (
+                        "No pude completar esta consulta con las herramientas disponibles. "
+                        "La operación no se considera finalizada; puedes intentar de nuevo.")
                     break
                 last_turn_signatures = current_turn_signatures
                 if turn["provider"] == "gemini":
@@ -1321,6 +1434,7 @@ async def _chat_internal(
                             getattr(operation_scope, "total_tokens", None),
                             getattr(operation_scope, "reasoning_tokens", None),
                             event_id=f"scope-tool-{call_id}",
+                            provider_calls_known=getattr(operation_scope, "provider_calls_known", True),
                         )
                         if not operation_scope.allowed:
                             _scope_decision.set(operation_scope)
@@ -1404,7 +1518,7 @@ async def _chat_internal(
                             if not checked_content.allowed:
                                 raise ValueError("Documento bloqueado por Output Guard")
                             content = checked_content.text
-                            executed = await mcp_executor.execute(
+                            executed = await _execute_mcp(ctx, mcp_executor,
                                 name, {"title": args.get("title"), "content": content,
                                        "format": args.get("format")}, user_roles,
                                  authenticated=request.user.authenticated)
@@ -1421,7 +1535,7 @@ async def _chat_internal(
                             executed_signatures.add(tool_sig)
                         else:
                             _report_progress(f"Ejecutando herramienta MCP: {name}…")
-                            executed = await mcp_executor.execute(name, args, user_roles,
+                            executed = await _execute_mcp(ctx, mcp_executor, name, args, user_roles,
                                                             authenticated=request.user.authenticated)
                             if not executed["audit"]["allowed"]:
                                 raise ValueError("Permiso de herramienta denegado")
@@ -1475,14 +1589,14 @@ async def _chat_internal(
     except AIGuardBlocked as exc:
         imported = ctx.import_llm_events(exc, "generation-error")
         if imported and getattr(exc, "generation_calls", 0) > 0:
-            ctx.record_stage("generation", "failed")
+            ctx.record_stage("generation", "guard_denied")
         calls = getattr(exc, "provider_calls", None)
         if calls is None:
             calls = 1
         if calls > 0 and not imported:
             ctx.failed_calls += calls
             ctx.generation_calls += calls
-            ctx.record_stage("generation", "failed")
+            ctx.record_stage("generation", "guard_denied")
         scope = exc.scope
         if isinstance(scope, dict):
             usage = scope.get("usage")
@@ -1506,10 +1620,15 @@ async def _chat_internal(
                 reply=("La revisión de alcance bloqueó la operación propuesta. Reformula la solicitud.")
                     if exc.code == "OUT_OF_SCOPE" else
                     "No pude verificar el alcance de la operación propuesta. Inténtalo nuevamente.",
-                role=primary_role, audit=audit, policy=policy_info, security_classification=security_classification)
-        return _make_response(ctx, blocked=True, block_type="model_guard", reason=exc.code.lower(),
+                role=primary_role, audit=audit, policy=policy_info, security_classification=security_classification,
+                scope=scope)
+        response = _make_response(ctx, blocked=True, block_type="model_guard", reason=exc.code.lower(),
             reply="Promption no pudo autorizar la operación propuesta por el modelo.",
             role=primary_role, audit=audit, policy=policy_info, security_classification=security_classification)
+        response.guard_direction = exc.direction
+        response.guard_reason = exc.reason
+        response.guard_policy_id = exc.policy_id
+        return response
     except ScopeBlocked as exc:
         return _make_response(ctx, blocked=True,
             reply="La herramienta propuesta excede el alcance de esta solicitud y fue bloqueada.",
@@ -1610,9 +1729,20 @@ async def _chat_internal(
             detail={"error": "Error del proveedor LLM", "code": "MODEL_UNAVAILABLE"},
         ) from exc
 
-    if not any(action["type"] in {"attachment", "existing_document"} for action in actions):
-        if file_requested or _FILE_CLAIM.search(reply):
-            reply = "No pude adjuntar un archivo en esta respuesta. Inténtalo nuevamente."
+    reply, attachment_unavailable = _repair_unverified_attachment_reply(
+        reply, requested=file_requested,
+        verified=any(action["type"] in {"attachment", "existing_document"} for action in actions),
+    )
+    # Verify high-impact numeric claims against authorized MCP evidence before Output Guard.
+    shipping_evidence = next((result for name, result in authorized_contexts
+                              if name == "getShippingPolicy" and isinstance(result, dict)), None)
+    if shipping_evidence is None:
+        shipping_evidence = next((value for key, value in executed_tool_cache.items()
+                                  if isinstance(key, str) and key.startswith("getShippingPolicy:")
+                                  and isinstance(value, dict)), None)
+    reply, grounding_repairs = enforce_shipping_threshold(reply, shipping_evidence)
+    if grounding_repairs:
+        logger.info("Corrected unsupported shipping threshold claims count=%s", len(grounding_repairs))
 
     _report_progress("Verificando respuesta…")
     # 5. Output Guard
@@ -1707,21 +1837,31 @@ async def _chat_internal(
         )
 
     # 6. Check for unauthorized secret leakage.
-    leaked = _contains_secret(reply) and not _allowed_confidential_reply(
-        roles=user_roles,
-        audit=audit,
-        policy=policy_info,
-    )
+    verified_tool_results = {}
+    # Only tool results that were actually retrieved and audited in this turn.
+    for audited in audit:
+        if audited.allowed and audited.tool in {"getPromotions", "getEmployees", "getKPIStats", "getVIPClients"}:
+            matching = [value for signature, value in executed_tool_cache.items()
+                        if isinstance(signature, str) and signature.startswith(audited.tool + ":")]
+            if matching:
+                verified_tool_results[audited.tool] = matching[-1]
+    for tool_name, tool_result in authorized_contexts:
+        if any(item.allowed and item.tool == tool_name for item in audit):
+            verified_tool_results.setdefault(tool_name, tool_result)
+    leaked, leak_assessment = assess_delivered_markers(
+        reply, roles=user_roles, audit=audit,
+        provenance=verified_tool_results, output_allowed=output_policy.allowed)
+
 
     # 7. Add warning if filter was disabled
-    if not filter_enabled:
-        reply += "\n\n⚠️ (Nota del sistema: esta respuesta ha sido generada SIN filtro de entrada ni output guard. En producción, el filtro está activado y este contenido habría sido bloqueado.)"
 
     response = _make_response(
         ctx,
         blocked=False,
         reply=reply,
         leaked=leaked,
+        leak_assessment=leak_assessment,
+        reason="attachment_unavailable" if attachment_unavailable else ("tool_no_progress" if tool_no_progress else None),
         guard=guard_result.get("action", "SKIPPED") if guard_result else "SKIPPED",
         filter_enabled=filter_enabled,
         output_guard_enabled=output_guard_enabled,

@@ -113,7 +113,8 @@ async def test_chat_endpoint_strictly_bounds_total_budget():
         await asyncio.sleep(1.2)
         return routes.ChatResponse(reply="tarde")
 
-    with patch.object(routes, "_chat_internal", side_effect=stalling_internal):
+    with patch.object(routes, "_chat_internal", side_effect=stalling_internal), \
+         patch.object(routes, "get_filter_client", return_value=AsyncMock()):
         t0 = time.monotonic()
         with pytest.raises(HTTPException) as exc_info:
             await routes.chat(req, deadline=budget)

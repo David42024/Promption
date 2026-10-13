@@ -18,6 +18,7 @@ from promption.utils.logger import logger
 _CONF = load_config()
 _EMBED_MODEL = _CONF["model"]["embedding_model"]
 _EMBED_PREFIX = str(_CONF["model"].get("embedding_prefix", "") or "")
+_EMBED_REVISION = _CONF["model"].get("embedding_revision")
 _CLS_PATH = _CONF["paths"]["classifier"]
 
 
@@ -131,7 +132,8 @@ class MLFilter:
             logger.info("Loading embedding model '%s'…", _EMBED_MODEL)
             try:
                 from sentence_transformers import SentenceTransformer
-                self._encoder = SentenceTransformer(_EMBED_MODEL)
+                self._encoder = SentenceTransformer(_EMBED_MODEL,
+                    **({"revision": _EMBED_REVISION} if _EMBED_REVISION else {}))
                 logger.info("Embedding model loaded.")
                 import joblib
                 self._clf = joblib.load(self.model_path)

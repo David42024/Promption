@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createScopeEvaluator } from '@promption/ai-sdk';
 import { trustedAIRequest } from '../../../../lib/ai/trusted.js';
 import { getModelProviderOptions, validateModelConfiguration } from '../../../../lib/ai/modelOptions.js';
+import { trustedShopScopeFastpath } from '../../../../lib/ai/trustedScopeFastpath.js';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -28,6 +29,11 @@ export async function POST(request) {
       request_id: requestId,
     }, { status: 499, headers: { 'x-request-id': requestId } });
   }
+  // The caller is server-authenticated; still constrain the fast path to the
+  // server policy + effective identity + complete single-intent syntax.
+  const proven = trustedShopScopeFastpath(body);
+  if (proven) return Response.json({ ...proven, model: null, request_id: requestId },
+    { headers: { 'x-request-id': requestId } });
   let callInitiated = false;
   try {
     const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -63,16 +69,23 @@ export async function POST(request) {
       statusCode: Number.isInteger(error?.statusCode) ? error.statusCode : undefined,
       causeName: typeof error?.cause?.name === 'string' ? error.cause.name : undefined,
     });
+    const timedOut = error?.name === 'TimeoutError'
+      || (error?.name === 'AbortError' && !request.signal?.aborted);
+    const truncated = error?.finishReason === 'length'
+      || error?.cause?.finishReason === 'length';
+    const invalid = ['NoObjectGeneratedError', 'AI_NoObjectGeneratedError', 'SyntaxError',
+      'ZodError'].includes(error?.name);
+    const failureReason = timedOut ? 'scope_timeout' : truncated ? 'scope_truncated'
+      : invalid ? 'invalid_scope_response' : 'scope_unavailable';
     return Response.json({
       classification: 'UNCERTAIN',
-      reason: error?.name === 'TimeoutError' || error?.name === 'AbortError' && !request.signal?.aborted
-        ? 'scope_timeout' : 'scope_unavailable',
+      reason: failureReason,
       allowed: false,
       model: process.env.OPENAI_MODEL || null,
       provider_calls: callInitiated ? 1 : 0,
       usage: null,
       request_id: requestId,
-    }, { status: error instanceof TypeError ? 400 :
-      error?.name === "TimeoutError" || error?.name === "AbortError" && !request.signal?.aborted ? 504 : 503, headers: { 'x-request-id': requestId } });
+    }, { status: timedOut ? 504 : truncated ? 403 : error instanceof TypeError ? 400 : 503,
+      headers: { 'x-request-id': requestId } });
   }
 }

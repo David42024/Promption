@@ -16,6 +16,30 @@ import filelock
 
 logger = logging.getLogger(__name__)
 
+
+def _apply_baseline_lease(state: dict) -> None:
+    """Disabled guards are leased; unrelated toggles never extend the deadline."""
+    if state.get("filter_enabled", True) and state.get("output_guard_enabled", True):
+        state["baseline_expires_at"] = None
+        return
+    from promption.utils.config import load_config
+    ttl = float(load_config().get("limits", {}).get("baseline_max_seconds", 900))
+    ttl = max(1, min(ttl, 3600))
+    expires = state.get("baseline_expires_at")
+    if not isinstance(expires, (int, float)) or isinstance(expires, bool):
+        state["baseline_expires_at"] = time.time() + ttl
+
+
+def _effective_security_state(state: dict) -> dict:
+    """Fail closed for expired, absent or invalid baseline leases on every read."""
+    state = dict(state)
+    disabled = not state.get("filter_enabled", True) or not state.get("output_guard_enabled", True)
+    expires = state.get("baseline_expires_at")
+    valid = isinstance(expires, (int, float)) and not isinstance(expires, bool) and time.time() < expires
+    if disabled and not valid:
+        state.update(filter_enabled=True, output_guard_enabled=True, baseline_expired=True)
+    return state
+
 _DEFAULT = {
     "filter_enabled": True,
     "output_guard_enabled": True,
@@ -308,6 +332,7 @@ class FileSecurityBackend(SecurityStateBackend):
             else:
                 raise ValueError(f"Unknown security action: {action}")
 
+            _apply_baseline_lease(current)
             now = datetime.now(timezone.utc).isoformat()
             current["updated_at"] = now
             current["updated_by"] = updated_by
@@ -392,6 +417,7 @@ class SQLiteSecurityBackend(SecurityStateBackend):
                 conn.rollback()
                 raise ValueError(f"Unknown security action: {action}")
 
+            _apply_baseline_lease(current)
             now = datetime.now(timezone.utc).isoformat()
             current["updated_at"] = now
             current["updated_by"] = updated_by
@@ -469,6 +495,7 @@ class RedisSecurityBackend(SecurityStateBackend):
                     pipe.unwatch()
                     raise ValueError(f"Unknown security action: {action}")
 
+                _apply_baseline_lease(current)
                 now = datetime.now(timezone.utc).isoformat()
                 current["updated_at"] = now
                 current["updated_by"] = updated_by
@@ -503,7 +530,7 @@ class SecurityStateStore:
         self.backend = backend or FileSecurityBackend(self.path)
 
     def get(self) -> dict:
-        state = self.backend.get_state()
+        state = _effective_security_state(self.backend.get_state())
         return {
             "filter_enabled": bool(state.get("filter_enabled", True)),
             "output_guard_enabled": bool(state.get("output_guard_enabled", True)),
@@ -511,6 +538,8 @@ class SecurityStateStore:
             "updated_by": state.get("updated_by"),
             "history": list(state.get("history") or [])[:20],
             "version": int(state.get("version", 1)),
+            "baseline_expires_at": state.get("baseline_expires_at"),
+            "baseline_expired": state.get("baseline_expired", False),
         }
 
     def update(

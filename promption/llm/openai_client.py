@@ -178,16 +178,33 @@ class OpenAICompatibleClient:
 
     def generate(self, prompt: str, system: str | None = None, temperature: float | None = None,
                  max_tokens: int | None = None) -> LLMResponse:
+        """Generate a completion. Empty, budget-exhausted GPT-5 output is retried once.
+
+        Reasoning tokens count against ``max_completion_tokens`` even when
+        there is no visible output. Only retry an empty GPT-5 response with
+        ``finish_reason=length``; do not retry refusals, arbitrary malformed
+        payloads, authorization errors or an explicitly requested token cap.
+        Calls and token usage across retries are preserved for auditing.
+        """
         import time
+
         messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         is_openai_gpt5 = (
-            "api.openai.com" in self.host.lower()
+            urlsplit(self.host).hostname == "api.openai.com"
             and self.model.lower().startswith("gpt-5")
         )
-        token_limit = max_tokens if max_tokens is not None else int(_CONF.get("max_tokens", 200))
+        configured_limit = int(_CONF.get("max_tokens", 200))
+        token_limit = max_tokens if max_tokens is not None else configured_limit
+        if token_limit <= 0:
+            raise ValueError("max_tokens must be positive")
+        # Default configured limit is shared with non-reasoning models (200).
+        # GPT-5 reasoning can consume it before producing a single visible token.
+        if is_openai_gpt5 and max_tokens is None:
+            token_limit = max(token_limit, 768)
+
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -202,81 +219,124 @@ class OpenAICompatibleClient:
                 temperature if temperature is not None else float(_CONF.get("temperature", 0.2))
             )
 
+        max_attempts = 2 if is_openai_gpt5 and max_tokens is None else 1
+        provider_calls = 0
+        token_totals = {
+            "input": 0, "output": 0, "total": 0, "cached": 0, "reasoning": 0,
+        }
+        complete = {name: True for name in token_totals}
+        observed = {name: False for name in token_totals}
         start = time.perf_counter()
-        try:
-            r = requests.post(f"{self.host}/chat/completions", json=payload,
-                              headers=self._headers(), timeout=self.timeout)
-        except requests.exceptions.Timeout as exc:
-            raise LLMTimeoutError(f"Chat completion timed out after {self.timeout}s",
-                                  model=self.model, provider="openai") from exc
-        except requests.exceptions.ConnectionError as exc:
-            raise LLMConnectivityError("Cannot connect to chat completions endpoint",
-                                      model=self.model, provider="openai") from exc
-        except requests.RequestException as exc:
-            raise LLMConnectivityError(f"Chat completion error: {type(exc).__name__}",
-                                      model=self.model, provider="openai") from exc
+        for attempt in range(max_attempts):
+            provider_calls += 1
+            try:
+                r = requests.post(f"{self.host}/chat/completions", json=payload,
+                                  headers=self._headers(), timeout=self.timeout)
+            except requests.exceptions.Timeout as exc:
+                err = LLMTimeoutError(f"Chat completion timed out after {self.timeout}s",
+                                      model=self.model, provider="openai")
+                err.provider_calls = provider_calls
+                raise err from exc
+            except requests.exceptions.ConnectionError as exc:
+                err = LLMConnectivityError("Cannot connect to chat completions endpoint",
+                                           model=self.model, provider="openai")
+                err.provider_calls = provider_calls
+                raise err from exc
+            except requests.RequestException as exc:
+                err = LLMConnectivityError(f"Chat completion error: {type(exc).__name__}",
+                                           model=self.model, provider="openai")
+                err.provider_calls = provider_calls
+                raise err from exc
 
-        status = getattr(r, "status_code", 200)
-        if status != 200:
-            _raise_for_http_error(r, self.model)
+            status = getattr(r, "status_code", 200)
+            if status != 200:
+                try:
+                    _raise_for_http_error(r, self.model)
+                except (LLMConfigurationError, LLMQuotaError, LLMProviderUnavailableError) as err:
+                    err.provider_calls = provider_calls
+                    raise
 
-        try:
-            data = r.json()
-        except Exception as exc:
-            raise LLMInvalidResponseError("Invalid JSON in completion response",
-                                          model=self.model, provider="openai") from exc
+            try:
+                data = r.json()
+            except Exception as exc:
+                err = LLMInvalidResponseError("Invalid JSON in completion response",
+                                              model=self.model, provider="openai")
+                err.provider_calls = provider_calls
+                raise err from exc
+            if not isinstance(data, dict):
+                err = LLMInvalidResponseError("Completion payload must be a JSON object",
+                                              model=self.model, provider="openai")
+                err.provider_calls = provider_calls
+                raise err
+            choices = data.get("choices")
+            if not isinstance(choices, list) or not choices:
+                err = LLMInvalidResponseError("Completion response missing choices",
+                                              model=self.model, provider="openai")
+                err.provider_calls = provider_calls
+                raise err
 
-        if not isinstance(data, dict):
-            raise LLMInvalidResponseError("Completion payload must be a JSON object",
-                                          model=self.model, provider="openai")
+            choice = _as_dict(choices[0])
+            message = _as_dict(choice.get("message"))
+            from .final_content import final_text
+            content = final_text(message.get("content"))
+            finish_reason = choice.get("finish_reason")
+            truncated = finish_reason == "length"
 
-        choices = data.get("choices")
-        if not isinstance(choices, list) or len(choices) == 0:
-            raise LLMInvalidResponseError("Completion response missing choices",
-                                          model=self.model, provider="openai")
+            usage = _as_dict(data.get("usage"))
+            input_details = _as_dict(usage.get("prompt_tokens_details"))
+            output_details = _as_dict(usage.get("completion_tokens_details"))
+            def count(container, *names):
+                for name in names:
+                    value = container.get(name)
+                    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                        return value
+                return None
+            reported = {"input": count(usage, "prompt_tokens", "input_tokens"),
+                        "output": count(usage, "completion_tokens", "output_tokens"),
+                        "total": count(usage, "total_tokens"),
+                        "cached": count(input_details, "cached_tokens"),
+                        "reasoning": count(output_details, "reasoning_tokens")}
+            for name, value in reported.items():
+                if value is None:
+                    complete[name] = False
+                else:
+                    observed[name] = True
+                    token_totals[name] += value
 
-        first_choice = _as_dict(choices[0])
-        message = _as_dict(first_choice.get("message"))
-        content = message.get("content")
-        if isinstance(content, list):
-            content = "".join(
-                str(part.get("text") or "")
-                for part in content
-                if isinstance(part, dict)
+            if content.strip():
+                latency = (time.perf_counter() - start) * 1000
+                logger.debug("LLM call: %s chars in %.1fms, attempts=%d",
+                             len(content), latency, provider_calls)
+                return LLMResponse(
+                    text=content, model=self.model, latency_ms=latency,
+                    ok=True, truncated=truncated,
+                    finish_reason=str(finish_reason) if finish_reason else None,
+                    input_tokens=token_totals["input"] if complete["input"] else None,
+                    output_tokens=token_totals["output"] if complete["output"] else None,
+                    total_tokens=token_totals["total"] if complete["total"] else None,
+                    cached_tokens=token_totals["cached"] if complete["cached"] else None,
+                    reasoning_tokens=token_totals["reasoning"] if complete["reasoning"] else None,
+                    provider_calls=provider_calls,
+                    retry_count=provider_calls - 1,
+                    known_usage={name: value if observed[name] else None for name, value in token_totals.items()},
+                    usage_coverage={"fields": complete, "is_complete": all(complete.values())},
+                )
+
+            if truncated and attempt + 1 < max_attempts:
+                # Bounded retry for empty output caused by a depleted reasoning
+                # budget. This does not relax input/output protection.
+                payload["max_completion_tokens"] = min(
+                    2048, max(int(payload["max_completion_tokens"]) * 2, 1024)
+                )
+                logger.info("LLM empty length-limited completion: retrying with larger budget")
+                continue
+
+            err = LLMInvalidResponseError(
+                "Completion returned empty content" + (" (length limit)" if truncated else ""),
+                model=self.model, provider="openai", truncated=truncated,
             )
-        if not isinstance(content, str):
-            content = ""
+            err.provider_calls = provider_calls
+            err.retry_count = provider_calls - 1
+            raise err
 
-        finish_reason = first_choice.get("finish_reason")
-        truncated = (finish_reason == "length")
-
-        if not content.strip():
-            raise LLMInvalidResponseError("Completion returned empty content",
-                                          model=self.model, provider="openai",
-                                          truncated=truncated)
-
-        usage = _as_dict(data.get("usage"))
-        input_details = _as_dict(usage.get("prompt_tokens_details"))
-        output_details = _as_dict(usage.get("completion_tokens_details"))
-        input_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
-        output_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
-        total_tokens = int(usage.get("total_tokens") or input_tokens + output_tokens)
-        reasoning_tokens = int(output_details.get("reasoning_tokens") or 0)
-        if reasoning_tokens == 0:
-            reasoning_tokens = max(0, total_tokens - input_tokens - output_tokens)
-
-        latency = (time.perf_counter() - start) * 1000
-        logger.debug("LLM call: %s chars in %.1fms", len(content), latency)
-        return LLMResponse(
-            text=content,
-            model=self.model,
-            latency_ms=latency,
-            ok=True,
-            truncated=truncated,
-            finish_reason=str(finish_reason) if finish_reason else None,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            total_tokens=total_tokens,
-            cached_tokens=int(input_details.get("cached_tokens") or 0),
-            reasoning_tokens=reasoning_tokens,
-        )
+        raise AssertionError("Unreachable: completion loop must return or raise")

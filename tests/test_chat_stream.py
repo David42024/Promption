@@ -88,7 +88,12 @@ def test_file_claim_without_action_is_replaced(monkeypatch):
     monkeypatch.setattr(routes, "get_llm_client", lambda: LLM())
     response = asyncio.run(routes.chat(request()))
     assert response.actions == []
-    assert response.reply == "No pude adjuntar un archivo en esta respuesta. Inténtalo nuevamente."
+    assert response.reply == (
+        "No pude generar el archivo solicitado. Inténtalo nuevamente.\n\n"
+        "No hay un archivo adjunto disponible en esta respuesta."
+    )
+    assert "Ya preparé" not in response.reply
+    assert response.reason == "attachment_unavailable"
 
 
 def test_openai_forced_document_tool_choice(monkeypatch):

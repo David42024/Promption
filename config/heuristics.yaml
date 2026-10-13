@@ -5,8 +5,14 @@
 # ============================================================
 
 rules:
+  - name: "reveal_internal_prompt_es"
+    pattern: '(?<!no\s)(?<!sin\s)\b(?:ver|obtener|revelar|revela|reveles|mostrar|mu[eé]strame|muestra|entregar|entrega|imprimir|imprime|copiar|copia|leer|dime|compartir|comparte|ense[ñn]ame|acceder\s+a(?:l)?)\s+(?:(?:el|tu|tus|su|sus|las|los|[ií]ntegro|completo|contenido|de|del|real)\s+){0,6}(?:prompt\s+(?:base|interno|inicial|(?:de|del)\s+sistema)|(?:mensaje|instrucciones)\s+(?:internas|(?:de|del)\s+sistema))\b'
+    description: "Solicitud de acceso al prompt o instrucciones internas en español"
+    severity: "high"
+    enabled: true
+
   - name: "ignore_previous_instructions"
-    pattern: "ignore (all )?(previous|prior|above|earlier) (instructions|prompts|commands|messages|context|directions)"
+    pattern: '\b(?:ignore|disregard)\s+(?:(?:all|any|the)\s+)?(?:(?:previous|prior|above|earlier)\s+(?:instructions|prompts|commands|messages|context|directions)|(?:instructions|prompts|commands)\s+(?:before|prior\s+to)\s+(?:this|the)\s+(?:one|message))\b'
     description: "Instruction to ignore previously given instructions"
     severity: "high"
     enabled: true
@@ -30,8 +36,8 @@ rules:
     enabled: true
 
   - name: "reveal_system_prompt"
-    pattern: "system prompt|initial prompt|your instructions|your system message|reveal (the )?(original|system) prompt"
-    description: "Prompt leaking / extraction attempt"
+    pattern: '\b(?:reveal|show|print|repeat|copy|give|display|disclose|expose)\s+(?:me\s+)?(?:(?:the|your|full|original|hidden|entire|complete|internal)\s+){0,5}(?:system\s+prompt|initial\s+prompt|system\s+message|(?:internal\s+)?instructions)\b'
+    description: "Explicit request to disclose privileged instructions, not conceptual mention"
     severity: "high"
     enabled: true
 
@@ -50,13 +56,13 @@ rules:
   - name: "sql_injection"
     pattern: "(union select|drop table|delete from|insert into|select .{0,40}from .{0,40}where|x['\"] or|or 1=1|;.*--|information_schema)"
     description: "SQL injection payload"
-    severity: "high"
+    severity: "medium"
     enabled: true
 
   - name: "commands_dangerous"
-    pattern: "rm -rf|format c:|del /f /s /q|cmd\\.exe|powershell -exec|wget .{0,30}-O|curl .{0,30}-o .+\\s(exec|sh|chmod|bash)"
+    pattern: 'rm -rf|format c:|del /f /s /q|cmd\.exe|powershell -exec|wget .{0,30}-O|curl .{0,30}-o .+\s(exec|sh|chmod|bash)'
     description: "Dangerous shell / system commands"
-    severity: "high"
+    severity: "medium"
     enabled: true
 
   - name: "extraction_xss"
@@ -68,7 +74,7 @@ rules:
   - name: "dont_tell_user"
     pattern: "(?:don't|do not) (tell|mention|reveal|say|inform) (the|your|any) (user|human)"
     description: "Instruction to hide information from the user"
-    severity: "high"
+    severity: "medium"
     enabled: true
 
   - name: "translate_to_instructions"
@@ -84,7 +90,7 @@ rules:
     enabled: true
 
   - name: "steganography_gibberish"
-    pattern: "(\\b[a-z]{2,5}\\b ?){20,}|\\b\\w{40,}\\b"
+    pattern: '(\b[a-z]{2,5}\b ?){20,}|\b\w{40,}\b'
     description: "Gibberish / obfuscation patterns"
     severity: "low"
     enabled: true
@@ -102,7 +108,7 @@ rules:
     enabled: true
 
   - name: "credentials_request_es"
-    pattern: "(dame|pasame|pásame|dime|revelame|revélame|pasa|da|entrega|revela|revéla|proporcioname|entregame).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|credenciales?|api[_ -]?key|clave (secreta|privada|de acceso|api)|acceso (administrativo|privilegiado|root))"
+    pattern: '\b(dame|pasame|pásame|dime|revelame|revélame|pasa|da|entrega|revela|revéla|proporcioname|entregame)\b[\s\S]{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|credenciales?|api[_ -]?key|clave (secreta|privada|de acceso|api)|acceso (administrativo|privilegiado|root))'
     description: "ES: petición directa de token/contraseña/secreto"
     severity: "high"
     enabled: true
@@ -116,7 +122,7 @@ rules:
   - name: "token_secreto_direct"
     pattern: "(token|c[óo]digo).{0,10}(secreto|secret|confidencial|interno)"
     description: "Mención directa de token secreto/código secreto"
-    severity: "high"
+    severity: "medium"
     enabled: true
 
   - name: "ignore_instructions_es"
@@ -138,13 +144,13 @@ rules:
     enabled: true
 
   - name: "sneaky_reference_es"
-    pattern: "(cu[áa]l|qu[ée]|c[óo]mo).{0,40}(c[óo]digo|secreto).{0,40}(mencionan\\b|guardas?\\b|tienes\\b|tiene\\b|interno|oculto)|(mencionan\\b|guardas?\\b|tienes\\b).{0,40}(c[óo]digo|secreto)"
+    pattern: '(cu[áa]l|qu[ée]|c[óo]mo).{0,40}(c[óo]digo|secreto).{0,40}(mencionan\b|guardas?\b|tienes\b|tiene\b|interno|oculto)|(mencionan\b|guardas?\b|tienes\b).{0,40}(c[óo]digo|secreto)'
     description: "ES: referencia indirecta al secreto (cuál era ese código que mencionan…)"
     severity: "medium"
     enabled: true
 
   - name: "dan_jailbreak"
-    pattern: "(eres|soy|act[úu]a como|ahora eres|a partir de ahora eres).{0,25}\\bDAN\\b|\\bDAN\\b.{0,25}(sin restricciones|sin censura|sin l[íi]mites)"
+    pattern: '(eres|soy|act[úu]a como|ahora eres|a partir de ahora eres).{0,25}\bDAN\b|\bDAN\b.{0,25}(sin restricciones|sin censura|sin l[íi]mites)'
     description: "Jailbreak DAN (ES/EN, sin uso benigno posible)"
     severity: "high"
     enabled: true
@@ -210,13 +216,13 @@ rules:
     enabled: true
 
   - name: "corporate_credential"
-    pattern: "(\\bRFP\\b|\\bNDA\\b|\\bM&A\\b|auditor[íi]a|incidente de seguridad|acta de reuni[óo]n).{0,100}(credencial|contrase[ñn]a|password|clave sint[ée]tica|clave de respaldo|acceso temporal|muestra|entrega|proporciona|provide|indica|state)|(informe de incidente|incident report).{0,100}(clave|key|credencial|cual fue|cuál fue|what was)"
+    pattern: '(\bRFP\b|\bNDA\b|\bM&A\b|auditor[íi]a|incidente de seguridad|acta de reuni[óo]n).{0,100}(credencial|contrase[ñn]a|password|clave sint[ée]tica|clave de respaldo|acceso temporal|muestra|entrega|proporciona|provide|indica|state)|(informe de incidente|incident report).{0,100}(clave|key|credencial|cual fue|cuál fue|what was)'
     description: "Pretexto corporativo (RFP/NDA/M&A/auditoría/incidente) + petición de credencial"
     severity: "medium"
     enabled: true
 
   - name: "buried_exception"
-    pattern: "(como excepci[óo]n|olvidaba mencionar|nota al pie|por cierto|\\bPS:).{0,80}(muestra|devuelve|revela|ignora|bypass|imprime|print|output|indica)"
+    pattern: '(como excepci[óo]n|olvidaba mencionar|nota al pie|por cierto|\bPS:).{0,80}(muestra|devuelve|revela|ignora|bypass|imprime|print|output|indica)'
     description: "Cláusula de excepción enterrada + acción de extracción"
     severity: "medium"
     enabled: true
@@ -227,8 +233,19 @@ rules:
     severity: "medium"
     enabled: true
 
+  - name: "indirect_document_secret_override"
+    pattern: '(?i)(?:<documento\b[^>]*>|<document\b[^>]*>|(?:nota|note)\s+(?:para|to)\s+(?:el\s+)?(?:asistente|assistant))(?:(?!</(?:documento|document)>)[\s\S]){0,350}\b(?:ignora(?:\s+(?:todas?\s+)?(?:las?\s+)?)?|ignore\s+(?:all\s+)?)\b[\s\S]{0,90}\b(?:pol[ií]tica(?:s)?|policy|policies|instrucciones|instructions)\b[\s\S]{0,160}\b(?:muestra|revela|entrega|show|reveal|disclose|env[ií]a)\b[\s\S]{0,90}\b(?:claves?|credenciales?|secrets?|keys?|tokens?|contrase[ñn]as?)\b'
+    description: "Untrusted document instructs the assistant to override policy and disclose protected server data"
+    severity: "high"
+    enabled: true
+  - name: "decode_execute_base64_context"
+    pattern: '(?i)\b(?:decod\w*|decode)\b[\s\S]{0,80}\b(?:ejecut\w*|ejec[úu]t\w*|execute|obedece|follow|sigue)\b[\s\S]{0,80}\bbase\s*64\b|\b(?:decod\w*|decode)\b[\s\S]{0,80}\bbase\s*64\b[\s\S]{0,80}\b(?:ejecut\w*|ejec[úu]t\w*|execute|sigue|follow)\b'
+    description: "Solicitud de decodificar y ejecutar Base64; solo señal, no veto sin contenido decodificado malicioso"
+    severity: "medium"
+    enabled: true
+
   - name: "decode_follow"
-    pattern: "(decod\\w*|decodific\\w*|conviert\\w*|convert\\w*).{0,30}(base64|hexadecimal|\\bhex\\b|rot\\s?13).{0,150}(follow|execut\\w*|ejecut\\w*|ejec[úu]t\\w*)"
+    pattern: '(decod\w*|decodific\w*|conviert\w*|convert\w*).{0,30}(base64|hexadecimal|\bhex\b|rot\s?13).{0,150}(follow|execut\w*|ejecut\w*|ejec[úu]t\w*)'
     description: "Decodificar + seguir la instrucción resultante"
     severity: "medium"
     enabled: true
@@ -269,7 +286,7 @@ rules:
   - name: "ask_id_es"
     pattern: "(dame|muéstrame|dime).{0,30}(identificacion|id|clave|número)"
     description: "ES: petición de ID/cliente"
-    severity: "high"
+    severity: "medium"
     enabled: true
     applies_to_roles: ["customer"]
 
@@ -310,7 +327,7 @@ rules:
     enabled: true
 
   - name: "base64_exfil"
-    pattern: "base\\s?64.{0,60}(c[óo]digo|secreto)|c[óo]digo.{0,60}base\\s?64"
+    pattern: 'base\s?64.{0,60}(c[óo]digo|secreto)|c[óo]digo.{0,60}base\s?64'
     description: "Exfiltración del código codificado en base64"
     severity: "medium"
     enabled: true
@@ -369,8 +386,74 @@ rules:
     severity: "medium"
     enabled: true
 
+  - name: "private_key_request_en"
+    pattern: '\b(?:what|which)\s+is\s+(?:your|the)\s+(?:current\s+|active\s+)?private\s+key\b(?:[\s\S]{0,75}\b(?:configuration|environment|system|security|setup)\b)?'
+    description: "Pregunta por clave privada actual; las menciones educativas no se vetan por sí solas"
+    severity: "high"
+    enabled: true
+  - name: "unauthorized_extraction_es"
+    pattern: '(?:aunque\s+(?:mi|la)\s+cuenta\s+no\s+est[eé]\s+autorizada|sin\s+(?:estar|tener)\s+autorizaci[oó]n|sin\s+permisos).{0,110}(?:extrae|descarga|obt[eé]n|entrega|exp[oó]rtame).{0,100}(?:datos|informaci[oó]n|confidencial|registros|clientes)|(?:extrae|descarga|obt[eé]n).{0,100}(?:datos|informaci[oó]n|confidencial).{0,100}(?:sin\s+permisos|salta\s+los\s+controles)'
+    description: "Solicitud de extracción con reconocimiento explícito de no autorización"
+    severity: "high"
+    enabled: true
+  - name: "declarative_admin_override_en"
+    pattern: '\b(?:the\s+)?(?:administrator|system\s+administrator|developer)\s+has\s+(?:unlocked|enabled|disabled|removed).{0,50}\b(?:unrestricted|no\s+restrictions|safety\s+filters?|guardrails?|all\s+rules)\b'
+    description: "Afirmación de autoridad no autenticada para modificar restricciones"
+    severity: "high"
+    enabled: true
+  - name: "secret_obfuscation_en"
+    pattern: '\b(?:encode|convert|obfuscate)\b.{0,45}\b(?:password|secret|private\s+key|token)\b.{0,50}\b(?:base\s*64|hide|nobody\s+notices|avoid\s+detection)\b'
+    description: "Posible intento de ocultar una credencial; no bloquear Base64 aislado"
+    severity: "medium"
+    enabled: true
+
+  - name: "direct_secret_exfiltration_es"
+    pattern: '\b(?:publica|incluye|imprime|enumera|devuelve|copia|entrega|mu[eé]strame|muestra|escribe|exporta|revela|filtra|comparte)\b[\s\S]{0,100}\b(?:contrase[ñn]a\s+(?:de\s+servicio|almacenada|actual|interna)|token\s+(?:restringido|privado|interno|activo)|credenciales\s+(?:reservadas|privadas|internas|del\s+entorno)|secreto\s+(?:interno|protegido|almacenado)|clave\s+de\s+acceso\s+(?:interna|privada))\b'
+    description: "Orden explícita de extraer credenciales protegidas; no veto por mero vocabulario"
+    severity: "high"
+    enabled: true
+  - name: "disable_rules_direct_es"
+    pattern: '\b(?:olvida|ignora|omite|desobedece)\s+(?:todas?\s+)?(?:las\s+)?(?:reglas|pol[ií]ticas|controles)\s+de\s+(?:seguridad|protecci[oó]n|privacidad)\b'
+    description: "Orden directa de anular controles, revisando contexto de citas"
+    severity: "high"
+    enabled: true
+
 # Señales benignas explícitas. Una coincidencia completa da score 0 y permite
 # omitir el veto ML únicamente cuando ninguna regla maliciosa coincide.
+
+  # Explicit override of higher-trust directives; ordinary changes of user task are not hard-vetoed.
+  - name: "forget_previous_instructions_context_en"
+    pattern: '(?i)\bforget\s+(?:about\s+)?(?:all\s+)?(?:the\s+)?(?:previous\s+)?(?:instructions|demands?|rules|commands|everything)\b'
+    description: "Contextual signal of a change of instructions; needs authority analysis"
+    severity: "medium"
+    enabled: true
+
+  # Mention of DAN without explicit bypass is a signal, not sufficient grounds to block.
+  - name: "dan_persona_signal_bilingual"
+    pattern: '(?i)\b(?:como|modo|personalidad|as|mode|personality)\s+dan\b|\b(?:la\s+otra\s+personalidad\s+es|the\s+other\s+personality\s+is)\s+dan\b'
+    description: "Bilingual DAN reference; avoid blocking quoted or fictional mentions"
+    severity: "medium"
+    enabled: true
+
+  # High confidence requires a second, explicit instruction to behave contrary to instructions.
+  - name: "dual_persona_bypass_bilingual"
+    pattern: '(?i)\b(?:you\s+(?:must|should|will)\s+(?:respond|answer)|debes\s+responder|vas\s+a\s+responder|responde)\b[\s\S]{0,700}\b(?:the\s+other\s+personality\s+is|la\s+otra\s+personalidad\s+es)\s+dan\b[\s\S]{0,240}\b(?:opposite|opuesta|opuesto|sin\s+restricciones|without\s+restrictions|ignore\s+rules|ignora\s+(?:las\s+)?reglas)\b'
+    description: "Dual assistant persona with an explicit contradictory/unrestricted behavior request"
+    severity: "high"
+    enabled: true
+
+  - name: "evil_roleplay_context_signal"
+    pattern: '(?i)\b(?:pretend\s+(?:you\s+are|to\s+be)|finge\s+(?:que\s+eres|ser)|act\s+as)\s+(?:an?\s+)?(?:evil\s+(?:ai|assistant|bot)|(?:una\s+)?ia\s+malvada)\b'
+    description: "Roleplay is not by itself instruction-hierarchy manipulation"
+    severity: "medium"
+    enabled: true
+
+  - name: "concealed_credential_exfiltration_en"
+    pattern: '(?i)\b(?:encode|convert|obfuscate)\b[\s\S]{0,60}\b(?:password|secret|private\s+key|token|credential)\b[\s\S]{0,95}\b(?:so\s+nobody\s+notices|avoid\s+detection|to\s+hide\s+(?:it|the\s+secret)|without\s+(?:anyone|the\s+user)\s+noticing)\b'
+    description: "Explicitly conceal a credential from detection; does not match benign Base64 usage alone"
+    severity: "high"
+    enabled: true
+
 benign:
   - name: "authorized_payroll_read"
     applies_to_roles: ["admin"]

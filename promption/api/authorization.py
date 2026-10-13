@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from urllib.parse import unquote, urlsplit
 
 from promption.utils.logger import logger
 
@@ -84,6 +85,36 @@ _SENSITIVE_PATTERNS = [
 ]
 
 
+def _normalized_endpoint_path(endpoint: str) -> str | None:
+    """Accept local absolute API paths, not URL strings or encoded path tricks."""
+    if not isinstance(endpoint, str) or not endpoint.startswith("/") or endpoint.startswith("//"):
+        return None
+    if any(ord(char) < 32 or char == "\\" for char in endpoint):
+        return None
+    parsed = urlsplit(endpoint)
+    if parsed.scheme or parsed.netloc:
+        return None
+    original_path = parsed.path
+    # Reject encoded separators and traversal rather than relying on framework normalization.
+    if any(code in original_path.lower() for code in ("%2f", "%5c", "%00", "%25")):
+        return None
+    decoded = unquote(original_path)
+    if decoded != original_path and ("/" in decoded[len(original_path):] or "\\" in decoded):
+        return None
+    path_segments = decoded.split("/")
+    if any(part in (".", "..") or not part for part in path_segments[1:-1]):
+        return None
+    if "%" in decoded or "\\" in decoded:
+        return None
+    normalized = "/" + "/".join(s.lower() for s in path_segments if s)
+    return normalized.rstrip("/") or "/"
+
+
+def _path_in_route(path: str, route: str) -> bool:
+    route = route.lower().rstrip("/")
+    return path == route or path.startswith(route + "/")
+
+
 def check_endpoint_authorization(
     endpoint: str,
     roles: list[str],
@@ -101,11 +132,17 @@ def check_endpoint_authorization(
         log_authorization_attempt(endpoint, roles, False, "Sin roles autenticados", tenant_id=tenant_id, user_id=user_id)
         return False, "Sin roles autenticados", None
 
-    endpoint_normalized = endpoint.lower().strip()
-    
+    endpoint_normalized = _normalized_endpoint_path(endpoint)
+    if endpoint_normalized is None:
+        log_authorization_attempt(endpoint, roles, False, "Ruta inválida", tenant_id=tenant_id, user_id=user_id)
+        return False, "Ruta inválida", None
+
+    segments = endpoint_normalized.split("/")[1:]
     for pattern, severity, pattern_path in _SENSITIVE_PATTERNS:
-        pattern_path_normalized = pattern_path.lower()
-        if pattern_path_normalized in endpoint_normalized:
+        restricted = pattern_path.strip("/").split("/")
+        # Full contiguous segments; /tokenization and /apitoken are not credentials.
+        if any(segments[i:i+len(restricted)] == restricted
+               for i in range(len(segments)-len(restricted)+1)):
             logger.warning(
                 "Auth blocked: sensitive endpoint pattern=%s requested=%s roles=%s severity=%s",
                 pattern, endpoint, roles, severity,
@@ -116,7 +153,7 @@ def check_endpoint_authorization(
 
     for rule_group in _ROLE_ENDPOINTS.values():
         for rule in rule_group:
-            if any(role in rule.allowed_roles for role in roles) and rule.path.lower() in endpoint_normalized:
+            if any(str(role).lower() in rule.allowed_roles for role in roles) and _path_in_route(endpoint_normalized, rule.path):
                 logger.info(
                     "Auth allowed: endpoint=%s roles=%s category=%s",
                     endpoint, roles, rule.category,

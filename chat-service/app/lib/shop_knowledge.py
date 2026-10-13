@@ -75,7 +75,7 @@ _KNOWLEDGE = {
                 {"pregunta": "¿Debo compartir mi contraseña para comprar?", "respuesta": "No compartas contraseñas ni códigos de acceso con vendedores."}],
     },
     "getShippingPolicy": {
-        "envios": {"gratis": "Pedidos +50€", "estandar": "3-5 días laborables", "express": "1-2 días laborables (+5€)",
+        "envios": {"gratis": "Envío gratis a Península solo con pedidos superiores a 50 € (50 € exactos no aplica)", "estandar": "3-5 días laborables", "express": "1-2 días laborables (+5€)",
                    "baleares": "3-5 días; gastos 4,99€", "canarias_ceuta_melilla": "5-7 días; gastos 9,99€"},
         "garantias": {"devolucion": "30 días", "garantia": "2 años"},
         "horarios": {"atencion": "L-V 9:00-18:00", "envios": "L-V 9:00-17:00"},

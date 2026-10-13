@@ -64,8 +64,14 @@ PATTERNS: list[tuple] = [
     ("api_key_bare_value", "api_key", "HIGH",
      r"(?i)[`'\"]?\b((?:[A-Za-z0-9_]*[_-])?(?:api[_-]?key|apikey))\b[`'\"]?\s+((?:sk-|gsk-|ghp_|gho_|AKIA|xox[bap]-)[A-Za-z0-9\-_]{6,}[A-Za-z0-9\-_.=]*)",
      0.9, False),
+    # Password assignment must begin with an unambiguous credential field.
+    # "indicadores clave: inflación" is prose, NOT a credential assignment.
     ("password_assign", "password", "HIGH",
-     r"(?i)\b(passwd|password|pwd|contrase[ñn]a|clave(?: privada)?)\b(?:\s+[A-Za-zÁ-ú]{2,20}){0,2}\s*[:=]\s*['\"]?([^\s'\",;]{4,})", 0.85, False),
+     r"(?i)\b(passwd|password|pwd|contrase[ñn]a|clave\s+(?:privada|secreta|de\s+acceso|api))\b(?:\s+(?:admin(?:istrador)?|del?\s+(?:router|sistema|usuario|servidor)))?\s*[:=]\s*[`'\"]?([^\s'`\",;]{4,})", 0.85, False),
+    # Generic "clave:" can be used for secrets, but only with a token-like value.
+    # It should never redact a regular word such as "confidencialidad".
+    ("generic_clave_assign", "password", "MEDIUM",
+     r"(?i)\b(clave)\s*[:=]\s*[`'\"]?([^\s'`\",;]{8,})", 0.7, False, "credential_like"),
     ("user_pass_pair", "password", "CRITICAL",
      r"(?i)\b(user(name)?|login)\b\s*[:=]\s*['\"]?[^\s'\",;]+\s+(?:\S+\s+)?\b(passwd|password|pwd)\b\s*[:=]\s*['\"]?[^\s'\",;]{4,}",
      0.9, True),

@@ -94,6 +94,47 @@ def roc(df: pd.DataFrame, score_col: str = "ensemble_score", label_col: str = "l
     return {"fpr": fpr.tolist(), "tpr": tpr.tolist(), "auc": float(auc(fpr, tpr))}
 
 
+def three_state_metrics(df: pd.DataFrame, decision_col: str = "ensemble_decision") -> dict:
+    """Count BLOCKED / GUARDED / ALLOWED without conflating guarded with allowed.
+
+    This supplements (not replaces) the legacy binary *early-block* confusion
+    matrix, where both GUARDED and ALLOWED are counted as non-blocks.
+    """
+    states = ("BLOCKED", "GUARDED", "ALLOWED")
+    counts = {state: 0 for state in states}
+    by_label = {
+        "malicious": {state: 0 for state in states},
+        "benign": {state: 0 for state in states},
+    }
+    if decision_col not in df.columns or "label" not in df.columns:
+        return {"status": "SKIPPED", "counts": counts, "by_label": by_label,
+                "evaluated": 0, "skipped": len(df)}
+
+    evaluated = 0
+    for decision, label in zip(df[decision_col], df["label"]):
+        normalized = str(decision).upper()
+        if normalized not in counts or pd.isna(label):
+            continue
+        try:
+            numeric_label = int(label)
+        except (TypeError, ValueError):
+            continue
+        if numeric_label not in (0, 1):
+            continue
+        evaluated += 1
+        counts[normalized] += 1
+        by_label["malicious" if numeric_label == 1 else "benign"][normalized] += 1
+    return {"status": "EVALUATED" if evaluated else "SKIPPED",
+            "counts": counts, "by_label": by_label,
+            "evaluated": evaluated, "skipped": len(df) - evaluated,
+            "attack_blocked": by_label["malicious"]["BLOCKED"],
+            "attack_guarded": by_label["malicious"]["GUARDED"],
+            "attack_allowed": by_label["malicious"]["ALLOWED"],
+            "benign_blocked": by_label["benign"]["BLOCKED"],
+            "benign_guarded": by_label["benign"]["GUARDED"],
+            "benign_allowed": by_label["benign"]["ALLOWED"]}
+
+
 def layer_breakdown(df: pd.DataFrame) -> dict:
     """Compute per-layer detection and containment metrics."""
     res = {}
@@ -121,6 +162,8 @@ def layer_breakdown(df: pd.DataFrame) -> dict:
         res["scope"] = {"status": "SKIPPED", "evaluated": 0, "skipped": len(df)}
 
     res["filter"] = filter_metrics(df, "label", "filter_blocked")
+    res["ensemble_three_state"] = three_state_metrics(df)
+    res["policy_three_state"] = three_state_metrics(df, "policy_decision")
 
     if "output_guard_executed" in df.columns:
         og_exec = df["output_guard_executed"].fillna(False).astype(bool)

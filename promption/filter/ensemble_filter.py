@@ -249,8 +249,20 @@ class EnsembleFilter:
             # ML unavailable or failed on uncertain input: fail-safe to GUARDED (requires Output Guard)
             decision = "GUARDED"
 
+        # A clearly educational request that quotes an attack for analysis is
+        # not itself an instruction to perform it.  Never ALLOW it by shortcut:
+        # retain GUARDED status and require downstream output protection.
+        # This exception does not apply if an actual instruction occurs outside
+        # the quoted spans (validated by HeuristicFilter).
+        quoted_educational_review = bool(
+            heur.quoted_educational_context and not heur.blocked and decision == "BLOCKED"
+            and ml_res is not None
+        )
+        if quoted_educational_review:
+            decision = "GUARDED"
+
         blocked = decision == "BLOCKED"
-        safe_intent_override = False
+        safe_intent_override = quoted_educational_review
 
         merged = {
             "heuristic_score": heur.score,
@@ -268,10 +280,12 @@ class EnsembleFilter:
             "ml_failed": ml_failed,
             "ml_state": self._ml_state,
             "safe_intent_override": safe_intent_override,
+            "quoted_educational_review": quoted_educational_review,
             "explicit_benign_override": explicit_benign_fast_path,
             "benign_fast_path": explicit_benign_fast_path,
             "requires_output_guard": decision == "GUARDED",
-            "heuristic_band": risk_band(heur.score, self.low_threshold, self.high_threshold),
+            "heuristic_veto_threshold": heur.threshold,
+            "heuristic_band": risk_band(heur.score, self.low_threshold, heur.threshold),
             "ml_band": (
                 risk_band(ml_probability, self.low_threshold, self.high_threshold)
                 if ml_probability is not None else "UNAVAILABLE"

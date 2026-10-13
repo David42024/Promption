@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import random
+import re
 import time
 from functools import wraps
 from contextvars import ContextVar
@@ -9,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 from promption.metrics_aggregator import MetricsAggregator
+from promption.llm.final_content import final_text
 
 from promption.llm.exceptions import (
     LLMConfigurationError,
@@ -51,7 +53,7 @@ class _AttemptMetrics:
         self.aggregator = MetricsAggregator()
         self.events = []
 
-    def record(self, data=None, failed=False):
+    def record(self, data=None, failed=False, metadata=None):
         data = data if isinstance(data, dict) else {}
         from .scope import collect_scope_receipts
         collect_scope_receipts(data)
@@ -74,6 +76,7 @@ class _AttemptMetrics:
         summary = {"provider_calls": calls, "generation_calls": calls - scope,
                    "scope_calls": scope, "failed_calls": data.get("failed_calls", calls if failed else 0),
                    "known_usage": known, "usage_coverage": coverage}
+        summary["attempt_metadata"] = metadata or {}
         event_id = f"attempt-{len(self.events) + 1}"
         self.aggregator.add_summary(summary, event_id)
         self.events.append(summary)
@@ -101,7 +104,8 @@ def _track_attempts(method):
                 return result.model_copy(update=packet)
             return {**result, **packet}
         except BaseException as exc:
-            metrics.fail_last()
+            if not isinstance(exc, AIGuardBlocked):
+                metrics.fail_last()
             for name, value in metrics.packet().items():
                 setattr(exc, name, value)
             raise
@@ -112,6 +116,13 @@ def _track_attempts(method):
 
 async def _post_http(client, url, **kwargs):
     metrics = _attempt_metrics.get()
+    started = time.perf_counter()
+    body = kwargs.get("json") if isinstance(kwargs.get("json"), dict) else {}
+    def metadata(failed):
+        return {"model": body.get("model"), "operation": "tool_turn" if body.get("tools") else "generation",
+                "request_id": body.get("request_id"), "transport_started": True,
+                "transport_completed": not failed, "transport_failed": failed,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2)}
     try:
         if not isinstance(client, _ORIGINAL_ASYNC_CLIENT) and hasattr(client, "__aenter__"):
             async with client as active_client:
@@ -120,14 +131,15 @@ async def _post_http(client, url, **kwargs):
             response = await client.post(url, **kwargs)
     except BaseException:
         if metrics is not None:
-            metrics.record(failed=True)
+            metrics.record(failed=True, metadata=metadata(True))
         raise
     if metrics is not None:
         try:
             data = response.json()
         except (ValueError, TypeError):
             data = None
-        metrics.record(data, failed=getattr(response, "status_code", 200) >= 400)
+        metrics.record(data, failed=getattr(response, "status_code", 200) >= 400,
+                       metadata=metadata(False))
     return response
 
 _guard_identity = ContextVar("vercel_ai_guard_identity", default=None)
@@ -136,10 +148,14 @@ _guard_identity = ContextVar("vercel_ai_guard_identity", default=None)
 class AIGuardBlocked(Exception):
     """Carry a sanitized model-guard failure without treating it as provider downtime."""
 
-    def __init__(self, code: str, scope: dict | None = None, provider_calls: int = 0):
+    def __init__(self, code: str, scope: dict | None = None, provider_calls: int = 0,
+                 *, direction=None, reason=None, policy_id=None):
         self.code = code
         self.scope = scope
         self.provider_calls = provider_calls
+        self.direction = direction if direction in ('input', 'output') else None
+        self.reason = reason if reason in ('malicious_input', 'insufficient_scope', 'sensitive_output') else None
+        self.policy_id = policy_id if isinstance(policy_id, str) and re.fullmatch(r'[a-zA-Z0-9_.-]{1,96}', policy_id) else None
         super().__init__(code)
 
 
@@ -149,6 +165,8 @@ def _raise_bridge_guard(response: httpx.Response) -> None:
     try:
         data = response.json()
     except ValueError:
+        data = {}
+    if not isinstance(data, dict):
         data = {}
     codes = {
         "OUT_OF_SCOPE", "SCOPE_UNCERTAIN", "CONTENT_BLOCKED", "GUARD_UNAVAILABLE",
@@ -161,18 +179,17 @@ def _raise_bridge_guard(response: httpx.Response) -> None:
     if code in codes or response.status_code == 403:
         scope = data.get("scope") if isinstance(data, dict) else None
         calls = int(data.get("provider_calls", 0)) if isinstance(data, dict) and str(data.get("provider_calls", "")).isdigit() else 0
-        raise AIGuardBlocked(code if code in codes else "CONTENT_BLOCKED", scope, provider_calls=calls)
+        raise AIGuardBlocked(code if code in codes else "CONTENT_BLOCKED", scope, provider_calls=calls,
+                            direction=data.get('direction'), reason=data.get('reason'), policy_id=data.get('policy_id'))
 
 
 def _extract_token_count(usage: dict | None, *keys: str) -> int | None:
     if not isinstance(usage, dict):
         return None
     for k in keys:
-        if k in usage and usage[k] is not None:
-            try:
-                return int(usage[k])
-            except (ValueError, TypeError):
-                pass
+        value = usage.get(k)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
     return None
 
 
@@ -367,15 +384,18 @@ class LLMClient:
             if candidates and isinstance(candidates[0], dict):
                 parts = candidates[0].get("content", {}).get("parts", [])
                 if parts and isinstance(parts[0], dict):
-                    return str(parts[0].get("text", "")).strip()
+                    return final_text([{**part, "type": "text"} for part in parts if isinstance(part, dict)])
             return ""
         if "text" in data:
-            return str(data["text"]).strip()
+            return final_text(data["text"])
         choices = data.get("choices")
         if isinstance(choices, list) and choices:
             choice = choices[0]
             if isinstance(choice, dict):
-                return str(choice.get("message", {}).get("content", "")).strip()
+                message = choice.get("message")
+                if not isinstance(message, dict) or message.get("channel", "final") != "final":
+                    return ""
+                return final_text(message.get("content"))
         return ""
 
     @_track_attempts
@@ -416,6 +436,7 @@ class LLMClient:
                     exc.fallback_reason = fallback_reason
                     raise exc
 
+                budget_bound = budget.remaining <= self.provider_timeout
                 step_timeout = budget.remaining_for_step(self.provider_timeout, step_name=model_config["provider"])
                 headers = {"Content-Type": "application/json"}
                 resolved_temperature = (
@@ -475,6 +496,9 @@ class LLMClient:
                     logger.info("LLM generation cancelled")
                     raise
                 except (httpx.TimeoutException, TimeoutError) as exc:
+                    if budget_bound:
+                        raise LLMTimeoutError("Request timeout: deadline exhausted during generation",
+                            model=model_config["label"], provider=model_config["provider"]) from exc
                     prior_provider_calls += 1
                     last_exception = LLMTimeoutError(
                         f"{model_config['provider'].upper()} timed out after {step_timeout:.1f}s",
@@ -673,6 +697,7 @@ class LLMClient:
                 exc.fallback_reason = fallback_reason
                 raise exc
 
+            budget_bound = budget.remaining <= self.provider_timeout
             step_timeout = budget.remaining_for_step(self.provider_timeout, step_name=config["provider"])
             try:
                 if config["api"] == "vercel_ai":
@@ -816,14 +841,14 @@ class LLMClient:
                     calls = [{"id": part["functionCall"].get("id"), "name": part["functionCall"]["name"],
                               "arguments": part["functionCall"].get("args", {})}
                              for i, part in enumerate(parts) if "functionCall" in part]
-                    content = "".join(part.get("text", "") for part in parts).strip()
+                    content = final_text([{**part, "type": "text"} for part in parts if isinstance(part, dict)])
                     assistant = {"role": "assistant", "gemini_parts": parts}
                 else:
                     assistant = data["choices"][0]["message"]
                     calls = [{"id": call["id"], "name": call["function"]["name"],
                               "arguments": call["function"].get("arguments", "{}")}
                              for call in assistant.get("tool_calls", [])]
-                    content = assistant.get("content") or ""
+                    content = final_text(assistant.get("content"))
 
                 if not str(content).strip() and not calls:
                     raise LLMInvalidResponseError("Empty LLM response without tool calls",
@@ -862,6 +887,9 @@ class LLMClient:
             except (AIGuardBlocked, asyncio.CancelledError):
                 raise
             except (httpx.TimeoutException, TimeoutError) as exc:
+                if budget_bound:
+                    raise LLMTimeoutError("Request timeout: deadline exhausted during tool turn",
+                        model=config["label"], provider=config["provider"]) from exc
                 prior_provider_calls += 1
                 last_exception = LLMTimeoutError(f"Timeout during tool turn after {step_timeout:.1f}s",
                                                  model=config["label"], provider=config["provider"])

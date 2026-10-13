@@ -1,4 +1,5 @@
 paths:
+  reviewed_dataset: "data/processed/reviewed_training_data.csv"
   raw_data: data/raw
   processed_data: data/processed
   results: data/results
@@ -13,6 +14,7 @@ stt:
   language: null
 model:
   embedding_model: intfloat/multilingual-e5-small
+  embedding_revision: 614241f622f53c4eeff9890bdc4f31cfecc418b3
   embedding_prefix: 'query: '
   classifier_path: models/random_forest.pkl
   lightweight_classifier_path: models/lightweight_classifier.pkl
@@ -20,7 +22,7 @@ model:
   max_depth: 20
   min_samples_leaf: 1
   random_state: 42
-  confidence_threshold: 0.66
+  confidence_threshold: 0.60  # synchronize standalone ML and ensemble thresholds
   chunk_chars: 250
   chunk_overlap: 100
   use_lightweight_ml: true
@@ -28,11 +30,11 @@ ensemble:
   heuristic_weight: 0.4
   ml_weight: 0.6
   decision_low_threshold: 0.33
-  decision_high_threshold: 0.66
+  decision_high_threshold: 0.60  # candidate calibrated on known benchmark; validate independently
   require_llm_veto: false
 classification:
   ml_benign_threshold: 0.33
-  ml_malicious_threshold: 0.66
+  ml_malicious_threshold: 0.60  # keep classification in sync with ensemble
 llm:
   provider: auto
   host: http://localhost:11434

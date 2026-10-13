@@ -29,14 +29,15 @@ export class MetricsAggregator {
       eventId = `${callType}-${this._events.size + 1}`;
     }
 
-    const p = typeof promptTokens === "number" ? promptTokens : null;
-    const c = typeof completionTokens === "number" ? completionTokens : null;
-    const t = typeof totalTokens === "number" ? totalTokens : null;
-    const r = typeof reasoningTokens === "number" ? reasoningTokens : null;
+    const valid = n => Number.isSafeInteger(n) && n >= 0;
+    const p = valid(promptTokens) ? promptTokens : null;
+    const c = valid(completionTokens) ? completionTokens : null;
+    const t = valid(totalTokens) ? totalTokens : null;
+    const r = valid(reasoningTokens) ? reasoningTokens : null;
 
-    const actualHasUsage = hasUsage !== null && hasUsage !== undefined
-      ? Boolean(hasUsage)
-      : (p !== null || c !== null || t !== null || r !== null);
+    // A transport-level hasUsage flag cannot make missing numeric values known.
+    const numericUsage = p !== null || c !== null || t !== null || r !== null;
+    const actualHasUsage = hasUsage === false ? false : numericUsage;
 
     const callsCnt = Number.isFinite(calls) ? Math.max(0, Math.floor(calls)) : 0;
     if (callType === "scope") this.scopeCalls += callsCnt;

@@ -92,7 +92,7 @@ def test_tool_deduplication_preserves_transcript_and_prevents_duplicate_actions(
 
     user = User(id="admin-1", name="Admin", email="admin@example.com", roles=["admin"], authenticated=True)
     req = ChatRequest(
-        text="Dame el reporte mensual de facturación",
+        text="Genera un archivo con el reporte mensual de facturación",
         user=user,
     )
 
@@ -179,7 +179,7 @@ def test_tool_deduplication_different_arguments_not_reused(monkeypatch):
     monkeypatch.setattr(routes, "get_llm_client", lambda: MockLLM())
 
     user = User(id="admin-1", name="Admin", email="admin@example.com", roles=["admin"], authenticated=True)
-    req = ChatRequest(text="Dame el reporte mensual de facturación", user=user)
+    req = ChatRequest(text="Genera un archivo con el reporte mensual de facturación", user=user)
 
     resp = asyncio.run(routes.chat(req))
     print("TEST 2 RESP:", resp.blocked, resp.reason, resp.reply)
@@ -243,8 +243,8 @@ def test_tool_deduplication_different_users_do_not_share_cache(monkeypatch):
     user1 = User(id="user-1", name="User 1", email="u1@example.com", roles=["admin"], authenticated=True)
     user2 = User(id="user-2", name="User 2", email="u2@example.com", roles=["admin"], authenticated=True)
 
-    resp1 = asyncio.run(routes.chat(ChatRequest(text="Dame el reporte mensual de facturación", user=user1)))
-    resp2 = asyncio.run(routes.chat(ChatRequest(text="Dame el reporte mensual de facturación", user=user2)))
+    resp1 = asyncio.run(routes.chat(ChatRequest(text="Genera un archivo con el reporte mensual de facturación", user=user1)))
+    resp2 = asyncio.run(routes.chat(ChatRequest(text="Genera un archivo con el reporte mensual de facturación", user=user2)))
 
     # Both requests executed their own tool call
     make_doc_executions = [e for e in executions if e[0] == "make_document"]
