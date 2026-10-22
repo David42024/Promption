@@ -1,0 +1,98 @@
+[
+  {
+    "original": "data\\processed\\split_manifest.json",
+    "copied": "data__processed__split_manifest.json",
+    "sha256": "0A1D3D24CAF39E5214D16BFD8EB86E3EB901F2097C86CBEBF7C76FD71E85A133",
+    "bytes": 1331966
+  },
+  {
+    "original": "data\\processed\\label_overrides.csv",
+    "copied": "data__processed__label_overrides.csv",
+    "sha256": "0347B180B30A4382C6A5AD6030F6630685380754B6B802D6AEEAFA7D3BE8D108",
+    "bytes": 2311
+  },
+  {
+    "original": "data\\processed\\quarantine.csv",
+    "copied": "data__processed__quarantine.csv",
+    "sha256": "8A32264B2F22E7C05CCAEF40E7D69E5051B1F709D2BD8E6F324877C25559211C",
+    "bytes": 42940
+  },
+  {
+    "original": "data\\results\\corrected-language-comparison-20261011-011403\\final_report.md",
+    "copied": "data__results__corrected-language-comparison-20261011-011403__final_report.md",
+    "sha256": "63604D2EB108BD25ACFE128E16905C5EB5EA1958860D6EAADDECBAF374924C9F",
+    "bytes": 2221
+  },
+  {
+    "original": "data\\results\\corrected-language-comparison-20261011-011403\\comparison.json",
+    "copied": "data__results__corrected-language-comparison-20261011-011403__comparison.json",
+    "sha256": "BC7AFF20D55C8B2F01BC9FF78340CFD486D0DE9F0C7F86F84CC1FB42FDF9915F",
+    "bytes": 190885
+  },
+  {
+    "original": "data\\results\\scientific-v9-historical-final-20261012\\summary.json",
+    "copied": "data__results__scientific-v9-historical-final-20261012__summary.json",
+    "sha256": "42756955D1C8FC32F577A88FA0D1A52A5C12CE4E68DE9B10A09B07C193E3361E",
+    "bytes": 8045
+  },
+  {
+    "original": "data\\results\\scientific-v9-historical-final-20261012\\layer_metrics.csv",
+    "copied": "data__results__scientific-v9-historical-final-20261012__layer_metrics.csv",
+    "sha256": "F01A374E9C81E3DB89B3A42940C4D6A5447684986A1296E42BF13F196EED6295",
+    "bytes": 5
+  },
+  {
+    "original": "data\\results\\scientific-v9-historical-final-20261012\\layer_evidence.csv",
+    "copied": "data__results__scientific-v9-historical-final-20261012__layer_evidence.csv",
+    "sha256": "F01A374E9C81E3DB89B3A42940C4D6A5447684986A1296E42BF13F196EED6295",
+    "bytes": 5
+  },
+  {
+    "original": "data\\results\\scientific-v9-historical-final-20261012\\latencies_by_stage.csv",
+    "copied": "data__results__scientific-v9-historical-final-20261012__latencies_by_stage.csv",
+    "sha256": "BE7D6D9152F28F414BE9ED3DBA374F22292C8B4404E6B1497E3AA887EB9FC8E1",
+    "bytes": 4459
+  },
+  {
+    "original": "data\\results\\synthetic-benchmark-v9-final\\e1_results\\summary.json",
+    "copied": "data__results__synthetic-benchmark-v9-final__e1_results__summary.json",
+    "sha256": "873D733EBE7FC62FDF641D07B097C17413DF16839DD9C02DB55025E412D9E978",
+    "bytes": 2135
+  },
+  {
+    "original": "data\\results\\synthetic-benchmark-v9-final\\e2_results\\summary.json",
+    "copied": "data__results__synthetic-benchmark-v9-final__e2_results__summary.json",
+    "sha256": "B13CDFE6E48297DB34EA179AAA2269D10AC9D574CF4752DDEC6FF3C48BF1CD77",
+    "bytes": 3607
+  },
+  {
+    "original": "data\\results\\synthetic-benchmark-v9-final\\e2_results\\execution_stop.json",
+    "copied": "data__results__synthetic-benchmark-v9-final__e2_results__execution_stop.json",
+    "sha256": "C3CDD54F9CC7374762B8E595BC6185E3FE24E293EFC7986CE8DBEB2B3EE0C071",
+    "bytes": 115
+  },
+  {
+    "original": "data\\results\\v4-full-chat-20261010-232722\\INFORME_MODIFICACIONES_V4.md",
+    "copied": "data__results__v4-full-chat-20261010-232722__INFORME_MODIFICACIONES_V4.md",
+    "sha256": "71123EF4F4FF0F7EC51BA8562E8CBA2606F06DAE128AD1A05CA05CB06B4195D9",
+    "bytes": 7300
+  },
+  {
+    "original": "INFORME_CORRECCIONES_V3.md",
+    "copied": "INFORME_CORRECCIONES_V3.md",
+    "sha256": "D7810DE36641F3215723F0E0238D596DA594452B1CE0361E7F414B92B72E4A52",
+    "bytes": 5784
+  },
+  {
+    "original": "config\\config.yaml",
+    "copied": "config__config.yaml",
+    "sha256": "58AA193E31BC218CB520FEB096B57704BB23D87E6E4B76553464549871265865",
+    "bytes": 3440
+  },
+  {
+    "original": "config\\heuristics.yaml",
+    "copied": "config__heuristics.yaml",
+    "sha256": "DD0F65AB0B2B8E6A7375939FCDBA626787C20A6CB889A30AFB26079EFF4CEDCC",
+    "bytes": 26432
+  }
+]
