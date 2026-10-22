@@ -1,0 +1,92 @@
+api:
+  host: 0.0.0.0
+  port: 8000
+  reload: true
+benchmark:
+  history_dir: C:\Users\USERJSSV\Downloads\Promption\data\results\history
+  min_llm_queries: 3
+  sample_size: null
+  save_history: true
+classification:
+  ml_benign_threshold: 0.33
+  ml_malicious_threshold: 0.66
+conversation_guard:
+  max_chars: 100000
+  max_messages: 128
+dashboard:
+  host: 0.0.0.0
+  port: 8501
+ensemble:
+  decision_high_threshold: 0.66
+  decision_low_threshold: 0.33
+  heuristic_weight: 0.4
+  ml_weight: 0.6
+  require_llm_veto: false
+limits:
+  benchmark_concurrency: 1
+  benchmark_max_queue: 2
+  concurrency_queue_timeout_seconds: 5.0
+  max_benchmark_sample_size: 5000
+  max_body_bytes: 2097152
+  max_context_bytes: 65536
+  max_context_keys: 64
+  max_history_chars: 100000
+  max_history_messages: 128
+  max_role_name_chars: 64
+  max_roles: 32
+  max_text_chars: 100000
+  max_user_id_chars: 128
+  protection_concurrency: 4
+  protection_max_queue: 8
+  rate_limit:
+    benchmark_rph: 1
+    protection_rpm: 60
+llm:
+  health_timeout: 5
+  host: http://localhost:11434
+  max_tokens: 200
+  model: mistral:latest
+  openai:
+    base_url: https://api.groq.com/openai/v1
+    model: openai/gpt-oss-120b
+  provider: auto
+  temperature: 0.2
+  timeout: 60
+logging:
+  backup_count: 5
+  file: data/results/corrected-language-comparison-20261011-011403/test.log
+  format: '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s'
+  level: INFO
+  max_bytes: 5242880
+model:
+  chunk_chars: 250
+  chunk_overlap: 100
+  classifier_path: C:\Users\USERJSSV\Downloads\Promption\models\random_forest.pkl
+  confidence_threshold: 0.66
+  embedding_model: intfloat/multilingual-e5-small
+  embedding_prefix: 'query: '
+  embedding_revision: 614241f622f53c4eeff9890bdc4f31cfecc418b3
+  lightweight_classifier_path: C:\Users\USERJSSV\Downloads\Promption\models\lightweight_classifier.pkl
+  max_depth: 20
+  min_samples_leaf: 1
+  n_trees: 400
+  random_state: 42
+  use_lightweight_ml: true
+paths:
+  audio_payloads: C:\Users\USERJSSV\Downloads\Promption\data\audio_payloads
+  cfg: C:\Users\USERJSSV\Downloads\Promption\config\config.yaml
+  classifier: C:\Users\USERJSSV\Downloads\Promption\models\random_forest.pkl
+  heuristics: C:\Users\USERJSSV\Downloads\Promption\config\heuristics.yaml
+  logs: C:\Users\USERJSSV\Downloads\Promption\logs
+  models: C:\Users\USERJSSV\Downloads\Promption\models
+  pdf_payloads: C:\Users\USERJSSV\Downloads\Promption\data\pdf_payloads
+  plots: C:\Users\USERJSSV\Downloads\Promption\data\results\plots
+  processed_data: C:\Users\USERJSSV\Downloads\Promption\data\processed
+  raw_data: C:\Users\USERJSSV\Downloads\Promption\data\raw
+  reports: C:\Users\USERJSSV\Downloads\Promption\reports
+  results: C:\Users\USERJSSV\Downloads\Promption\data\results
+  reviewed_dataset: C:\Users\USERJSSV\Downloads\Promption\data\processed\reviewed_training_data.csv
+  root: C:\Users\USERJSSV\Downloads\Promption
+stt:
+  language: null
+  model: tiny
