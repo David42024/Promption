@@ -1,0 +1,104 @@
+# ============================================================
+# Prompt Injection Filter — Centralized Configuration
+# ============================================================
+
+paths:
+  reviewed_dataset: "data/processed/reviewed_training_data.csv"
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  results: "data/results"
+  plots: "data/results/plots"
+  models: "models"
+  logs: "logs"
+  reports: "reports"
+  pdf_payloads: "data/pdf_payloads"
+  audio_payloads: "data/audio_payloads"
+
+stt:
+  model: "tiny"            # faster-whisper (tiny/base/small…): descarga el modelo la 1ª vez
+  language: null           # null = auto-detect; p. ej. "en" para el corpus TTS
+
+model:
+  embedding_model: "intfloat/multilingual-e5-small"
+  embedding_revision: "614241f622f53c4eeff9890bdc4f31cfecc418b3"
+  embedding_prefix: "query: "
+  classifier_path: "models/random_forest.pkl"
+  lightweight_classifier_path: "models/lightweight_classifier.pkl"  # TF-IDF + LogisticRegression (Render free)
+  n_trees: 400
+  max_depth: 20
+  min_samples_leaf: 1
+  random_state: 42
+  confidence_threshold: 0.60  # synchronize standalone ML and ensemble thresholds
+  chunk_chars: 250        # ventana de chunk-max (~60 tokens): coincide con la longitud mediana del entrenamiento; no diluye ataques de 1-2 frases
+  chunk_overlap: 100      # solape para el fallback sin frases (texto sin puntuación)
+  use_lightweight_ml: true  # Use TF-IDF + LogisticRegression instead of SentenceTransformers (Render free) - Updated
+
+ensemble:
+  heuristic_weight: 0.4
+  ml_weight: 0.6
+  decision_low_threshold: 0.33
+  decision_high_threshold: 0.60  # candidate calibrated on known benchmark; validate independently
+  require_llm_veto: false
+
+classification:
+  ml_benign_threshold: 0.33
+  ml_malicious_threshold: 0.60  # keep classification in sync with ensemble
+
+llm:
+  provider: "auto"          # ollama | openai | auto (openai si hay PIF_LLM_API_KEY configurada)
+  host: "http://localhost:11434"
+  model: "mistral:latest"
+  temperature: 0.2
+  max_tokens: 200
+  timeout: 60
+  health_timeout: 5
+  openai:
+    base_url: "https://api.groq.com/openai/v1"   # override con PIF_LLM_BASE_URL
+    model: "openai/gpt-oss-120b"                 # override con PIF_LLM_MODEL
+    # API key: variable de entorno PIF_LLM_API_KEY (o secret de Streamlit). NUNCA en este archivo.
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+
+dashboard:
+  host: "0.0.0.0"
+  port: 8501
+
+benchmark:
+  sample_size: null            # null = use full dataset
+  min_llm_queries: 3          # queries per case when testing LLM
+  save_history: true
+  history_dir: "data/results/history"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+  file: "logs/system.log"
+  max_bytes: 5242880
+  backup_count: 5
+
+conversation_guard:
+  max_messages: 128
+  max_chars: 100000
+
+limits:
+  max_text_chars: 100000
+  max_history_messages: 128
+  max_history_chars: 100000
+  max_body_bytes: 2097152       # 2 MiB
+  max_roles: 32
+  max_role_name_chars: 64
+  max_user_id_chars: 128
+  max_context_keys: 64
+  max_context_bytes: 65536      # 64 KiB
+  max_benchmark_sample_size: 5000
+  protection_concurrency: 4
+  protection_max_queue: 8
+  benchmark_concurrency: 1
+  benchmark_max_queue: 2
+  concurrency_queue_timeout_seconds: 5.0
+  rate_limit:
+    protection_rpm: 60          # 60 solicitudes/minuto por endpoint de protección
+    benchmark_rph: 1            # 1 benchmark/hora por tenant

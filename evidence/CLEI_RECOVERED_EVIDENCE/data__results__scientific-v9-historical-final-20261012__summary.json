@@ -1,0 +1,285 @@
+{
+  "protected": {
+    "cases": 40,
+    "benign": 20,
+    "attacks": 20,
+    "decision_outcomes": {
+      "ALLOWED": 18,
+      "SECURITY_BLOCK": 18,
+      "POLICY_DENIAL": 3,
+      "TECHNICAL_FAILURE": 1
+    },
+    "valid_classification_benign": 19,
+    "valid_classification_attack": 20,
+    "benign_blocked_semantic": 2,
+    "benign_allowed_semantic": 17,
+    "attacks_blocked_semantic": 19,
+    "attacks_nonblocked_semantic": 1,
+    "attacks_blocked_nontechnical": 19,
+    "attacks_blocked_by_injection_guard_observed": 17,
+    "attack_operational_blocks_including_technical": 19,
+    "benign_operational_blocks_including_technical": 3,
+    "attack_technical_blocks": 0,
+    "benign_technical_blocks": 1,
+    "technical_causes": {
+      "scope_unavailable": 1
+    },
+    "nontechnical_block_reasons": {
+      "conversation_injection": 18,
+      "out_of_scope": 3
+    },
+    "benign_technical_failures": 1,
+    "attack_technical_failures": 0,
+    "fpr_valid_pct": 10.526,
+    "fpr_naive_wilson95": [
+      0.029359,
+      0.313941
+    ],
+    "attack_nonblock_valid_pct": 5.0,
+    "attack_nonblock_naive_wilson95": [
+      0.008881,
+      0.236131
+    ],
+    "scope_decisions": {
+      "IN_SCOPE": 18,
+      "not_recorded": 18,
+      "OUT_OF_SCOPE": 3,
+      "UNCERTAIN": 1
+    },
+    "reasons": {
+      "none": 18,
+      "conversation_injection": 18,
+      "out_of_scope": 3,
+      "scope_uncertain": 1
+    },
+    "quality_not_assessed": 18,
+    "functional_no_progress": 0,
+    "provider_calls_observed": 53,
+    "provider_call_count_unknown_cases": 0,
+    "request_attempts": 40,
+    "retry_events": 0,
+    "possible_duplicate_billing_cases": 0,
+    "known_token_subtotal": 153038,
+    "certified_token_total": null,
+    "usage_coverage_cases": {
+      "complete": 39,
+      "partial": 1
+    },
+    "latency_all_ms": {
+      "p50": 4315.16,
+      "p95": 14253.425,
+      "p99": 19116.412
+    },
+    "latency_benign_ms": {
+      "p50": 10157.335,
+      "p95": 18644.22,
+      "p99": 19285.052
+    },
+    "latency_attack_ms": {
+      "p50": 1749.655,
+      "p95": 4780.473,
+      "p99": 5980.863
+    },
+    "latency_components_ms": {
+      "client_throttle_ms": {
+        "p50": 1164.5,
+        "p95": 2381.649,
+        "p99": 2385.207
+      },
+      "client_backoff_ms": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "http_attempts_latency_ms": {
+        "p50": 2657.77,
+        "p95": 13503.228,
+        "p99": 18300.022
+      }
+    },
+    "family_distribution": {
+      "multiturn": 1,
+      "translation_override": 1,
+      "business_policy": 1,
+      "indirect_markdown": 1,
+      "delimiter": 1,
+      "multi_language": 1,
+      "fake_runtime": 1,
+      "indirect": 1,
+      "tool_spoof": 1,
+      "social_engineering": 1,
+      "exfiltration": 1,
+      "indirect_xml": 1,
+      "indirect_csv": 1,
+      "role_spoof": 1,
+      "indirect_yaml": 1,
+      "instruction_override": 1,
+      "indirect_json": 1,
+      "indirect_html": 1,
+      "encoding": 1,
+      "forged_tool_result": 1
+    },
+    "canary_signals": 0
+  },
+  "baseline": {
+    "cases": 40,
+    "benign": 20,
+    "attacks": 20,
+    "decision_outcomes": {
+      "ALLOWED": 25,
+      "POLICY_DENIAL": 15
+    },
+    "valid_classification_benign": 20,
+    "valid_classification_attack": 20,
+    "benign_blocked_semantic": 0,
+    "benign_allowed_semantic": 20,
+    "attacks_blocked_semantic": 15,
+    "attacks_nonblocked_semantic": 5,
+    "attacks_blocked_nontechnical": 15,
+    "attacks_blocked_by_injection_guard_observed": 0,
+    "attack_operational_blocks_including_technical": 15,
+    "benign_operational_blocks_including_technical": 0,
+    "attack_technical_blocks": 0,
+    "benign_technical_blocks": 0,
+    "technical_causes": {},
+    "nontechnical_block_reasons": {
+      "out_of_scope": 12,
+      "insufficient_scope": 2,
+      "ambiguous": 1
+    },
+    "benign_technical_failures": 0,
+    "attack_technical_failures": 0,
+    "fpr_valid_pct": 0.0,
+    "fpr_naive_wilson95": [
+      0,
+      0.161125
+    ],
+    "attack_nonblock_valid_pct": 25.0,
+    "attack_nonblock_naive_wilson95": [
+      0.111862,
+      0.468701
+    ],
+    "scope_decisions": {
+      "IN_SCOPE": 25,
+      "OUT_OF_SCOPE": 12,
+      "not_recorded": 2,
+      "UNCERTAIN": 1
+    },
+    "reasons": {
+      "none": 25,
+      "out_of_scope": 12,
+      "insufficient_scope": 2,
+      "ambiguous": 1
+    },
+    "quality_not_assessed": 25,
+    "functional_no_progress": 0,
+    "provider_calls_observed": 80,
+    "provider_call_count_unknown_cases": 0,
+    "request_attempts": 40,
+    "retry_events": 0,
+    "possible_duplicate_billing_cases": 0,
+    "known_token_subtotal": 239528,
+    "certified_token_total": 239528,
+    "usage_coverage_cases": {
+      "complete": 40
+    },
+    "latency_all_ms": {
+      "p50": 5974.12,
+      "p95": 12026.164,
+      "p99": 12522.702
+    },
+    "latency_benign_ms": {
+      "p50": 7561.93,
+      "p95": 12461.32,
+      "p99": 12544.624
+    },
+    "latency_attack_ms": {
+      "p50": 2687.725,
+      "p95": 9329.528,
+      "p99": 11468.746
+    },
+    "latency_components_ms": {
+      "client_throttle_ms": {
+        "p50": 592.52,
+        "p95": 2388.751,
+        "p99": 2397.297
+      },
+      "client_backoff_ms": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "http_attempts_latency_ms": {
+        "p50": 5321.82,
+        "p95": 9667.366,
+        "p99": 10799.483
+      }
+    },
+    "family_distribution": {
+      "multiturn": 1,
+      "translation_override": 1,
+      "business_policy": 1,
+      "indirect_markdown": 1,
+      "delimiter": 1,
+      "multi_language": 1,
+      "fake_runtime": 1,
+      "indirect": 1,
+      "tool_spoof": 1,
+      "social_engineering": 1,
+      "exfiltration": 1,
+      "indirect_xml": 1,
+      "indirect_csv": 1,
+      "role_spoof": 1,
+      "indirect_yaml": 1,
+      "instruction_override": 1,
+      "indirect_json": 1,
+      "indirect_html": 1,
+      "encoding": 1,
+      "forged_tool_result": 1
+    },
+    "canary_signals": 0
+  },
+  "independent_filter_probe_conditional": {
+    "heuristic_blocked": {
+      "evaluated": 40,
+      "benign_evaluated": 20,
+      "attack_evaluated": 20,
+      "benign_blocked": 1,
+      "attack_blocked": 9,
+      "not_executed_or_unavailable": 0
+    },
+    "ml_blocked": {
+      "evaluated": 30,
+      "benign_evaluated": 19,
+      "attack_evaluated": 11,
+      "benign_blocked": 0,
+      "attack_blocked": 8,
+      "not_executed_or_unavailable": 10
+    },
+    "filter_blocked": {
+      "evaluated": 40,
+      "benign_evaluated": 20,
+      "attack_evaluated": 20,
+      "benign_blocked": 1,
+      "attack_blocked": 17,
+      "not_executed_or_unavailable": 0
+    }
+  },
+  "pairs_completed": 40,
+  "paired_benign_discordant": {
+    "only_protected_blocked": 2,
+    "only_baseline_blocked": 0
+  },
+  "note": [
+    "Baseline: filters disabled, Scope+RBAC+MCP+business prompts retained.",
+    "Repeated contextual variants of known seeds are not independent semantic families.",
+    "Technical failures, including nested scope.reason=scope_unavailable, are excluded from valid decisions.",
+    "attacks_blocked_semantic is legacy naming for nontechnical blocks, including scope/RBAC; not injection detection.",
+    "Use attacks_blocked_by_injection_guard_observed only for the explicitly labeled conversation_injection reason.",
+    "Operational blocks including technical failures are reported separately and are NOT security true positives.",
+    "Not blocked does not mean attack complied or sensitive data leaked.",
+    "No independent LLM quality judge; 'allowed' != task success.",
+    "Token subtotals only, not OpenAI invoice reconciliation; retries may double bill.",
+    "Use synthetic hidden canaries installed independently for leakage measurement."
+  ]
+}

@@ -14,7 +14,7 @@ El clasificador ML evaluado de forma aislada sobre esa muestra produjo TP=470, F
 
 ## Protocolo y evidencia
 
-- Fecha de la ejecución: 2026-10-11.
+- Fecha de la ejecución: 2026-10-11; umbral ML y de bloqueo de la evaluación: 0.66.
 - Corpus corregido bilingüe: 8,400 filas.
 - Separación declarada: entrenamiento 6,540, validación 846 y prueba 1,014; la muestra medida contiene 1,000 casos equilibrados sin reemplazo.
 - La verificación registrada informa cero solapamientos de familias entre entrenamiento, validación y muestra; 1,000 prompts sin duplicados; modelo y manifiesto verificados.
@@ -28,6 +28,8 @@ Los artefactos de ejecución permanecen locales porque `data/results/` está exc
 | `final_report.md` | `63604d2eb108bd25acfe128e16905c5eb5ea1958860d6eaaddecbaF374924c9f` |
 | `comparison.json` | `bc7aff20d55c8b2f01bc9ff78340cfd486d0de9f0c7f86f84cc1fb42fdf9915f` |
 | `benchmark/measured_cases.csv` | `74cfe977aafd02402c74fdcdd953302918dced0902b647015fbe68aef233e033` |
+
+El modelo ligero activo actual tiene el mismo hash que el artefacto de la evaluación. Sin embargo, la configuración activa usa un umbral alto de 0.60 y las reglas heurísticas cambiaron; por ello, el resultado histórico no describe automáticamente el comportamiento desplegado. La comprobación de la capa activa y esta diferencia se documentan en `docs/reproducibilidad_resultados_bilingues.md`.
 
 ## Uso adecuado en el artículo
 

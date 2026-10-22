@@ -1,0 +1,26 @@
+{
+  "model_hash_verified": true,
+  "manifest_verified": true,
+  "sample_cases": 1000,
+  "benign": 500,
+  "attacks": 500,
+  "duplicate_prompts": 0,
+  "train_sample_family_overlap": 0,
+  "val_sample_family_overlap": 0,
+  "api_health": 200,
+  "api_ml_inference": "SUCCESS",
+  "dashboard": "OK",
+  "provider_calls": 0,
+  "tokens": 0,
+  "python_tests": {
+    "passed": 992,
+    "failed": 0,
+    "deselected_live": 9,
+    "warnings": 8
+  },
+  "sdk_tests": {
+    "passed": 64,
+    "failed": 0
+  },
+  "model_sha256": "c4dfb0128d8aa6a91bbe0cc6e81b69b048ee2a1cc49bc072bf8eecc546299efb"
+}
