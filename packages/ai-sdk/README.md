@@ -57,7 +57,14 @@ El paquete se distribuye localmente con `npm pack`; no está publicado en un reg
 
 ## Alcance del sistema
 
-Añade `scopeEvaluator: createScopeEvaluator({ model: openai(process.env.OPENAI_MODEL) })`
+A partir de 1.3.0 puedes usar `scopeEvaluator: createContextEvaluator({ model })` para
+obtener intención canónica, procedencia y alcance en una sola evaluación estructurada.
+Se importa de `@promption/ai-sdk`. El historial, política e identidad se resuelven en
+el servidor; el evaluador no reemplaza ACL ni Output Guard. Ver
+[contrato y límites](../../docs/context_intent_20261023.md).
+
+La integración anterior sigue disponible:
+`scopeEvaluator: createScopeEvaluator({ model: openai(process.env.OPENAI_MODEL) })`
 a `createPromption` para evaluar el alcance definido en `generateText({ system, ... })`
 o `streamText`. Importa `createScopeEvaluator` desde `@promption/ai-sdk`.
 El middleware comprueba solicitudes y llamadas a herramientas con el historial.

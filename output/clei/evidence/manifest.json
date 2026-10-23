@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-02",
+  "git_commit": "8e13d8cffb80e79139758efea54687f3f353c275",
+  "python": "3.11.15 (main, Jul  5 2026, 19:11:12) [GCC 16.1.1 20260625]",
+  "platform": "Linux-7.2.8-1-cachyos-x86_64-with-glibc2.44",
+  "processor": "",
+  "cpu_count": 12,
+  "sklearn": "1.9.0",
+  "pandas": "3.0.6",
+  "numpy": "2.4.6",
+  "full_n": 7823,
+  "full_labels": {
+    "0": 4247,
+    "1": 3576
+  },
+  "public_before_cleaning": 5885,
+  "conflicting_normalized_rows": 0,
+  "duplicate_normalized_rows_removed": 13,
+  "public_n": 5872,
+  "corpus_counts": {
+    "NEPI": {
+      "0": 201,
+      "1": 313
+    },
+    "Shomi28": {
+      "0": 640,
+      "1": 640
+    },
+    "deepset": {
+      "0": 401,
+      "1": 259
+    },
+    "jailbreak_llms": {
+      "0": 1959,
+      "1": 1357
+    },
+    "yanismiraoui": {
+      "0": 0,
+      "1": 102
+    }
+  },
+  "languages": {
+    "en": 5652,
+    "es": 220
+  },
+  "rules": 60,
+  "benign_rules": 5,
+  "split_audit_test_n": 1184,
+  "split_audit_synthetic_n": 199,
+  "latency": {
+    "n": 600,
+    "median_ms": 4.329687500046475,
+    "p95_ms": 21.686519399986512,
+    "mean_ms": 7.011717693331813,
+    "scope": "600 warm in-process scalar predictions on first 200 seed-42 test rows"
+  },
+  "hashes": {
+    "data/processed/training_data.csv": "18490c4dc96d2ba2040bc1d6bbbe45f63cde13ba2f47358e7571fcdefce48e83",
+    "data/processed/label_overrides.csv": "0347b180b30a4382c6a5ad6030f6630685380754b6b802d6aeeafa7d3be8d108",
+    "data/processed/quarantine.csv": "b3808c7e9e025ec05f05f8431774097babd31c51f11f5cef8237497bab4183be",
+    "config/config.yaml": "29c38e42dfbd1d0d0cae89756e024fed8d7f4ead975e27ffc0195459fa70d999",
+    "config/heuristics.yaml": "cfb575e9ef8ea0185a7636a6663c3763fa67a117f9c811718456800323216672",
+    "promption/filter/ensemble_filter.py": "2f3c5986fefd74460cfc407b49032ac8e076197283711f8dbe1983317de6375c",
+    "promption/training/split.py": "01a4b9983e06cd0354c8a087e6d1e86b89c0a34d62d48b7446193c43d4de4a42",
+    "models/lightweight_classifier.pkl": "862c87b7c809ac906b6584a024244b0b3206e7c3a946145d4db62ba73cec9988",
+    "promption/filter/heuristic_filter.py": "92915bb4e87a07f65a34dadb84fda824093229e63094b12b8e487b4e6a373934",
+    "promption/training/train_lightweight.py": "3daec0b8a00c9e653ca0e0ec3c5cb292f64656f5b6c88a1b1b6d22f29f49ccbe",
+    "promption/training/dataset.py": "f010f30897ab565fd318dcd79b3abab486288419f5536b69a18ac22abc6d8fe8",
+    "promption/utils/config.py": "bc113306e21690da3300510bc364c5c6ea27ab3d8560481be386c865698b10ee",
+    "promption/utils/lang.py": "7c7d0931c24d9dcea181d01a727d8f01d8f864633dcea244f0601d5903b39534"
+  },
+  "experimental_harness_sha256": "cc575b047f643e297555d5d41a33d3ad1e36110e99e89b187d2a3d51a4f038a3"
+}

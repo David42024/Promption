@@ -1,0 +1,2 @@
+# Optional fine-tuned sequence classifiers; official tokenizer/inference runtime, no downloaded weights.
+-e .[small-models]

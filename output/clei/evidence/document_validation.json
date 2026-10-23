@@ -1,0 +1,34 @@
+{
+  "abstract_words": 182,
+  "manuscript_words": 8273,
+  "tables": 9,
+  "figures": 3,
+  "title_points": 16,
+  "body_points": 10,
+  "single_spacing": true,
+  "page_size_mm": [
+    210,
+    297
+  ],
+  "margins_cm": {
+    "top": 2,
+    "right": 2,
+    "bottom": 2.5,
+    "left": 2.5
+  },
+  "references": 14,
+  "page_count": 15,
+  "all_15_pages_visually_reviewed": true,
+  "visual_review": "passed after final rendering",
+  "author_instructions": "AuthorInstructions2016-OTH.pdf supplied by the user",
+  "author_instructions_sha256": "955e0675d084dde5d85b04970021626f98de3d971f77156fc06e183ed2323650",
+  "headings_explicitly_left_aligned": true,
+  "table_vertical_borders_absent": true,
+  "abstract_and_keywords_on_first_page": true,
+  "pdf_uri_links": 16,
+  "confusion_matrices_verified": 32,
+  "predictions_verified": 9397,
+  "input_hashes_verified": 13,
+  "docx_sha256": "cc237da3144286abc4452d0f166b378c130de69fbec58aae81a99382a6424730",
+  "pdf_sha256": "ebf60a17fc548b9d4a4e96ffae542490a6a763d1a6554a094da595f9648226d1"
+}

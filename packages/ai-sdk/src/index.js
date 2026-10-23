@@ -3,6 +3,7 @@ import { PromptionError } from "./errors.js";
 import { createFilterApiTransport } from "./transports.js";
 import { validateScopeDecision, validateScopeRequest } from "./scope.js";
 export { createScopeEvaluator } from "./scope.js";
+export { createContextEvaluator } from "./context.js";
 export { PromptionError } from "./errors.js";
 export { createFilterApiTransport, createGuardEndpointTransport } from "./transports.js";
 export { MetricsAggregator } from "./metrics.js";

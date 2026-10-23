@@ -9,12 +9,17 @@ if str(ROOT) not in sys.path:
 
 
 @pytest.fixture(autouse=True)
-def _reset_singletons():
+def _reset_singletons(monkeypatch):
     """The MLFilter is a process-wide singleton; reset between tests to avoid
     cross-test state (fake encoders vs real model)."""
     from src.filter.ml_filter import MLFilter
     from promption.filter.ml_filter_lightweight import LightMLFilter
     from promption.limiter import get_rate_limiter_backend
+    for name in (
+        "PROMPTION_API_KEYS", "PIF_API_KEYS", "PROMPTION_ADMIN_API_KEYS",
+        "PROMPTION_API_KEY", "PROMPTION_TENANT_ID", "FILTER_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
     MLFilter._instance = None
     LightMLFilter._instance = None
     get_rate_limiter_backend().reset()

@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "files": 182,
+  "zip_bytes": 6620321,
+  "zip_sha256": "89d817f1fe756ef9a3929b2df5cf3d635c4d753c53872d06b53dde659fdb902b",
+  "pages": 15,
+  "metric_rows_checked": 32,
+  "predictions_checked": 9397,
+  "links": 16,
+  "tracked_source_modified": false
+}

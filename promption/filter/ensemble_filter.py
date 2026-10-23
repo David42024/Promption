@@ -1,5 +1,6 @@
 """Ensemble filter — orchestrates input detection and guarded generation."""
 import time
+import math
 from dataclasses import dataclass
 
 from promption.filter.exceptions import (
@@ -69,6 +70,7 @@ class EnsembleResult:
     layer: str = "ensemble"
     heuristic_latency_ms: float = 0.0
     ml_latency_ms: float = 0.0
+    additional_results: tuple = ()
 
     @property
     def blocking_reason(self) -> str:
@@ -82,6 +84,8 @@ class EnsembleResult:
             reasons.append(f"heurística ({rules or 'score alto'})")
         if self.ml is not None and self.ml.blocked:
             reasons.append(f"ML (p={self.ml.probability:.2f})")
+        reasons.extend(f"ML adicional {index + 1} (score={result.probability:.2f})"
+                       for index, result in enumerate(self.additional_results) if result.blocked)
         return " + ".join(reasons) or "permitido"
 
     @property
@@ -91,7 +95,7 @@ class EnsembleResult:
 
 class EnsembleFilter:
     def __init__(self, heuristic: HeuristicFilter | None = None, ml: MLFilter | None = None,
-                 ml_threshold: float | None = None):
+                 ml_threshold: float | None = None, additional_filters=None):
         conf = _CONF.get("ensemble", {})
         self.heuristic_weight = float(conf.get("heuristic_weight", 0.4))
         self.ml_weight = float(conf.get("ml_weight", 0.6))
@@ -108,6 +112,15 @@ class EnsembleFilter:
         else:
             self.ml = ml or MLFilter()
         self.ml_threshold = self.high_threshold
+        if additional_filters is None:
+            from promption.filter.ml_filter_lightweight import LightMLFilter as ArtifactFilter
+            additional_filters = []
+            for detector in conf.get("additional_classifiers", []):
+                threshold = float(detector["threshold"])
+                if not math.isfinite(threshold) or not 0 < threshold < 1:
+                    raise ValueError("Additional detector threshold must be strictly between zero and one")
+                additional_filters.append(ArtifactFilter.from_artifact(detector["model_path"], threshold=threshold))
+        self.additional_filters = tuple(additional_filters)
 
         # Observability state tracking
         self._ml_state: str = "HEALTHY" if self.ml.is_trained() else "UNAVAILABLE"
@@ -225,6 +238,29 @@ class EnsembleFilter:
                 ml_latency = (time.perf_counter() - t_ml0) * 1000
 
         heuristic_risk = heur.score if heur.signal == "malicious" else 0.0
+        additional_results = []
+        additional_status = "NOT_CONFIGURED"
+        if self.additional_filters:
+            if heur.blocked or (ml_res is not None and ml_res.blocked):
+                additional_status = "SKIPPED_BASE_VETO"
+            elif explicit_benign_fast_path:
+                additional_status = "SKIPPED_BENIGN_FAST_PATH"
+            elif not use_ml:
+                additional_status = "SKIPPED_USER_DISABLED"
+            else:
+                additional_status = "SUCCESS"
+                t_extra = time.perf_counter()
+                try:
+                    for detector in self.additional_filters:
+                        extra = detector.analyze(text)
+                        if (not isinstance(extra.blocked, bool) or not math.isfinite(extra.probability)
+                                or not 0 <= extra.probability <= 1):
+                            raise MLInferenceError("Invalid additional detector result")
+                        additional_results.append(extra)
+                        if extra.blocked:
+                            break
+                finally:
+                    ml_latency += (time.perf_counter() - t_extra) * 1000
         ml_probability = ml_res.probability if ml_res is not None else None
         weighted_score = (
             self.heuristic_weight * heuristic_risk + self.ml_weight * ml_probability
@@ -249,6 +285,11 @@ class EnsembleFilter:
             # ML unavailable or failed on uncertain input: fail-safe to GUARDED (requires Output Guard)
             decision = "GUARDED"
 
+        if any(result.blocked for result in additional_results):
+            decision = "BLOCKED"
+        if additional_results:
+            score = max(score, *(result.probability for result in additional_results))
+
         blocked = decision == "BLOCKED"
         safe_intent_override = False
 
@@ -266,6 +307,9 @@ class EnsembleFilter:
             "ml_error_code": ml_error_code,
             "ml_attempted": ml_attempted,
             "ml_failed": ml_failed,
+            "additional_status": additional_status,
+            "additional_filters": [{"blocked": result.blocked, "score": result.probability,
+                                    "threshold": result.threshold} for result in additional_results],
             "ml_state": self._ml_state,
             "safe_intent_override": safe_intent_override,
             "explicit_benign_override": explicit_benign_fast_path,
@@ -290,6 +334,7 @@ class EnsembleFilter:
             latency_ms=latency_ms,
             heuristic_latency_ms=heuristic_latency,
             ml_latency_ms=ml_latency,
+            additional_results=tuple(additional_results),
         )
 
     def layers_status(self) -> dict:
@@ -309,6 +354,7 @@ class EnsembleFilter:
             "ml_error_code": self._ml_last_error_code,
             "ml_consecutive_failures": self._consecutive_failures,
             "ml_threshold": self.high_threshold,
+            "additional_classifier_count": len(self.additional_filters),
             "decision_low_threshold": self.low_threshold,
             "decision_high_threshold": self.high_threshold,
         }

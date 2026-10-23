@@ -1,0 +1,8 @@
+{
+  "calls": 48,
+  "spent_upper_usd": 0.295118,
+  "budget_stopped": false,
+  "stop_reason": "operational_failure",
+  "decisions": 47,
+  "external_tools_executed": 0
+}

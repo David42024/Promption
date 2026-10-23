@@ -31,25 +31,33 @@ function key(message) {
   return JSON.stringify([message.role, message.tool_name ?? '', content]);
 }
 
-export function conversationEvidence(prompt, retained = [], limits = {}) {
-  const actual = evidence(prompt);
-  const messages = retained.map(message => ({ ...message }));
-  if (!messages.length) messages.push(...actual);
-  else {
-    const lastUser = actual.filter(message => message.role === 'user').at(-1);
-    if (lastUser && key(lastUser) !== key(messages.filter(message => message.role === 'user').at(-1) ?? {})) {
-      messages.push(lastUser);
-    }
-    const counts = new Map();
-    for (const message of retained.filter(message => message.role === 'tool')) {
-      counts.set(key(message), (counts.get(key(message)) ?? 0) + 1);
-    }
-    for (const message of actual.filter(message => message.role === 'tool')) {
-      const remaining = counts.get(key(message)) ?? 0;
-      if (remaining) counts.set(key(message), remaining - 1);
-      else messages.push(message);
+function mergeEvidence(retained, actual) {
+  const left = retained.map(key), right = actual.map(key);
+  const common = Array.from({ length: left.length + 1 }, () => new Uint16Array(right.length + 1));
+  for (let i = left.length - 1; i >= 0; i--) {
+    for (let j = right.length - 1; j >= 0; j--) {
+      common[i][j] = left[i] === right[j] ? 1 + common[i + 1][j + 1]
+        : Math.max(common[i + 1][j], common[i][j + 1]);
     }
   }
+  const messages = [];
+  let i = 0, j = 0;
+  while (i < retained.length && j < actual.length) {
+    if (left[i] === right[j]) { messages.push({ ...actual[j++] }); i++; }
+    else if (common[i + 1][j] >= common[i][j + 1]) messages.push({ ...retained[i++] });
+    else messages.push({ ...actual[j++] });
+  }
+  return messages.concat(retained.slice(i).map(message => ({ ...message })),
+    actual.slice(j).map(message => ({ ...message })));
+}
+
+export function conversationEvidence(prompt, retained = [], limits = {}) {
+  const actual = evidence(prompt);
+  if (!Array.isArray(retained)) throw new TypeError('Retained conversation evidence must be an array');
+  if (Math.max(retained.length, actual.length) > (limits.maxMessages ?? 128)) {
+    throw new PromptionError('CONVERSATION_TOO_LARGE');
+  }
+  const messages = mergeEvidence(retained, actual);
   if (messages.length > (limits.maxMessages ?? 128)) throw new PromptionError('CONVERSATION_TOO_LARGE');
   let characters = 0;
   for (const message of messages) {

@@ -91,6 +91,12 @@ de herramientas se validan aparte; las instrucciones confiables van en `system`.
 
 ### Detección conversacional
 
+Las correcciones y la evaluación diagnóstica de la versión 1.1.1 se describen en
+[`docs/research_improvements_20261023.md`](docs/research_improvements_20261023.md).
+La versión 1.2.0 añade segmentación configurable y detectores complementarios con
+umbral independiente. La comparación de estrategias y el perfil experimental están
+en [`docs/guardrail_strategies_20261023.md`](docs/guardrail_strategies_20261023.md).
+
 La revisión acumulativa está activada en el middleware: antes de `generateText` o
 `streamText` envía al filtro mensajes del usuario, respuestas del asistente como
 contexto y resultados de herramientas con su origen separado. El filtro inspecciona
@@ -340,13 +346,22 @@ contra un modelo de lenguaje.
 
 ## Construcción, distribución y comprobación
 
+La versión 1.3.0 incorpora `createContextEvaluator` para intención y alcance en
+una sola evaluación, `ContextScopeGuard`/`AsyncContextScopeGuard` y el adaptador
+opcional `SmallModelFilter`. Contratos, integración, alternativas y límites:
+[contexto e intención](docs/context_intent_20261023.md).
+
+La versión 1.3.3 corrige vetos ML heredados en intervenciones autónomas y exige Output
+Guard para esas transiciones. Conserva la inspección de ataques entre turnos y el
+historial completo: [corrección y evaluación](docs/history_transitions_20261023.md).
+
 ```bash
 uv build
 cd packages/ai-sdk && npm pack
 ```
 
 El wheel en `dist/` y el tarball de npm se instalan en otros proyectos con
-`pip install /ruta/promption-1.1.0-py3-none-any.whl` y `npm install /ruta/promption-ai-sdk-1.1.0.tgz`.
+`pip install /ruta/promption-1.3.3-py3-none-any.whl` y `npm install /ruta/promption-ai-sdk-1.3.3.tgz`.
 Estos comandos construyen paquetes locales; no publican en PyPI ni npm.
 
 ```bash

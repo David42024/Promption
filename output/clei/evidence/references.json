@@ -1,0 +1,58 @@
+[
+  [
+    "K. Greshake, S. Abdelnabi, S. Mishra, C. Endres, T. Holz, and M. Fritz, “Not what you've signed up for: Compromising real-world LLM-integrated applications with indirect prompt injection,” arXiv preprint arXiv:2302.12173, 2023.",
+    "https://doi.org/10.48550/arXiv.2302.12173"
+  ],
+  [
+    "J. Yi et al., “Benchmarking and defending against indirect prompt injection attacks on large language models,” arXiv preprint arXiv:2312.14197, ver. 4, 2025.",
+    "https://doi.org/10.48550/arXiv.2312.14197"
+  ],
+  [
+    "Q. Zhan, Z. Liang, Z. Ying, and D. Kang, “InjecAgent: Benchmarking indirect prompt injections in tool-integrated large language model agents,” arXiv preprint arXiv:2403.02691, 2024.",
+    "https://doi.org/10.48550/arXiv.2403.02691"
+  ],
+  [
+    "E. Debenedetti, J. Zhang, M. Balunović, L. Beurer-Kellner, M. Fischer, and F. Tramèr, “AgentDojo: A dynamic environment to evaluate prompt injection attacks and defenses for LLM agents,” arXiv preprint arXiv:2406.13352, 2024.",
+    "https://doi.org/10.48550/arXiv.2406.13352"
+  ],
+  [
+    "E. Wallace, K. Xiao, R. Leike, L. Weng, J. Heidecke, and A. Beutel, “The instruction hierarchy: Training LLMs to prioritize privileged instructions,” arXiv preprint arXiv:2404.13208, 2024.",
+    "https://doi.org/10.48550/arXiv.2404.13208"
+  ],
+  [
+    "E. Debenedetti et al., “Defeating prompt injections by design,” arXiv preprint arXiv:2503.18813, ver. 2, 2025.",
+    "https://doi.org/10.48550/arXiv.2503.18813"
+  ],
+  [
+    "R. Bhagwatkar et al., “Indirect prompt injections: Are firewalls all you need, or stronger benchmarks?” arXiv preprint arXiv:2510.05244, ver. 2, 2026.",
+    "https://doi.org/10.48550/arXiv.2510.05244"
+  ],
+  [
+    "verazuo, “jailbreak_llms,” GitHub repository, accessed Oct. 2, 2026. [Online]. Available:",
+    "https://github.com/verazuo/jailbreak_llms"
+  ],
+  [
+    "Vaibhav-GOAT, “nepi-prompts-dataset,” Hugging Face dataset, accessed Oct. 2, 2026. [Online]. Available:",
+    "https://huggingface.co/datasets/Vaibhav-GOAT/nepi-prompts-dataset"
+  ],
+  [
+    "Shomi28, “prompt-injection-dataset,” Hugging Face dataset, accessed Oct. 2, 2026. [Online]. Available:",
+    "https://huggingface.co/datasets/Shomi28/prompt-injection-dataset"
+  ],
+  [
+    "deepset, “prompt-injections,” Hugging Face dataset, accessed Oct. 2, 2026. [Online]. Available:",
+    "https://huggingface.co/datasets/deepset/prompt-injections"
+  ],
+  [
+    "yanismiraoui, “prompt_injections,” Hugging Face dataset, accessed Oct. 2, 2026. [Online]. Available:",
+    "https://huggingface.co/datasets/yanismiraoui/prompt_injections"
+  ],
+  [
+    "scikit-learn developers, “TfidfVectorizer,” API documentation, accessed Oct. 2, 2026. [Online]. Available:",
+    "https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html"
+  ],
+  [
+    "scikit-learn developers, “LogisticRegression,” API documentation, accessed Oct. 2, 2026. [Online]. Available:",
+    "https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html"
+  ]
+]

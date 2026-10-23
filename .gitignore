@@ -70,3 +70,6 @@ Thumbs.db
 # Frontend (demo Next.js)
 node_modules/
 .next/
+
+output/research_20261023/
+output/guardrail_experiments_20261023/

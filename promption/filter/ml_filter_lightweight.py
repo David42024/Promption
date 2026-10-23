@@ -6,10 +6,9 @@ This is a much lighter alternative to SentenceTransformers + RandomForest:
 - Very fast inference (~10ms vs ~200ms)
 """
 import threading
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
-
-import numpy as np
 
 from promption.filter.exceptions import (
     MLInferenceError,
@@ -18,6 +17,7 @@ from promption.filter.exceptions import (
 )
 from promption.utils.config import load_config
 from promption.utils.logger import logger
+from promption.filter.text_scoring import score_texts, scoring_views
 
 _CONF = load_config()
 _MODEL_PATH = _CONF["model"]["lightweight_classifier_path"]
@@ -42,6 +42,15 @@ class LightMLFilter:
     _instance: "LightMLFilter | None" = None
     _lock = threading.Lock()
 
+    @classmethod
+    def from_artifact(cls, model_path: str, *, threshold: float):
+        """Create an independent detector without changing the default singleton."""
+        if not math.isfinite(threshold) or not 0 < threshold < 1:
+            raise ValueError("Detector threshold must be strictly between zero and one")
+        instance = object.__new__(cls)
+        cls.__init__(instance, model_path=model_path, threshold=threshold)
+        return instance
+
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             with cls._lock:
@@ -56,6 +65,7 @@ class LightMLFilter:
                 self.model_path = Path(model_path)
                 self._vectorizer = None
                 self._classifier = None
+                self._inference = {}
             if threshold is not None:
                 self.threshold = threshold
             return
@@ -63,6 +73,7 @@ class LightMLFilter:
         self.threshold = threshold if threshold is not None else float(_CONF["model"].get("confidence_threshold", 0.5))
         self._vectorizer = None
         self._classifier = None
+        self._inference = {}
         self._initialized = True
 
     def _ensure_loaded(self) -> None:
@@ -85,8 +96,13 @@ class LightMLFilter:
                 model_data = joblib.load(self.model_path)
                 if not isinstance(model_data, dict) or "vectorizer" not in model_data or "classifier" not in model_data:
                     raise ValueError("Model file is missing required vectorizer or classifier components")
+                inference = model_data.get("inference", {})
+                if not isinstance(inference, dict):
+                    raise ValueError("Invalid classifier inference settings")
+                scoring_views("", **inference)
                 self._vectorizer = model_data["vectorizer"]
                 self._classifier = model_data["classifier"]
+                self._inference = dict(inference)
             except Exception as exc:
                 logger.error("Failed to load lightweight ML model: %s", type(exc).__name__)
                 raise MLModelLoadError(f"Corrupt or invalid model file: {type(exc).__name__}") from exc
@@ -96,18 +112,11 @@ class LightMLFilter:
             logger.info("Max features: %d", model_data.get('max_features', 0))
 
     def predict_proba(self, text: str) -> float:
-        """Return malicious probability in [0,1]."""
+        """Return maximum malicious score in [0,1] for the artifact's inspection views."""
         self._ensure_loaded()
         try:
-            # TF-IDF transform
-            X = self._vectorizer.transform([text])
-            
-            # Predict probability
-            proba = self._classifier.predict_proba(X)[0]
-            
-            # Assuming class 1 is "injection/malicious"
-            pos_idx = int(np.flatnonzero(self._classifier.classes_ == 1)[0]) if len(self._classifier.classes_) > 1 else 1
-            return float(proba[pos_idx])
+            return float(score_texts(self._vectorizer, self._classifier, [text],
+                                    inference=self._inference)[0])
         except Exception as exc:
             raise MLInferenceError(f"Lightweight ML inference failed: {type(exc).__name__}") from exc
 

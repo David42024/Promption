@@ -57,6 +57,17 @@ export interface ScopeDecision {
   model?: string | null;
   provider_calls?: number;
   reused?: boolean;
+  intent?: IntentAssessment;
+}
+export interface IntentAssessment {
+  name: "social" | "public_information" | "document_creation" | "web_retrieval" | "clarification"
+    | "security_discussion" | "protected_information" | "instruction_override" | "privilege_escalation" | "other" | "unknown";
+  attack: "none" | "instruction_override" | "secret_extraction" | "system_prompt_extraction"
+    | "privilege_escalation" | "indirect_injection" | "unknown";
+  relation: "standalone" | "follow_up" | "quoted" | "unresolved";
+  origin: "none" | "user" | "tool" | "mixed";
+  confidence: number;
+  evidence: number[];
 }
 export interface ScopeRequest {
   text: string;
@@ -67,7 +78,7 @@ export interface ScopeRequest {
   signal?: AbortSignal;
   providerOptions?: Record<string, unknown>;
 }
-export type ScopeEvaluator = (request: ScopeRequest) => Promise<Pick<ScopeDecision, "classification" | "reason"> & { usage?: ScopeUsage | null; allowed?: boolean; status?: number; provider_calls?: number; reused?: boolean }>;
+export type ScopeEvaluator = (request: ScopeRequest) => Promise<Pick<ScopeDecision, "classification" | "reason"> & { usage?: ScopeUsage | null; allowed?: boolean; status?: number; provider_calls?: number; reused?: boolean; intent?: IntentAssessment }>;
 export interface GuardRequest {
   text: string;
   direction: Direction;
@@ -130,6 +141,8 @@ export class PromptionError extends Error {
 export function createFilterApiTransport(options: FilterApiOptions): GuardTransport;
 export function createGuardEndpointTransport(options: GuardEndpointOptions): GuardTransport;
 export function createScopeEvaluator(options: { model: LanguageModel; timeoutMs?: number; maxOutputTokens?: number; providerOptions?: Record<string, unknown> }): ScopeEvaluator;
+export function createContextEvaluator(options: { model: LanguageModel; timeoutMs?: number; maxOutputTokens?: number;
+  minimumConfidence?: number; providerOptions?: Record<string, unknown> }): ScopeEvaluator;
 export function createPromption(options: PromptionOptions): {
   check(text: string, options: Omit<GuardRequest, "text">): Promise<string>;
   checkScope(text: string, options: Omit<ScopeRequest, "text">): Promise<ScopeDecision>;

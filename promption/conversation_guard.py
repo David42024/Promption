@@ -1,13 +1,12 @@
 """Origin-aware inspection of cumulative user and tool instructions."""
 from __future__ import annotations
 
-import html
 import json
 import re
-import unicodedata
 from dataclasses import dataclass, field
 
 from .utils.config import load_config, load_heuristics
+from .utils.text import normalize_content
 
 
 class ConversationLimitError(ValueError):
@@ -29,17 +28,13 @@ class ConversationDecision:
     message_count: int = 0
     tool_message_count: int = 0
     reason: str = "conversation_checked"
+    evaluation_mode: str = "cumulative"
 
     def metadata(self) -> dict:
         return {"blocked": self.blocked, "requires_output_guard": self.requires_output_guard,
                 "matched_rules": self.matched_rules, "message_count": self.message_count,
-                "tool_message_count": self.tool_message_count, "reason": self.reason}
-
-
-def normalize_content(text: str) -> str:
-    text = html.unescape(unicodedata.normalize("NFKC", text))
-    text = "".join(character for character in text if unicodedata.category(character) != "Cf")
-    return re.sub(r"\s+", " ", text).strip()
+                "tool_message_count": self.tool_message_count, "reason": self.reason,
+                "evaluation_mode": self.evaluation_mode}
 
 
 def _strings(value, depth: int = 0, *, include_keys: bool = False) -> list[str]:
@@ -92,6 +87,14 @@ _ALIAS = re.compile(
     r"(?i)(?:\b(?:define|llama(?:remos)?|llamar[eé]|denomina|call|name)\s+[\"']?([\w-]{1,40})[\"']?\s+(?:a|al|como|as|to mean|=)\s+([^;\n]{1,200})"
     r"|[\"']?([\w-]{1,40})[\"']?\s+(?:significa|se refiere a|means|stands for)\s+([^;\n]{1,200})"
     r"|\b([A-Za-z][\w-]{0,39})\s*[:=]\s*([^;\n]{1,200}))"
+)
+
+_TURN_DEPENDENCY = re.compile(
+    r"(?i)\b(?:cuando\s+(?:yo\s+)?(?:diga|escriba|responda)|si\s+(?:yo\s+)?(?:digo|escribo|respondo)"
+    r"|(?:cada\s+vez|en\s+cuanto)\s+que|(?:(?:mi|tu|el|la)\s+)?(?:pr[oó]xim[oa]|siguiente)"
+    r"\s+(?:mensaje|respuesta|turno)|(?:de|a)\s+ahora\s+en\s+adelante"
+    r"|when(?:ever)?\s+i\s+(?:say|write|reply)|if\s+i\s+(?:say|write|reply)"
+    r"|(?:my|your|the)\s+next\s+(?:message|reply|turn)|from\s+now\s+on)\b"
 )
 
 
@@ -162,10 +165,15 @@ class ConversationGuard:
                       if rule.get("enabled", True)]
 
     def analyze(self, messages: list, *, roles: list[str] | None = None,
-                use_ml: bool = True) -> ConversationDecision:
+                use_ml: bool = True, current_text: str | None = None) -> ConversationDecision:
         messages = validate_messages(messages)
         decision = ConversationDecision(message_count=len(messages),
                                         tool_message_count=sum(message.role == "tool" for message in messages))
+        if current_text is not None:
+            if not isinstance(current_text, str):
+                raise ValueError("Current conversation text must be a string")
+            if not messages or messages[-1].content != current_text or messages[-1].role == "assistant":
+                messages = validate_messages(messages + [ConversationMessage("user", current_text)])
         views = conversation_views(messages)
         for text in views:
             heuristic = self.input_filter.heuristic.analyze(text, roles=roles)
@@ -179,13 +187,31 @@ class ConversationGuard:
         if not decision.blocked and views:
             untrusted = [message for message in messages if message.role in {"user", "tool"}]
             combined = " ".join(message_text(message) for message in untrusted)
-            result = self.input_filter.analyze(combined, roles=roles, use_ml=use_ml)
-            decision.blocked |= result.blocked
-            decision.requires_output_guard |= result.requires_output_guard
-            if result.blocked:
-                decision.matched_rules.extend(rule["name"] for rule in result.heuristic.matched_rules)
-                if result.ml and result.ml.blocked:
-                    decision.matched_rules.append("conversation_ml")
+            benign_dialogue = all(
+                message.role == "user"
+                and self.input_filter.heuristic.analyze(message_text(message), roles=roles).signal == "benign"
+                for message in untrusted
+            )
+            independent = (len(untrusted) > 1 and messages[-1].role == "user"
+                and not decision.tool_message_count
+                and callable(getattr(self.input_filter.heuristic, "is_independent_turn", None))
+                and self.input_filter.heuristic.is_independent_turn(messages[-1].content, roles=roles)
+                and not any(_ALIAS.search(message_text(message)) or _TURN_DEPENDENCY.search(message_text(message))
+                            for message in untrusted[:-1]))
+            if independent and not benign_dialogue:
+                decision.evaluation_mode = "independent_turn"
+                decision.requires_output_guard = True
+                decision.reason = "independent_turn_requires_output_guard"
+            elif not benign_dialogue:
+                result = self.input_filter.analyze(combined, roles=roles, use_ml=use_ml)
+                decision.blocked |= result.blocked
+                decision.requires_output_guard |= result.requires_output_guard
+                if result.blocked:
+                    decision.matched_rules.extend(rule["name"] for rule in result.heuristic.matched_rules)
+                    if result.ml and result.ml.blocked:
+                        decision.matched_rules.append("conversation_ml")
+                    decision.matched_rules.extend(f"conversation_additional_ml_{index + 1}"
+                        for index, extra in enumerate(getattr(result, "additional_results", ())) if extra.blocked)
         decision.matched_rules = list(dict.fromkeys(decision.matched_rules))
         if decision.blocked:
             decision.reason = "conversation_injection"

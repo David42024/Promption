@@ -1,4 +1,5 @@
-import { createPromption, createFilterApiTransport, createScopeEvaluator } from '../src/index.js';
+import { createPromption, createFilterApiTransport, createScopeEvaluator, createContextEvaluator,
+  type IntentAssessment } from '../src/index.js';
 import { wrapLanguageModel, generateText, streamText, tool, jsonSchema } from 'ai';
 
 declare const baseModel: Parameters<typeof wrapLanguageModel>[0]['model'];
@@ -16,6 +17,13 @@ const scoped = createPromption({ baseUrl: 'http://localhost:8000', apiKey: 'serv
 void generateText({ model: wrapLanguageModel({ model: baseModel, middleware: scoped.middleware({ identity }) }),
   system: 'Only answer shop questions', prompt: 'What products are available?' });
 void scoped.checkScope('Question', { identity, systemPrompt: 'Only answer shop questions' });
+const contextual = createPromption({ baseUrl: 'http://localhost:8000', apiKey: 'server-only',
+  scopeEvaluator: createContextEvaluator({ model: baseModel, minimumConfidence: .8 }) });
+void contextual.checkScope('Export it', { identity, systemPrompt: 'Only public shop documents',
+  messages: [{ role: 'user', content: 'Public catalog' }] }).then(result => {
+    const intent: IntentAssessment | undefined = result.intent;
+    return intent?.relation;
+  });
 import { withScopeReceipts, issueScopeReceipt, verifyScopeReceipt } from '../src/scope-receipts.js';
 const receiptRequest = { text: 'Catalog', systemPrompt: 'Shop only', identity: { userId: 'u', roles: ['customer'], authenticated: true } };
 const receiptBinding = { request_id: 'r', tenant_id: 't', conversation_id: 'c' };

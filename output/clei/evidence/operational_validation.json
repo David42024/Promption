@@ -1,0 +1,39 @@
+{
+  "detector_tests": {
+    "status": "passed",
+    "count": 80,
+    "seconds": 11.25
+  },
+  "javascript_tests": {
+    "status": "passed",
+    "test_files": 4
+  },
+  "benchmark_smoke": {
+    "status": "passed",
+    "rows": 7823,
+    "llm_calls": 0,
+    "save_to_application_results": false
+  },
+  "dashboard_home": {
+    "status": "passed",
+    "method": "Streamlit AppTest"
+  },
+  "api_direct_health": {
+    "status": "passed",
+    "http_status_verified": false,
+    "openapi_path_verified": true
+  },
+  "api_http_health": {
+    "status": "timeout",
+    "seconds": 25,
+    "method": "FastAPI TestClient"
+  },
+  "full_python_suite": {
+    "status": "interrupted_after_stall",
+    "collected_count": 508
+  },
+  "extended_core_suite": {
+    "status": "timeout",
+    "seconds": 120
+  }
+}

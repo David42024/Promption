@@ -31,7 +31,13 @@ rules:
 
   - name: "reveal_system_prompt"
     pattern: "system prompt|initial prompt|your instructions|your system message|reveal (the )?(original|system) prompt"
-    description: "Prompt leaking / extraction attempt"
+    description: "Referencia a instrucciones internas; no sustituye al evaluador de alcance"
+    severity: "high"
+    enabled: true
+
+  - name: "system_instruction_extraction"
+    pattern: '\b(?:show|print|reveal|repeat|dump|disclose|output|give\s+me|tell\s+me|what\s+(?:are|is)|muestra\w*|imprime\w*|revela\w*|repite|transcribe|devuelve|dame|dime|copia|exporta|traduce)\b[^.!?;]{0,100}\b(?:system\s+(?:prompt|message|instructions)|initial\s+prompt|(?:your|original)\s+instructions|prompt\s+(?:del?\s+)?sistema|mensaje\s+(?:del?\s+)?sistema|instrucciones\s+(?:del?\s+)?sistema|(?:tus|las)\s+(?:instrucciones|directivas)\s+(?:internas|iniciales|originales))\b'
+    description: "Petición explícita de extraer o transformar instrucciones internas ES/EN"
     severity: "high"
     enabled: true
 
@@ -114,8 +120,26 @@ rules:
     enabled: true
 
   - name: "token_secreto_direct"
-    pattern: "(token|c[óo]digo).{0,10}(secreto|secret|confidencial|interno)"
+    pattern: '(?:token|c[óo]digo).{0,10}(?:secreto|secret|confidencial|interno(?!\s+(?:de\s+(?:cada\s+|los\s+|un\s+|el\s+)?productos?|del\s+producto)\b))'
     description: "Mención directa de token secreto/código secreto"
+    severity: "high"
+    enabled: true
+
+  - name: "protected_credential_extraction"
+    pattern: '\b(?:muestra\w*|imprime\w*|revela\w*|dame|dime|entrega\w*|devuelve|exporta|copia|traduce|incluye|escribe|proporciona\w*|show|print|reveal|disclose|output|export|include|give\s+me)\b[^.!?;]{0,80}\b(?:clave\s+(?:secreta|privada|confidencial|interna|protegida|real)|contrase[ñn]a\s+(?:interna|real|de\s+administrador)|(?:secret|private|protected)\s+(?:key|password|token))\b'
+    description: "Extracción explícita de credenciales protegidas, incluso dentro de documentos"
+    severity: "high"
+    enabled: true
+
+  - name: "initialization_data_extraction"
+    pattern: '\b(?:imprime\w*|revela\w*|dame|dime|entrega\w*|devuelve|exporta|copia|traduce|incluye|lista|enlista|genera|muestra\w*|print|reveal|dump|export|show|include)\b[^.!?;]{0,100}\b(?:directivas\s+de\s+inicializaci[oó]n|instrucciones\s+(?:internas|ocultas|originales|iniciales)|tus\s+variables\s+de\s+entorno|variables\s+de\s+entorno\s+(?:activas|actuales|del\s+servidor)|(?:your|current|runtime)\s+environment\s+variables)\b'
+    description: "Solicitud de volcar configuración o instrucciones internas activas"
+    severity: "high"
+    enabled: true
+
+  - name: "private_file_extraction"
+    pattern: '\b(?:lee|abre|descarga|muestra\w*|imprime\w*|copia|exporta|read|open|download|show|print|dump)\s+(?:(?:el|tu|the|your)\s+)?(?:(?:archivo|fichero|file)\s+)?(?:\.env\b|/etc/(?:passwd|shadow)\b|id_rsa\b)'
+    description: "Lectura explícita de archivos de credenciales del servidor"
     severity: "high"
     enabled: true
 
@@ -377,17 +401,40 @@ benign:
     pattern: '^\s*(?:consulta|dime|muestra)\s+el\s+(?:sueldo|salario)\s+neto\s+mensual\s+registrado\s+de\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){0,3}\.?(?:\s+Responde\s+solo\s+ese\s+dato\.)?\s*$'
     description: "Lectura completa de nómina para admin; ACL y Output Guard siguen siendo obligatorios"
   - name: "assistant_capabilities"
+    independent_turn: true
     pattern: '^\s*[¿¡]?(?:(?:hola+|buenas|oye)[\s,!.¿?]+)?(?:(?:dime|cu[eé]ntame|expl[ií]came|mu[eé]strame|lista|enumera)\s+)?(?:(?:qu[eé]|(?:todo\s+)?lo\s+que)\s+(?:puedes|puedo|podemos)\s+(?:hacer|ahcer|hcaer)|qu[eé]\s+(?:haces|sabes\s+hacer|servicios\s+ofreces)|(?:cu[aá]les\s+son\s+)?(?:tus|mis|las)\s+(?:capacidades|funciones|permisos|herramientas)(?:\s+(?:disponibles|actuales|autorizadas))?|(?:en\s+qu[eé]|c[oó]mo)\s+(?:me\s+)?puedes\s+ayudar(?:me)?|qu[eé]\s+(?:funciones|herramientas)\s+(?:tienes|tengo))(?:\s+(?:en\s+(?:este\s+)?(?:chat|promption\s+shop)|con\s+mi\s+(?:cuenta|sesi[oó]n)|por\s+m[ií]))?(?:\s+y\s+qu[eé]\s+no(?:\s+puedes\s+hacer)?)?[\s,!.¿?]*(?:por\s+favor|porfa)?[\s,!.¿?]*$'
     description: "Pregunta completa sobre funciones o permisos; no autoriza herramientas ni datos"
   - name: "business_discount_policy"
+    independent_turn: true
     pattern: '^\s*[¿¡]?(?:por\s+favor[,:]?\s+)?(?:dame|mu[eé]strame|expl[ií]came|cu[aá]l\s+es|cu[aá]les\s+son)\s+(?:tu|tus|la|las|su|sus)\s+pol[ií]ticas?\s+(?:de|sobre)\s+(?:descuentos?|promociones)(?:\s+de\s+la\s+tienda)?(?:[,;]?\s+por\s+favor)?\s*[.!?]*\s*$'
     description: "Consulta completa de política comercial; los permisos se validan por separado"
   - name: "politeness"
     pattern: "^\\s*(gracias|muchas gracias|por favor|porfa|thank you|thanks|please)\\s*[.!¡¿?]*\\s*$"
     description: "Cortesía breve y completa"
   - name: "greeting"
-    pattern: "^\\s*(hola|buenos d[íi]as|buenas tardes|buenas noches|hello|hi|hey)(?:[, ]+¿?(?:c[oó]mo est[aá]s?|qu[eé] tal))?\\s*[.!¡¿?]*\\s*$"
+    independent_turn: true
+    pattern: '^\s*[¡¿]?(?:ho+la+|buenas|muy buenas|buenos d[íi]as|(?:muy )?buenas tardes|(?:muy )?buenas noches|hello+|hi+|hey+)(?:[, ]+¿?(?:c[oó]mo est[aá]s?|qu[eé] tal))?\s*[.!¡¿?]*\s*$'
     description: "Saludo breve y completo"
+  - name: "informal_laughter"
+    independent_turn: true
+    pattern: '^\s*(?:x+d+|(?:ja){2,}|(?:je){2,}|(?:ji){2,}|(?:js){2,}|(?:ha){2,}|lol|lmao)\s*[.!¡¿?]*\s*$'
+    description: "Risa completa; no acepta texto adicional ni concede permisos"
+  - name: "assistant_identity"
+    independent_turn: true
+    pattern: '^\s*[¿¡]?(?:qui[eé]n\s+eres|qu[eé]\s+eres|c[oó]mo\s+te\s+llamas|who\s+are\s+you)\s*[.!¡¿?]*\s*$'
+    description: "Identidad pública del asistente; no incluye instrucciones internas"
+  - name: "assistant_capability_limits"
+    independent_turn: true
+    pattern: '^\s*[¿¡]?(?:qu[eé]\s+(?:no\s+puedes|puedes\s+y\s+no\s+puedes)\s+hacer|(?:cu[aá]les\s+son\s+)?tus\s+l[ií]mites|qu[eé]\s+l[ií]mites\s+tiene\s+tu\s+modelo)\s*[.!¡¿?]*\s*$'
+    description: "Pregunta completa sobre límites públicos, sin solicitar instrucciones ni secretos"
+  - name: "social_reaction"
+    independent_turn: true
+    pattern: '^\s*[¡¿]?(?:te\s+(?:amo|quiero)|me\s+caes\s+bien|qu[eé]\s+buena\s+onda|(?:ho+la+|hello+|hey+)[\s,!.¡¿?]+(?:x+d+|(?:ja){2,}|(?:je){2,}|(?:js){2,}))(?:[\s.!¡¿?,]|[❤♥]\ufe0f?)*$'
+    description: "Reacción social completa y autónoma; no acepta instrucciones añadidas"
+  - name: "gratitude"
+    independent_turn: true
+    pattern: '^\s*(?:gracias|muchas\s+gracias|thank\s+you|thanks)\s*[.!¡¿?]*\s*$'
+    description: "Agradecimiento completo; no incluye confirmaciones ni peticiones de continuar"
   - name: "short_acknowledgement"
     pattern: "^\\s*(ahora\\s+s[ií]|ya|ok(?:ay)?|vale|listo|entendido|perfecto|de acuerdo|s[ií]|no)\\s*[.!¡¿?]*\\s*$"
     description: "Confirmación o seguimiento conversacional breve"

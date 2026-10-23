@@ -1,0 +1,10 @@
+{
+  "calls": 148,
+  "corrective_calls": 48,
+  "spent_upper_usd": 0.295118,
+  "corrective_spent_upper_usd": 0.110809,
+  "budget_stopped": false,
+  "stop_reason": "operational_failure",
+  "decisions": 97,
+  "external_tools_executed": 0
+}

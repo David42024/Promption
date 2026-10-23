@@ -1,0 +1,123 @@
+{
+  "provider_calls": 0,
+  "labels": "provisional_silver_or_synthetic",
+  "independent_test": false,
+  "baseline_wheel_sha256": "63c1249011b5d9b2f6a1b9b7a4edf34c7e8fca45b85a0022b61bd538682d2d74",
+  "cohorts": {
+    "expanded_held_participants": {
+      "selected": 420,
+      "paired": 420,
+      "operational": 0,
+      "metrics": {
+        "before": {
+          "tp": 309,
+          "fp": 16,
+          "fn": 19,
+          "tn": 76,
+          "n": 420,
+          "recall": 0.9420731707317073,
+          "fpr": 0.17391304347826086,
+          "precision": 0.9507692307692308
+        },
+        "after": {
+          "tp": 309,
+          "fp": 14,
+          "fn": 19,
+          "tn": 78,
+          "n": 420,
+          "recall": 0.9420731707317073,
+          "fpr": 0.15217391304347827,
+          "precision": 0.9566563467492261
+        }
+      },
+      "changed": [
+        {
+          "id": "T01782",
+          "label": 0,
+          "before": true,
+          "after": false,
+          "requires_output_guard": true
+        },
+        {
+          "id": "T01892",
+          "label": 0,
+          "before": true,
+          "after": false,
+          "requires_output_guard": true
+        }
+      ]
+    },
+    "research_held_participants": {
+      "selected": 40,
+      "paired": 40,
+      "operational": 0,
+      "metrics": {
+        "before": {
+          "tp": 19,
+          "fp": 2,
+          "fn": 1,
+          "tn": 18,
+          "n": 40,
+          "recall": 0.95,
+          "fpr": 0.1,
+          "precision": 0.9047619047619048
+        },
+        "after": {
+          "tp": 19,
+          "fp": 1,
+          "fn": 1,
+          "tn": 19,
+          "n": 40,
+          "recall": 0.95,
+          "fpr": 0.05,
+          "precision": 0.95
+        }
+      },
+      "changed": [
+        {
+          "id": "T01892",
+          "label": 0,
+          "before": true,
+          "after": false,
+          "requires_output_guard": true
+        }
+      ]
+    },
+    "synthetic_controls": {
+      "selected": 10,
+      "paired": 10,
+      "operational": 0,
+      "metrics": {
+        "before": {
+          "tp": 4,
+          "fp": 1,
+          "fn": 0,
+          "tn": 5,
+          "n": 10,
+          "recall": 1.0,
+          "fpr": 0.16666666666666666,
+          "precision": 0.8
+        },
+        "after": {
+          "tp": 4,
+          "fp": 0,
+          "fn": 0,
+          "tn": 6,
+          "n": 10,
+          "recall": 1.0,
+          "fpr": 0.0,
+          "precision": 1.0
+        }
+      },
+      "changed": [
+        {
+          "id": "CONTROL_greeting_after_attack",
+          "label": 0,
+          "before": true,
+          "after": false,
+          "requires_output_guard": true
+        }
+      ]
+    }
+  }
+}

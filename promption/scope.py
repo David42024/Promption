@@ -4,6 +4,9 @@ import inspect
 import json
 from dataclasses import asdict, dataclass
 from typing import Callable, Literal
+import math
+
+from .intent import IntentAssessment, validate_intent
 
 
 @dataclass(frozen=True)
@@ -17,13 +20,19 @@ class ScopeDecision:
     completion_tokens: int | None = None
     total_tokens: int | None = None
     reasoning_tokens: int | None = None
+    intent: IntentAssessment | None = None
 
     @property
     def allowed(self) -> bool:
         return self.classification == "IN_SCOPE"
 
     def to_dict(self) -> dict:
-        return {**asdict(self), "allowed": self.allowed}
+        result = {**asdict(self), "allowed": self.allowed}
+        if self.intent is not None:
+            result["intent"] = self.intent.to_dict()
+        else:
+            result.pop("intent")
+        return result
 
 
 def _validated(result) -> ScopeDecision:
@@ -37,6 +46,15 @@ def _validated(result) -> ScopeDecision:
         return _validated({**(data if isinstance(data, dict) else {}),
                            "classification": "UNCERTAIN", "reason": "invalid_scope_response"})
     label = data["classification"]
+    intent = None
+    if data.get("intent") is not None:
+        try:
+            intent = validate_intent(data["intent"])
+        except (TypeError, ValueError):
+            return _validated({**data, "classification": "UNCERTAIN", "reason": "invalid_scope_response", "intent": None})
+        if label == "IN_SCOPE" and (intent.attack != "none" or intent.relation == "unresolved"
+                or intent.name in {"unknown", "instruction_override", "privilege_escalation"}):
+            return _validated({**data, "classification": "UNCERTAIN", "reason": "invalid_scope_response", "intent": None})
     model = data.get("model")
     value = data.get("provider_calls", 0)
     calls = value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
@@ -55,7 +73,8 @@ def _validated(result) -> ScopeDecision:
                               504 if data["reason"] == "scope_timeout" else
                               503 if data["reason"] in {"scope_unavailable", "invalid_scope_response"} else 403),
         model=model, provider_calls=calls,
-        prompt_tokens=p_tok, completion_tokens=c_tok, total_tokens=t_tok, reasoning_tokens=r_tok
+        prompt_tokens=p_tok, completion_tokens=c_tok, total_tokens=t_tok, reasoning_tokens=r_tok,
+        intent=intent,
     )
 
 
@@ -129,3 +148,56 @@ class AsyncScopeGuard(ScopeGuard):
             return ScopeDecision("UNCERTAIN", "scope_timeout", 504)
         except Exception:
             return ScopeDecision("UNCERTAIN", "scope_unavailable", 503)
+
+
+def _context_decision(decision, messages, minimum_confidence, tool=None):
+    from dataclasses import replace
+    intent = decision.intent
+    if intent is None:
+        if decision.reason in {"scope_timeout", "scope_unavailable", "scope_truncated", "invalid_scope_response"}:
+            return decision
+        return replace(decision, classification="UNCERTAIN", reason="invalid_scope_response", status=503)
+    evidence = messages or []
+    has_proposal = (isinstance(tool, dict) and isinstance(tool.get("name"), str)
+                    and bool(tool["name"].strip()) and "input" in tool)
+    if (any(index >= len(evidence) for index in intent.evidence)
+            or (intent.relation == "follow_up" and not intent.evidence)
+            or (intent.origin in {"tool", "mixed"} and not has_proposal and not any(
+                evidence[index].get("role") == "tool" for index in intent.evidence))):
+        return replace(decision, classification="UNCERTAIN", reason="invalid_scope_response", status=503,
+                       intent=None)
+    if intent.confidence < minimum_confidence or intent.relation == "unresolved" or intent.attack == "unknown":
+        return replace(decision, classification="UNCERTAIN", reason="ambiguous", status=403)
+    return decision
+
+
+class ContextScopeGuard(ScopeGuard):
+    """Require canonical intent and provenance alongside policy compliance in one evaluation."""
+
+    def __init__(self, evaluator: Callable, *, minimum_confidence: float = 0.8):
+        super().__init__(evaluator)
+        if (isinstance(minimum_confidence, bool) or not isinstance(minimum_confidence, (int, float))
+                or not math.isfinite(minimum_confidence) or not 0 <= minimum_confidence <= 1):
+            raise ValueError("Minimum confidence must be within [0, 1]")
+        self.minimum_confidence = minimum_confidence
+
+    def check(self, text: str, *, system_prompt: str, identity=None,
+              messages: list[dict] | None = None, tool: dict | None = None) -> ScopeDecision:
+        decision = super().check(text, system_prompt=system_prompt, identity=identity, messages=messages, tool=tool)
+        return _context_decision(decision, messages, self.minimum_confidence, tool)
+
+
+class AsyncContextScopeGuard(AsyncScopeGuard):
+    """Asynchronous intent and scope evaluation with deadlines and strict evidence validation."""
+
+    def __init__(self, evaluator: Callable, *, timeout_seconds: float = 30, minimum_confidence: float = 0.8):
+        super().__init__(evaluator, timeout_seconds=timeout_seconds)
+        if (isinstance(minimum_confidence, bool) or not isinstance(minimum_confidence, (int, float))
+                or not math.isfinite(minimum_confidence) or not 0 <= minimum_confidence <= 1):
+            raise ValueError("Minimum confidence must be within [0, 1]")
+        self.minimum_confidence = minimum_confidence
+
+    async def check(self, text: str, *, system_prompt: str, identity=None,
+                    messages: list[dict] | None = None, tool: dict | None = None) -> ScopeDecision:
+        decision = await super().check(text, system_prompt=system_prompt, identity=identity, messages=messages, tool=tool)
+        return _context_decision(decision, messages, self.minimum_confidence, tool)

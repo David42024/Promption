@@ -1,0 +1,43 @@
+{
+  "version": "1.3.0",
+  "model": "gpt-5.4-mini",
+  "max_calls": 50,
+  "max_usd": 0.334309,
+  "max_output_tokens": 768,
+  "input_usd_per_million": 0.75,
+  "output_usd_per_million": 4.5,
+  "rates_source": "https://developers.openai.com/api/docs/models/gpt-5.4-mini",
+  "profiles": [
+    "context_intent"
+  ],
+  "selection": "10 per policy label/context-required stratum",
+  "selection_seed": "context-eval-20261023",
+  "research_n": 40,
+  "synthetic_n": 10,
+  "same_judge_family_as_silver_labels": true,
+  "independent_blind_test": false,
+  "selection_uses_filter_predictions": false,
+  "rules_or_threshold_tuning": false,
+  "small_model_weights_evaluated": false,
+  "redaction_exclusions": {
+    "redaction_present": 25,
+    "bounded_context_exceeded": 3
+  },
+  "cases_sha256": "4f178390d8a2c85bfa2cb4187c813f1e9648e5ef85af3de6beb47c5e2325ec12",
+  "library_sources": {
+    "packages/ai-sdk/src/context.js": "45c1cf2bd8f627c52a4267ebdeba84f5771a0b303f7b5884973d67232bdd0217",
+    "packages/ai-sdk/src/scope.js": "0d2a8b1cf5b520b00f918e611c08e30fd9fdb76ef9bd8a0d432f720aa2e9e45d",
+    "promption/filter/ensemble_filter.py": "0d87f71e8f6d3b0460f86ddf7029ba9a6f5f7afbe2961b03d6a6dedd40348c15"
+  },
+  "stage": "schema_consistency_fix_after_diagnostic_failure",
+  "prior_spent_upper_usd": 0.184309,
+  "prior_calls": 100,
+  "original_run": "/home/robertoa1/Datos/proyectos/Promption/output/context_eval_20261023",
+  "initial_invalid_or_unavailable": 31,
+  "case_selection_changed": false,
+  "thresholds_changed": false,
+  "fix": "constrain attack/origin combinations in JSON schema; preserve invalid-response usage",
+  "additional_budget_usd": 0.15,
+  "user_remaining_credit_usd": 0.2,
+  "stop_on_operational_error": true
+}

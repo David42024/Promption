@@ -42,6 +42,8 @@ def load_config() -> dict:
             model[key] = str((ROOT_DIR / model[key]).resolve())
     if model.get("classifier_path"):
         paths["classifier"] = model["classifier_path"]
+    for detector in cfg.get("ensemble", {}).get("additional_classifiers", []):
+        detector["model_path"] = str((ROOT_DIR / detector["model_path"]).resolve())
     paths["cfg"] = str(CONFIG_PATH)
     paths["heuristics"] = str(HEURISTICS_PATH)
     logging = cfg.setdefault("logging", {})

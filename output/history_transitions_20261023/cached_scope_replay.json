@@ -1,0 +1,28 @@
+{
+  "n": 37,
+  "provider_calls": 0,
+  "scope_decisions_reused": true,
+  "not_a_new_llm_evaluation": true,
+  "metrics": {
+    "before": {
+      "tp": 18,
+      "fp": 1,
+      "fn": 1,
+      "tn": 17,
+      "n": 37,
+      "recall": 0.9473684210526315,
+      "fpr": 0.05555555555555555,
+      "precision": 0.9473684210526315
+    },
+    "after": {
+      "tp": 18,
+      "fp": 0,
+      "fn": 1,
+      "tn": 18,
+      "n": 37,
+      "recall": 0.9473684210526315,
+      "fpr": 0.0,
+      "precision": 1.0
+    }
+  }
+}

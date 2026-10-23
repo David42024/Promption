@@ -1,0 +1,86 @@
+api:
+  host: 0.0.0.0
+  port: 8000
+  reload: true
+benchmark:
+  history_dir: /home/robertoa1/Datos/proyectos/Promption/output/history_transitions_20261023/smoke/history
+  min_llm_queries: 3
+  sample_size: null
+  save_history: true
+classification:
+  ml_benign_threshold: 0.33
+  ml_malicious_threshold: 0.66
+conversation_guard:
+  max_chars: 100000
+  max_messages: 128
+dashboard:
+  host: 0.0.0.0
+  port: 8501
+ensemble:
+  decision_high_threshold: 0.66
+  decision_low_threshold: 0.33
+  heuristic_weight: 0.4
+  ml_weight: 0.6
+  require_llm_veto: false
+limits:
+  benchmark_concurrency: 1
+  benchmark_max_queue: 2
+  concurrency_queue_timeout_seconds: 5.0
+  max_benchmark_sample_size: 5000
+  max_body_bytes: 2097152
+  max_context_bytes: 65536
+  max_context_keys: 64
+  max_history_chars: 100000
+  max_history_messages: 128
+  max_role_name_chars: 64
+  max_roles: 32
+  max_text_chars: 100000
+  max_user_id_chars: 128
+  protection_concurrency: 4
+  protection_max_queue: 8
+  rate_limit:
+    benchmark_rph: 1
+    protection_rpm: 60
+llm:
+  health_timeout: 5
+  host: http://localhost:11434
+  max_tokens: 200
+  model: mistral:latest
+  openai:
+    base_url: https://api.groq.com/openai/v1
+    model: openai/gpt-oss-120b
+  provider: auto
+  temperature: 0.2
+  timeout: 60
+logging:
+  backup_count: 5
+  file: /home/robertoa1/Datos/proyectos/Promption/output/history_transitions_20261023/smoke/verification.log
+  format: '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s'
+  level: INFO
+  max_bytes: 5242880
+model:
+  chunk_chars: 250
+  chunk_overlap: 100
+  classifier_path: models/random_forest.pkl
+  confidence_threshold: 0.66
+  embedding_model: intfloat/multilingual-e5-small
+  embedding_prefix: 'query: '
+  lightweight_classifier_path: models/lightweight_classifier.pkl
+  max_depth: 20
+  min_samples_leaf: 1
+  n_trees: 400
+  random_state: 42
+  use_lightweight_ml: true
+paths:
+  audio_payloads: data/audio_payloads
+  logs: logs
+  models: models
+  pdf_payloads: data/pdf_payloads
+  plots: /home/robertoa1/Datos/proyectos/Promption/output/history_transitions_20261023/smoke/plots
+  processed_data: /home/robertoa1/Datos/proyectos/Promption/output/history_transitions_20261023/smoke/processed_data
+  raw_data: data/raw
+  reports: reports
+  results: /home/robertoa1/Datos/proyectos/Promption/output/history_transitions_20261023/smoke/results
+stt:
+  language: null
+  model: tiny

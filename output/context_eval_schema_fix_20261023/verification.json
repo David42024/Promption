@@ -1,0 +1,20 @@
+{
+  "python_tests_passed": 1015,
+  "python_tests_skipped": 10,
+  "sdk_tests_passed": 88,
+  "types": "passed",
+  "initial_live_calls": 100,
+  "initial_cost_upper_usd": 0.184309,
+  "corrective_live_calls": 48,
+  "corrective_cost_upper_usd": 0.110809,
+  "corrective_status": "stopped_on_proposed_tool_origin_validation_error",
+  "corrective_decisions_saved": 47,
+  "corrective_semantic_decisions": 46,
+  "corrective_invalid_decisions": 1,
+  "additional_budget_max_usd": 0.15,
+  "maximum_additional_calls": 50,
+  "missing_case_decisions": 3,
+  "proposal_origin_fix_version": "1.3.2",
+  "proposal_origin_fix_live_retested": false,
+  "deployed": false
+}

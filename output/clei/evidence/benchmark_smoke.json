@@ -1,0 +1,34 @@
+{
+  "n_rows": 7823,
+  "columns": [
+    "id",
+    "prompt",
+    "dataset",
+    "attack_type",
+    "source",
+    "label",
+    "heuristic_score",
+    "heuristic_blocked",
+    "ml_probability",
+    "ml_blocked",
+    "ensemble_score",
+    "filter_blocked",
+    "filter_latency_ms",
+    "heuristic_latency_ms",
+    "ml_latency_ms",
+    "matched_rules",
+    "llm_success_no_filter",
+    "llm_success_with_filter",
+    "llm_latency_ms",
+    "response_no_filter",
+    "response_filtered"
+  ],
+  "llm_used": false,
+  "input_decisions": {
+    "ALLOWED": 0,
+    "GUARDED": 4427,
+    "BLOCKED": 3396
+  },
+  "recall": 0.8733221476510067,
+  "fpr": 0.06428066870732281
+}

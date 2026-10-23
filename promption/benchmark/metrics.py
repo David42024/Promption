@@ -17,15 +17,11 @@ def evaluated_confusion_counts(df: pd.DataFrame, label_col: str = "label", pred_
     if label_col not in df.columns or pred_col not in df.columns or df.empty:
         return 0, 0, 0, 0, {"TP": 0, "FP": 0, "FN": 0, "TN": 0, "evaluated": 0, "skipped": len(df)}
 
-    valid = df[df[pred_col].notna() & (df[pred_col] != "")]
-    if valid.empty:
-        return 0, 0, 0, 0, {"TP": 0, "FP": 0, "FN": 0, "TN": 0, "evaluated": 0, "skipped": len(df)}
-
-    y = pd.to_numeric(valid[label_col], errors="coerce").fillna(0).astype(int).to_numpy()
-    p_series = pd.to_numeric(valid[pred_col], errors="coerce")
-    valid_mask = p_series.notna()
-    y = y[valid_mask]
-    p = p_series[valid_mask].astype(int).to_numpy()
+    labels = pd.to_numeric(df[label_col], errors="coerce")
+    predictions = pd.to_numeric(df[pred_col], errors="coerce")
+    valid = labels.isin([0, 1]) & predictions.isin([0, 1])
+    y = labels[valid].astype(int).to_numpy()
+    p = predictions[valid].astype(int).to_numpy()
 
     tp = int(np.sum((y == 1) & (p == 1)))
     fp = int(np.sum((y == 0) & (p == 1)))
@@ -82,12 +78,14 @@ def latency_stats(df: pd.DataFrame, col: str = "filter_latency_ms") -> dict:
 
 
 def roc(df: pd.DataFrame, score_col: str = "ensemble_score", label_col: str = "label") -> dict:
-    s = row_values(df, score_col).dropna()
-    if not len(s):
-        s = pd.Series(pd.to_numeric(df.get("ml_probability", pd.Series(dtype=float)), errors="coerce").dropna().values, index=[])
-        if not len(s):
-            return {"fpr": [0, 1], "tpr": [0, 1], "auc": None}
-    labels = row_values(df.loc[s.index], label_col).fillna(0).astype(int)
+    s = row_values(df, score_col).replace([np.inf, -np.inf], np.nan).dropna()
+    if s.empty:
+        s = row_values(df, "ml_probability").replace([np.inf, -np.inf], np.nan).dropna()
+    if s.empty or label_col not in df:
+        return {"fpr": [0, 1], "tpr": [0, 1], "auc": None}
+    labels = row_values(df.loc[s.index], label_col)
+    valid = labels.isin([0, 1])
+    labels, s = labels[valid].astype(int), s[valid]
     if labels.nunique() < 2 or len(s) < 2:
         return {"fpr": [0, 1], "tpr": [0, 1], "auc": None}
     fpr, tpr, _ = roc_curve(labels, s)

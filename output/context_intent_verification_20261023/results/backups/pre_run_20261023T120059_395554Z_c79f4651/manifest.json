@@ -1,0 +1,18 @@
+{
+  "created_at": "20261023T120059_395554Z",
+  "description": "Previous artifacts preserved unchanged; unlabeled results retain unknown provenance.",
+  "files": [
+    {
+      "file": "models/random_forest.pkl",
+      "sha256": "9279d35776b119ba30e7865c6d29aeaf16f74c1619db77e3d9cb2013e83622c8"
+    },
+    {
+      "file": "models/lightweight_classifier.pkl",
+      "sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa"
+    },
+    {
+      "file": "models/lightweight_classifier.metadata.json",
+      "sha256": "f8885835cad07b3ccab327d451ad0bbd419169983892a7d7616ee794cfe797bb"
+    }
+  ]
+}

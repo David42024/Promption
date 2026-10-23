@@ -18,6 +18,7 @@ from promption.api.models import (AuditEventRequest, BenchmarkRequest, FilterReq
 from promption.benchmark.runner import BenchmarkRunner, RunnerOptions, json_safe, sanitize_prompt
 from promption.filter.ensemble_filter import EnsembleFilter
 from promption.filter.heuristic_filter import HeuristicFilter
+from promption.filter.exceptions import MLError
 from promption.limiter import concurrency_limiter, rate_limiter
 from promption.llm import get_llm_client
 from promption.utils.config import load_config
@@ -325,14 +326,22 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
         t0 = time.perf_counter()
         flt = _filter_for(tenant)
         merged_roles = list(req.roles) + list(getattr(tenant, "roles", []) or [])
-        res = flt.analyze(req.text, use_ml=req.use_ml, roles=merged_roles)
+        try:
+            res = flt.analyze(req.text, use_ml=req.use_ml, roles=merged_roles)
+        except MLError as exc:
+            logger.warning("Configured input detector unavailable: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Configured input detector unavailable") from exc
         conversation = None
         if req.messages:
             try:
                 conversation = ConversationGuard(flt).analyze(
-                    [message.model_dump() for message in req.messages], roles=merged_roles, use_ml=req.use_ml)
+                    [message.model_dump() for message in req.messages], roles=merged_roles,
+                    use_ml=req.use_ml, current_text=req.text)
             except ConversationLimitError as exc:
                 raise HTTPException(status_code=413, detail="Conversation security context exceeds limits") from exc
+            except MLError as exc:
+                logger.warning("Configured conversation detector unavailable: %s", type(exc).__name__)
+                raise HTTPException(status_code=503, detail="Configured conversation detector unavailable") from exc
             if conversation.blocked:
                 res = replace(res, blocked=True, decision="BLOCKED", score=max(res.score, 1.0))
             elif conversation.requires_output_guard and res.decision == "ALLOWED":
@@ -368,6 +377,8 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
                           "matched_rules": rules, "threshold": res.heuristic.threshold,
                           "benign_matched": list(res.heuristic.benign_matched)},
             "ml": ml_info,
+            "additional_ml": {"status": res.merged_features.get("additional_status", "NOT_CONFIGURED"),
+                              "results": res.merged_features.get("additional_filters", [])},
             "ensemble": {"score": res.score,
                          "decision": res.decision,
                          "requires_output_guard": res.requires_output_guard,

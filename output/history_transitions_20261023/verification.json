@@ -1,0 +1,22 @@
+{
+  "python_passed": 1056,
+  "python_skipped": 10,
+  "node_passed": 89,
+  "types": "passed",
+  "benchmark_cases": 661,
+  "benchmark_default_counts_unchanged": true,
+  "api_health": 200,
+  "dashboard": "full suite AppTest passed",
+  "openai_calls": 0,
+  "trained_models_changed": false,
+  "deployed": false,
+  "model_sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa",
+  "code_sha256": {
+    "promption/conversation_guard.py": "fae8412af3913c428fbf2587613b25834d2b27e97eb7be82b9d999b75d917aa3",
+    "promption/filter/heuristic_filter.py": "e6619e505fc991781efe0771655d4a03e78a0276f5d4325b42a5571d7a58b109",
+    "promption/api/routes.py": "64b427b92089f5bfa8d88d49b6dedb719ad888b2d450572236e39eece0c88df5",
+    "config/heuristics.yaml": "bc0cc4f64f3f7db15ecf563f5a7d871a6e1c2edf25708a405c345b32fa05483c"
+  },
+  "installed_wheel_smoke": "passed",
+  "version": "1.3.3"
+}

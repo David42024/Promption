@@ -1,0 +1,26 @@
+{
+  "title": "Promption for Prompt Injection Detection under Source Shift and Three State Enforcement",
+  "authors": [
+    {
+      "name": "Roberto Enrique Quezada-Rodriguez",
+      "institution": "Universidad Nacional de Trujillo",
+      "city": "Trujillo",
+      "country": "Peru",
+      "email": "requezadaro@unitru.edu.pe",
+      "ORCID": "0009-0004-0869-3881"
+    },
+    {
+      "name": "David Adrian Lucano Nieves",
+      "institution": "Universidad Nacional de Trujillo",
+      "city": "Trujillo",
+      "country": "Peru",
+      "email": "requezadaro@unitru.edu.pe",
+      "ORCID": "0009-0003-2167-8515"
+    }
+  ],
+  "abstract": "Prompt injection defenses must balance malicious-input detection with the preservation of legitimate requests. We present an empirical study of Promption, a reusable software framework combining regular expressions, a lightweight text classifier, and a three-state enforcement policy. A code audit establishes the behavior of the deployed configuration and identifies a positional-index error in the existing data splitter. New experiments use 5872 normalized, unique prompts from five upstream collections, three stratified random holdouts, and five leave-one-source-out evaluations. All vectorizers and classifiers are fitted exclusively on each training partition. On the seed-42 random holdout, strict OR enforcement obtains 83.90% recall with 9.98% false positives, whereas the implemented three-state policy obtains 83.33% recall with 8.11% false positives and routes 89 malicious inputs to output inspection. Source-held-out results reveal substantial variation that random holdouts obscure. The study contributes a reproducible policy comparison and a distinction between input escape, guarded routing, and demonstrated downstream compromise. No language-model attack success or monetary savings are inferred from these classifier experiments. The results support Promption as a measurable input-screening framework while exposing the evidence needed to validate its complete security pipeline.",
+  "keywords": "Prompt injection, text classification, source shift, security middleware, software evaluation",
+  "provisional_corresponding_author": "Roberto Enrique Quezada-Rodriguez",
+  "provisional_correspondence_email": "requezadaro@unitru.edu.pe",
+  "author_instructions_reference": "AuthorInstructions2016-OTH.pdf supplied by the user on 2026-10-02"
+}

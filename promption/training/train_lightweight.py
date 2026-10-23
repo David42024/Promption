@@ -35,23 +35,32 @@ from promption.utils.logger import logger
 _CONF = load_config()
 
 
-def train_lightweight_model(df: pd.DataFrame, max_features: int = 10000) -> tuple:
+def train_lightweight_model(df: pd.DataFrame, max_features: int = 10000, *, sample_weight=None) -> tuple:
     """Train TF-IDF + LogisticRegression (very lightweight)."""
     logger.info("Training lightweight TF-IDF + LogisticRegression model...")
     
     # Limpiar datos: eliminar filas con labels NaN
-    df = df.dropna(subset=['label', 'prompt'])
+    if sample_weight is not None:
+        sample_weight = np.asarray(sample_weight, dtype=float)
+        if (sample_weight.shape != (len(df),) or not np.all(np.isfinite(sample_weight))
+                or np.any(sample_weight <= 0)):
+            raise ValueError("Sample weights must be positive, finite and aligned with input rows")
+    present = df['label'].notna() & df['prompt'].notna()
+    if sample_weight is not None:
+        sample_weight = sample_weight[present.to_numpy()]
+    df = df[present]
     
     # Mapear labels a 0/1 (manejar ambos formatos: texto y numérico)
-    if df['label'].dtype == object:
-        y = df["label"].map({"injection": 1, "benign": 0, 1: 1, 0: 0}).values
-    else:
-        y = df["label"].values
+    y = pd.to_numeric(df["label"].replace({"injection": 1, "benign": 0}), errors="coerce").to_numpy()
     
     # Eliminar filas con labels inválidos
-    valid_mask = ~np.isnan(y)
+    valid_mask = np.isin(y, [0, 1])
     df = df[valid_mask]
     y = y[valid_mask]
+    if sample_weight is not None:
+        sample_weight = sample_weight[valid_mask]
+    if len(np.unique(y)) != 2:
+        raise ValueError("Training requires both binary classes after excluding unknown labels")
     
     logger.info("Cleaned training samples: %d", len(df))
     
@@ -89,7 +98,7 @@ def train_lightweight_model(df: pd.DataFrame, max_features: int = 10000) -> tupl
         random_state=42
     )
     
-    classifier.fit(X, y)
+    classifier.fit(X, y, sample_weight=sample_weight)
     
     return vectorizer, classifier, y
 

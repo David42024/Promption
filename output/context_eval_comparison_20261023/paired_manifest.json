@@ -1,0 +1,9 @@
+{
+  "baseline_source": "output/context_eval_20261023",
+  "context_source": "output/context_eval_schema_fix_20261023",
+  "same_cases_sha256": "4f178390d8a2c85bfa2cb4187c813f1e9648e5ef85af3de6beb47c5e2325ec12",
+  "legacy_decisions_reused_without_new_calls": 50,
+  "new_context_decisions": 47,
+  "same_silver_judge_family": true,
+  "post_diagnostic_fix_not_independent_test": true
+}

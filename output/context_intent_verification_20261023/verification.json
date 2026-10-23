@@ -1,0 +1,28 @@
+{
+  "python": {
+    "passed": 1013,
+    "skipped": 10
+  },
+  "node": {
+    "passed": 85
+  },
+  "types": "passed",
+  "benchmark": {
+    "mode": "no_llm_proxy",
+    "n": 661,
+    "confusion": {
+      "tp": 245,
+      "fp": 48,
+      "fn": 57,
+      "tn": 311
+    },
+    "default_profile_unchanged": true
+  },
+  "api_health": 200,
+  "dashboard": "full suite AppTest smoke passed",
+  "artifacts": "wheel and npm installed/extracted smoke passed",
+  "small_model_real_weights_evaluated": false,
+  "context_live_llm_evaluated": false,
+  "openai_calls": 0,
+  "deployed": false
+}

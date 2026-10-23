@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 from promption.utils.config import load_config, load_heuristics
 from promption.utils.logger import logger
+from promption.utils.text import normalize_content
 
 _CONF = load_config()
 _SCORES = {"high": 1.0, "medium": 0.7, "low": 0.4}
@@ -45,10 +46,13 @@ class HeuristicFilter:
         self.threshold = threshold if threshold is not None else float(scoring.get("heuristic_threshold", 0.6))
         self.unknown_score = float(scoring.get("unknown_score", 0.5))
         self.max_matches = int(scoring.get("max_matches", 5))
+        if self.max_matches < 1:
+            raise ValueError("max_matches must be a positive integer")
         self._benign: list[dict] = []
         for rule in cfg.get("benign", []) or []:
             self._benign.append({"name": rule["name"], "regex": re.compile(rule["pattern"], re.IGNORECASE),
-                "applies_to_roles": frozenset(r.lower() for r in rule.get("applies_to_roles", []))})
+                "applies_to_roles": frozenset(r.lower() for r in rule.get("applies_to_roles", [])),
+                "independent_turn": rule.get("independent_turn") is True})
         logger.info("HeuristicFilter initialized with %d rules (threshold=%.2f)", len(self._rules), self.threshold)
 
     # ------------------------------------------------------------------ public
@@ -63,7 +67,7 @@ class HeuristicFilter:
             Roles del usuario. Si una regla tiene ``applies_to_roles``, solo
             se evalúa si el usuario tiene al menos uno de esos roles.
         """
-        text = text or ""
+        text = normalize_content(text or "")
         user_roles = {r.lower() for r in (roles or [])}
         matches: list[dict] = []
         for rule in self._rules:
@@ -71,8 +75,8 @@ class HeuristicFilter:
                 continue
             if rule["regex"].search(text):
                 matches.append(rule)
-            if len(matches) >= self.max_matches:
-                break
+        matches.sort(key=lambda rule: rule["severity_score"], reverse=True)
+        matches = matches[:self.max_matches]
 
         benign = [b["name"] for b in self._benign if (not b["applies_to_roles"] or user_roles & b["applies_to_roles"]) and b["regex"].fullmatch(text)]
         if matches:
@@ -97,6 +101,12 @@ class HeuristicFilter:
         """Convenience: returns ``(blocked, score)``."""
         res = self.analyze(text)
         return res.blocked, res.score
+
+    def is_independent_turn(self, text: str, roles: list[str] | None = None) -> bool:
+        """Recognize a complete server-configured utterance without references or malicious rules."""
+        result = self.analyze(text, roles=roles)
+        return result.signal == "benign" and any(
+            rule["independent_turn"] and rule["name"] in result.benign_matched for rule in self._benign)
 
 
 if __name__ == "__main__":  # quick manual smoke test
