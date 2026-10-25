@@ -561,7 +561,7 @@ export default function AdminPanel() {
                       : "rgba(16, 185, 129, 0.6)"
                   }`,
                   background: filterState.filterEnabled
-                    ? "linear-gradient(135deg, #1f2937, #111827)"
+                    ? "linear-gradient(135deg, var(--bg-card-solid), var(--bg-secondary))"
                     : "linear-gradient(135deg, var(--success-500), var(--brand-600))",
                   color: filterState.filterEnabled ? "var(--danger-400)" : "white",
                   cursor: "pointer",
