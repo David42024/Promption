@@ -70,7 +70,7 @@ export default function GlobalHeader() {
         left: 0,
         right: 0,
         height: "64px",
-        background: "rgba(10, 14, 26, 0.95)",
+        background: "var(--bg-header)",
         backdropFilter: "blur(20px)",
         borderBottom: "1px solid var(--border)",
         zIndex: 1000,
@@ -78,7 +78,7 @@ export default function GlobalHeader() {
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 24px",
-        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)"
+        boxShadow: "var(--shadow-card)"
       }}
     >
       {/* Logo y branding */}

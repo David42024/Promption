@@ -423,7 +423,7 @@ export default function AdminPanel() {
                   fontSize: "0.92rem",
                   marginBottom: 12,
                   lineHeight: 1.6,
-                  color: filterState.filterEnabled ? "var(--text-secondary)" : "#fecaca",
+                  color: filterState.filterEnabled ? "var(--text-secondary)" : "var(--danger-400)",
                 }}
               >
                 {filterState.filterEnabled
@@ -460,7 +460,7 @@ export default function AdminPanel() {
                       }`,
                       color: filterState.outputGuardEnabled
                         ? "var(--accent-400)"
-                        : "#fbbf24",
+                        : "var(--warning-text)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -563,7 +563,7 @@ export default function AdminPanel() {
                   background: filterState.filterEnabled
                     ? "linear-gradient(135deg, #1f2937, #111827)"
                     : "linear-gradient(135deg, var(--success-500), var(--brand-600))",
-                  color: filterState.filterEnabled ? "#fca5a5" : "white",
+                  color: filterState.filterEnabled ? "var(--danger-400)" : "white",
                   cursor: "pointer",
                   display: "flex",
                   flexDirection: "column",
@@ -927,7 +927,7 @@ export default function AdminPanel() {
                             maxHeight: 300,
                             overflow: "auto",
                             borderRadius: 8,
-                            background: "rgba(2, 6, 23, .72)",
+                            background: "var(--bg-secondary)",
                             color: "var(--text-secondary)",
                             fontSize: 11,
                             whiteSpace: "pre-wrap",

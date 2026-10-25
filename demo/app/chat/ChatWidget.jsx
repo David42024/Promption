@@ -226,7 +226,7 @@ export default function ChatWidget() {
         zIndex: 1000,
         display: "flex",
         flexDirection: "column",
-        boxShadow: "0 12px 48px rgba(0, 0, 0, 0.5), 0 0 60px rgba(99, 102, 241, 0.12)",
+        boxShadow: "var(--shadow-elevated), var(--shadow-glow)",
         backdropFilter: "blur(20px)",
         overflow: "hidden",
       }}
@@ -381,7 +381,7 @@ export default function ChatWidget() {
         style={{
           padding: 14,
           borderTop: "1px solid var(--border)",
-          background: "rgba(15, 21, 36, 0.8)",
+          background: "var(--bg-chrome)",
           display: "flex",
           gap: 10,
           margin: 0,

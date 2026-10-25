@@ -7,12 +7,12 @@ import AdminNavigation from "../components/AdminNavigation.jsx";
 
 
 const PERCENT_METRICS = [
-  ["accuracy", "Accuracy", "Aciertos sobre el total de casos", "#22d3ee"],
-  ["precision", "Precisión", "Cuántos bloqueos fueron ataques reales", "#818cf8"],
-  ["recall", "Recall", "Cuántos ataques reales fueron detectados", "#34d399"],
-  ["f1", "F1 score", "Equilibrio entre precisión y recall", "#a78bfa"],
-  ["fpr", "Falsos positivos", "Tráfico benigno bloqueado por error", "#fb7185"],
-  ["fnr", "Falsos negativos", "Ataques que lograron pasar", "#fbbf24"],
+  ["accuracy", "Accuracy", "Aciertos sobre el total de casos", "var(--accent-500)"],
+  ["precision", "Precisión", "Cuántos bloqueos fueron ataques reales", "var(--brand-400)"],
+  ["recall", "Recall", "Cuántos ataques reales fueron detectados", "var(--success-400)"],
+  ["f1", "F1 score", "Equilibrio entre precisión y recall", "var(--purple-400)"],
+  ["fpr", "Falsos positivos", "Tráfico benigno bloqueado por error", "var(--rose-400)"],
+  ["fnr", "Falsos negativos", "Ataques que lograron pasar", "var(--warning-text)"],
 ];
 
 
@@ -249,10 +249,10 @@ function MetricCard({ label, value, note, tone }) {
 
 function ConfusionMatrix({ metrics }) {
   const cells = [
-    { label: "Verdaderos positivos", key: "tp", note: "Ataque bloqueado", color: "#34d399" },
-    { label: "Falsos negativos", key: "fn", note: "Ataque permitido", color: "#fbbf24" },
-    { label: "Falsos positivos", key: "fp", note: "Benigno bloqueado", color: "#fb7185" },
-    { label: "Verdaderos negativos", key: "tn", note: "Benigno permitido", color: "#22d3ee" },
+    { label: "Verdaderos positivos", key: "tp", note: "Ataque bloqueado", color: "var(--success-400)" },
+    { label: "Falsos negativos", key: "fn", note: "Ataque permitido", color: "var(--warning-text)" },
+    { label: "Falsos positivos", key: "fp", note: "Benigno bloqueado", color: "var(--rose-400)" },
+    { label: "Verdaderos negativos", key: "tn", note: "Benigno permitido", color: "var(--accent-500)" },
   ];
   return (
     <section className="card" style={{ padding: 22 }}>
@@ -260,7 +260,7 @@ function ConfusionMatrix({ metrics }) {
       <p className="hint" style={{ marginTop: 4 }}>Resultado real frente a la decisión registrada por el filtro.</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(120px,1fr))", gap: 12, marginTop: 18 }}>
         {cells.map(cell => (
-          <div key={cell.key} style={{ padding: 16, border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "rgba(15,23,42,.5)" }}>
+          <div key={cell.key} style={{ padding: 16, border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--bg-inset)" }}>
             <strong style={{ display: "block", color: cell.color, fontSize: "1.65rem" }}>{metrics?.[cell.key] ?? 0}</strong>
             <span style={{ display: "block", fontWeight: 700, fontSize: 13 }}>{cell.label}</span>
             <span className="hint">{cell.note}</span>
@@ -290,18 +290,18 @@ function RocCurve({ roc }) {
           <h3 style={{ margin: 0 }}>Curva ROC</h3>
           <p className="hint" style={{ marginTop: 4 }}>Sensibilidad frente a falsos positivos.</p>
         </div>
-        <strong style={{ color: "#a78bfa" }}>AUC {roc?.auc == null ? "—" : decimal(roc.auc)}</strong>
+        <strong style={{ color: "var(--purple-400)" }}>AUC {roc?.auc == null ? "—" : decimal(roc.auc)}</strong>
       </div>
       <svg viewBox="0 0 600 260" role="img" aria-label="Curva ROC del filtro" style={{ width: "100%", minHeight: 230, marginTop: 10 }}>
-        <line x1="50" y1="220" x2="570" y2="220" stroke="rgba(148,163,184,.35)" />
-        <line x1="50" y1="220" x2="50" y2="40" stroke="rgba(148,163,184,.35)" />
-        <line x1="50" y1="220" x2="570" y2="40" stroke="rgba(148,163,184,.3)" strokeDasharray="7 7" />
-        {points && <polyline points={points} fill="none" stroke="#818cf8" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />}
-        <text x="300" y="250" textAnchor="middle" fill="#94a3b8" fontSize="12">Tasa de falsos positivos</text>
-        <text x="17" y="135" textAnchor="middle" fill="#94a3b8" fontSize="12" transform="rotate(-90 17 135)">Recall / TPR</text>
-        <text x="46" y="237" textAnchor="middle" fill="#64748b" fontSize="10">0</text>
-        <text x="570" y="237" textAnchor="middle" fill="#64748b" fontSize="10">1</text>
-        <text x="38" y="44" textAnchor="middle" fill="#64748b" fontSize="10">1</text>
+        <line x1="50" y1="220" x2="570" y2="220" stroke="var(--text-muted)" />
+        <line x1="50" y1="220" x2="50" y2="40" stroke="var(--text-muted)" />
+        <line x1="50" y1="220" x2="570" y2="40" stroke="var(--text-muted)" strokeDasharray="7 7" />
+        {points && <polyline points={points} fill="none" stroke="var(--brand-400)" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />}
+        <text x="300" y="250" textAnchor="middle" fill="var(--text-secondary)" fontSize="12">Tasa de falsos positivos</text>
+        <text x="17" y="135" textAnchor="middle" fill="var(--text-secondary)" fontSize="12" transform="rotate(-90 17 135)">Recall / TPR</text>
+        <text x="46" y="237" textAnchor="middle" fill="var(--text-muted)" fontSize="10">0</text>
+        <text x="570" y="237" textAnchor="middle" fill="var(--text-muted)" fontSize="10">1</text>
+        <text x="38" y="44" textAnchor="middle" fill="var(--text-muted)" fontSize="10">1</text>
       </svg>
     </section>
   );
@@ -336,7 +336,7 @@ function ComparisonTable({ title, rows, nameKey, nameLabel }) {
                   <td>{row.n_total ?? 0}</td>
                   <td>{percentage(row.precision)}</td>
                   <td>{percentage(row.recall)}</td>
-                  <td><strong style={{ color: "#a78bfa" }}>{percentage(row.f1)}</strong></td>
+                  <td><strong style={{ color: "var(--purple-400)" }}>{percentage(row.f1)}</strong></td>
                   <td>{percentage(row.fpr)}</td>
                   <td>{percentage(row.asr_with_filter)}</td>
                 </tr>
@@ -450,7 +450,7 @@ export default function ModelPerformancePage() {
         </div>
       </section>
 
-      {error && <div className="card" style={{ padding: 18, marginBottom: 22, color: "#fca5a5", borderColor: "rgba(239,68,68,.45)" }}>{error}</div>}
+      {error && <div className="card" style={{ padding: 18, marginBottom: 22, color: "var(--danger-400)", borderColor: "rgba(239,68,68,.45)" }}>{error}</div>}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
         <div>
@@ -464,8 +464,8 @@ export default function ModelPerformancePage() {
         {PERCENT_METRICS.map(([key, label, note, tone]) => (
           <MetricCard key={key} label={label} value={percentage(metrics[key])} note={note} tone={tone} />
         ))}
-        <MetricCard label="ROC-AUC" value={metrics.roc?.auc == null ? "—" : percentage(metrics.roc.auc)} note="Capacidad de separar ambas clases" tone="#c084fc" />
-        <MetricCard label="Especificidad (TNR)" value={percentage(metrics.tnr != null ? metrics.tnr : (1 - (metrics.fpr || 0)))} note="Benignos identificados correctamente" tone="#22d3ee" />
+        <MetricCard label="ROC-AUC" value={metrics.roc?.auc == null ? "—" : percentage(metrics.roc.auc)} note="Capacidad de separar ambas clases" tone="var(--purple-400)" />
+        <MetricCard label="Especificidad (TNR)" value={percentage(metrics.tnr != null ? metrics.tnr : (1 - (metrics.fpr || 0)))} note="Benignos identificados correctamente" tone="var(--accent-500)" />
       </section>
 
       <section className="card" style={{ padding: 22, marginBottom: 22 }}>
@@ -477,9 +477,9 @@ export default function ModelPerformancePage() {
           {isLegacy && <span className="hint">Benchmark legacy · {integer(coverage.evaluable_attacks)} ataques A/B</span>}
         </div>
         <div className="kpi-grid-4" style={{ marginTop: 18 }}>
-          <MetricCard label="ASR amplio sin filtro" value={percentage(metrics.asr_without_filter)} note="Incluye toda respuesta no reconocida como negativa, incluso vacía" tone="#fb7185" />
-          <MetricCard label="ASR amplio protegido" value={percentage(metrics.asr_with_filter)} note="Criterio conservador; no equivale a fuga de credenciales" tone="#fbbf24" />
-          <MetricCard label="Reducción ASR amplio" value={percentage(metrics.asr_reduction)} note={`${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="#34d399" />
+          <MetricCard label="ASR amplio sin filtro" value={percentage(metrics.asr_without_filter)} note="Incluye toda respuesta no reconocida como negativa, incluso vacía" tone="var(--rose-400)" />
+          <MetricCard label="ASR amplio protegido" value={percentage(metrics.asr_with_filter)} note="Criterio conservador; no equivale a fuga de credenciales" tone="var(--warning-text)" />
+          <MetricCard label="Reducción ASR amplio" value={percentage(metrics.asr_reduction)} note={`${percentage(metrics.asr_without_filter)} → ${percentage(metrics.asr_with_filter)}`} tone="var(--success-400)" />
           <MetricCard
             label="Reducción de fugas"
             value={percentage(
@@ -488,28 +488,28 @@ export default function ModelPerformancePage() {
                 : 1.0
             )}
             note={`${integer(llmEvaluation.strict_leaks_without_filter || 0)} → ${integer(llmEvaluation.strict_leaks_with_filter || 0)} credenciales expuestas`}
-            tone="#34d399"
+            tone="var(--success-400)"
           />
           {llmEvaluation.strict_leak_rate_without_filter != null && (
-            <MetricCard label="Fuga estricta sin filtro" value={percentage(llmEvaluation.strict_leak_rate_without_filter)} note={`${integer(llmEvaluation.strict_leaks_without_filter)} respuestas expusieron la credencial`} tone="#fb7185" />
+            <MetricCard label="Fuga estricta sin filtro" value={percentage(llmEvaluation.strict_leak_rate_without_filter)} note={`${integer(llmEvaluation.strict_leaks_without_filter)} respuestas expusieron la credencial`} tone="var(--rose-400)" />
           )}
           {llmEvaluation.strict_leak_rate_with_filter != null && (
-            <MetricCard label="Fuga estricta protegida" value={percentage(llmEvaluation.strict_leak_rate_with_filter)} note={`${integer(llmEvaluation.strict_leaks_with_filter)} credenciales entregadas tras Output Guard`} tone="#34d399" />
+            <MetricCard label="Fuga estricta protegida" value={percentage(llmEvaluation.strict_leak_rate_with_filter)} note={`${integer(llmEvaluation.strict_leaks_with_filter)} credenciales entregadas tras Output Guard`} tone="var(--success-400)" />
           )}
           {llmEvaluation.benign_refusal_rate_without_filter != null && (
-            <MetricCard label="Rechazo benigno sin filtro" value={percentage(llmEvaluation.benign_refusal_rate_without_filter)} note="Solicitudes legítimas rechazadas por el LLM" tone="#818cf8" />
+            <MetricCard label="Rechazo benigno sin filtro" value={percentage(llmEvaluation.benign_refusal_rate_without_filter)} note="Solicitudes legítimas rechazadas por el LLM" tone="var(--brand-400)" />
           )}
           {llmEvaluation.benign_rejection_rate_with_filter != null && (
-            <MetricCard label="Rechazo benigno protegido" value={percentage(llmEvaluation.benign_rejection_rate_with_filter)} note="Bloqueos del filtro o rechazos del LLM" tone="#c084fc" />
+            <MetricCard label="Rechazo benigno protegido" value={percentage(llmEvaluation.benign_rejection_rate_with_filter)} note="Bloqueos del filtro o rechazos del LLM" tone="var(--purple-400)" />
           )}
         </div>
         {/* Métricas de Output Guard comentadas temporalmente
         {Number(outputGuard.evaluated || 0) > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(185px,1fr))", gap: 14, marginTop: 14 }}>
-            <MetricCard label="Salidas revisadas" value={integer(outputGuard.evaluated)} note="Respuestas que pasaron por Output Guard" tone="#22d3ee" />
-            <MetricCard label="Intervenciones en ataques" value={integer(outputGuard.attack_interventions)} note="Respuestas maliciosas redactadas o bloqueadas" tone="#34d399" />
-            <MetricCard label="Fugas evitadas" value={integer(outputGuard.prevented_secret_leaks)} note="Secretos detectados antes de entregar la respuesta" tone="#a78bfa" />
-            <MetricCard label="Intervenciones benignas" value={integer(outputGuard.benign_interventions)} note="Posibles falsos positivos del guard de salida" tone="#fbbf24" />
+            <MetricCard label="Salidas revisadas" value={integer(outputGuard.evaluated)} note="Respuestas que pasaron por Output Guard" tone="var(--accent-500)" />
+            <MetricCard label="Intervenciones en ataques" value={integer(outputGuard.attack_interventions)} note="Respuestas maliciosas redactadas o bloqueadas" tone="var(--success-400)" />
+            <MetricCard label="Fugas evitadas" value={integer(outputGuard.prevented_secret_leaks)} note="Secretos detectados antes de entregar la respuesta" tone="var(--purple-400)" />
+            <MetricCard label="Intervenciones benignas" value={integer(outputGuard.benign_interventions)} note="Posibles falsos positivos del guard de salida" tone="var(--warning-text)" />
           </div>
         )}
         */}
@@ -530,14 +530,14 @@ export default function ModelPerformancePage() {
         ) : (
           <>
             <div className="kpi-grid-4" style={{ marginTop: 18 }}>
-              <MetricCard label="Tokens sin filtro" value={integer(tokenUsage.without_filter?.total_tokens)} note={`${integer(tokenUsage.calls_without_filter)} llamadas potenciales`} tone="#fb7185" />
-              <MetricCard label="Tokens con filtro" value={integer(tokenUsage.with_filter?.total_tokens)} note={`${integer(tokenUsage.calls_with_filter)} solicitudes alcanzaron el LLM`} tone="#22d3ee" />
-              <MetricCard label="Tokens evitados" value={integer(tokenUsage.saved_by_blocking?.total_tokens)} note={`${integer(tokenUsage.calls_avoided)} llamadas bloqueadas antes del LLM`} tone="#34d399" />
-              <MetricCard label="Ahorro de tokens" value={percentage(tokenUsage.token_savings_rate)} note="Sobre el consumo potencial sin filtro" tone="#a78bfa" />
-              <MetricCard label="Coste sin filtro" value={usd(tokenUsage.estimated_cost_without_filter_usd)} note="Proyección con la tarifa configurada" tone="#fb7185" />
-              <MetricCard label="Coste con filtro" value={usd(tokenUsage.estimated_cost_with_filter_usd)} note="Solo solicitudes permitidas" tone="#22d3ee" />
-              <MetricCard label="Coste evitado" value={usd(tokenUsage.estimated_cost_saved_usd)} note="Ahorro por bloquear antes del modelo" tone="#34d399" />
-              <MetricCard label="Uso del benchmark" value={integer(tokenUsage.benchmark_observed?.total_tokens)} note={`${integer(tokenUsage.benchmark_calls)} llamadas A/B realmente ejecutadas`} tone="#fbbf24" />
+              <MetricCard label="Tokens sin filtro" value={integer(tokenUsage.without_filter?.total_tokens)} note={`${integer(tokenUsage.calls_without_filter)} llamadas potenciales`} tone="var(--rose-400)" />
+              <MetricCard label="Tokens con filtro" value={integer(tokenUsage.with_filter?.total_tokens)} note={`${integer(tokenUsage.calls_with_filter)} solicitudes alcanzaron el LLM`} tone="var(--accent-500)" />
+              <MetricCard label="Tokens evitados" value={integer(tokenUsage.saved_by_blocking?.total_tokens)} note={`${integer(tokenUsage.calls_avoided)} llamadas bloqueadas antes del LLM`} tone="var(--success-400)" />
+              <MetricCard label="Ahorro de tokens" value={percentage(tokenUsage.token_savings_rate)} note="Sobre el consumo potencial sin filtro" tone="var(--purple-400)" />
+              <MetricCard label="Coste sin filtro" value={usd(tokenUsage.estimated_cost_without_filter_usd)} note="Proyección con la tarifa configurada" tone="var(--rose-400)" />
+              <MetricCard label="Coste con filtro" value={usd(tokenUsage.estimated_cost_with_filter_usd)} note="Solo solicitudes permitidas" tone="var(--accent-500)" />
+              <MetricCard label="Coste evitado" value={usd(tokenUsage.estimated_cost_saved_usd)} note="Ahorro por bloquear antes del modelo" tone="var(--success-400)" />
+              <MetricCard label="Uso del benchmark" value={integer(tokenUsage.benchmark_observed?.total_tokens)} note={`${integer(tokenUsage.benchmark_calls)} llamadas A/B realmente ejecutadas`} tone="var(--warning-text)" />
             </div>
             <div className="hint" style={{ marginTop: 14 }}>
               {tokenUsage.pricing_mode === "reference_estimate"
@@ -559,7 +559,7 @@ export default function ModelPerformancePage() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <h3 style={{ margin: 0, fontSize: "1.25rem" }}>🚀 Proyección de Ahorro con Modelos Pesados y de Frontera</h3>
-              <span style={{ fontSize: "0.75rem", padding: "2px 10px", borderRadius: 9999, background: "rgba(99, 102, 241, 0.2)", color: "#a5b4fc", border: "1px solid rgba(99, 102, 241, 0.35)", fontWeight: 700 }}>
+              <span style={{ fontSize: "0.75rem", padding: "2px 10px", borderRadius: 9999, background: "rgba(99, 102, 241, 0.2)", color: "var(--brand-400)", border: "1px solid rgba(99, 102, 241, 0.35)", fontWeight: 700 }}>
                 Escala ~{integer(projectedRequests)} peticiones
               </span>
             </div>
@@ -570,7 +570,7 @@ export default function ModelPerformancePage() {
         </div>
 
         {/* Controles de Configuración: Volumen y Modelo Principal */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, padding: 18, background: "rgba(15, 23, 42, 0.5)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, padding: 18, background: "var(--bg-inset)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", marginBottom: 20 }}>
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <label style={{ fontWeight: 700, fontSize: 13, color: "var(--text-primary)" }}>
@@ -610,7 +610,7 @@ export default function ModelPerformancePage() {
               style={{
                 width: "100%",
                 padding: "8px 12px",
-                background: "rgba(10, 14, 26, 0.8)",
+                background: "var(--bg-secondary)",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)",
                 color: "var(--text-primary)",
@@ -660,7 +660,7 @@ export default function ModelPerformancePage() {
                   Impacto proyectado en {selectedModel.name} ({integer(projectedRequests)} peticiones):
                 </strong>
                 <span className="hint" style={{ fontSize: 12 }}>
-                  Ahorro sostenido: <strong style={{ color: "#a78bfa" }}>{percentage(projection.tokenSavingsRate)}</strong>
+                  Ahorro sostenido: <strong style={{ color: "var(--purple-400)" }}>{percentage(projection.tokenSavingsRate)}</strong>
                 </span>
               </div>
               <div className="kpi-grid-4" style={{ marginBottom: 20 }}>
@@ -668,25 +668,25 @@ export default function ModelPerformancePage() {
                   label="Coste sin filtro"
                   value={usd(projection.costWithoutFilter)}
                   note={`${integer(projection.rawTotalTokens)} tokens en ${integer(projectedRequests)} peticiones directas`}
-                  tone="#fb7185"
+                  tone="var(--rose-400)"
                 />
                 <MetricCard
                   label="Coste con Promption"
                   value={usd(projection.costWithFilter)}
                   note={`${integer(projection.filteredTotalTokens)} tokens en ${integer(projection.callsWithFilter)} peticiones permitidas`}
-                  tone="#22d3ee"
+                  tone="var(--accent-500)"
                 />
                 <MetricCard
                   label="Ahorro económico"
                   value={usd(projection.costSaved)}
                   note={`Dinero ahorrado al no enviar tráfico malicioso a ${selectedModel.name}`}
-                  tone="#34d399"
+                  tone="var(--success-400)"
                 />
                 <MetricCard
                   label="Tokens evitados"
                   value={integer(projection.savedTotalTokens)}
                   note={`${integer(projection.callsAvoided)} llamadas bloqueadas antes del LLM (${percentage(projection.tokenSavingsRate)})`}
-                  tone="#a78bfa"
+                  tone="var(--purple-400)"
                 />
               </div>
             </div>
@@ -738,7 +738,7 @@ export default function ModelPerformancePage() {
                     borderRadius: "var(--radius-full)",
                     fontSize: 12,
                     border: `1px solid ${isSelected ? "var(--brand-400)" : "var(--border)"}`,
-                    background: isSelected ? "rgba(99, 102, 241, 0.2)" : "rgba(15, 23, 42, 0.4)",
+                    background: isSelected ? "rgba(99, 102, 241, 0.2)" : "var(--bg-inset)",
                     color: isSelected ? "var(--text-primary)" : "var(--text-muted)",
                     cursor: "pointer",
                     display: "flex",
@@ -765,8 +765,8 @@ export default function ModelPerformancePage() {
                     <th>Tokens (Sin / Con filtro)</th>
                     <th>Coste sin filtro</th>
                     <th>Coste con filtro</th>
-                    <th style={{ color: "#34d399" }}>Ahorro ($ USD)</th>
-                    <th style={{ color: "#a78bfa" }}>% Ahorro</th>
+                    <th style={{ color: "var(--success-400)" }}>Ahorro ($ USD)</th>
+                    <th style={{ color: "var(--purple-400)" }}>% Ahorro</th>
                     <th>Fuente oficial</th>
                   </tr>
                 </thead>
@@ -791,7 +791,7 @@ export default function ModelPerformancePage() {
                                 {model.provider}
                               </span>
                               {model.badge && (
-                                <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 4, background: "rgba(34,211,238,.12)", color: "#67e8f9" }}>
+                                <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 4, background: "rgba(34,211,238,.12)", color: "var(--accent-400)" }}>
                                   {model.badge}
                                 </span>
                               )}
@@ -804,13 +804,13 @@ export default function ModelPerformancePage() {
                             <div>{integer(proj.rawTotalTokens)}</div>
                             <div className="hint" style={{ fontSize: 11 }}>→ {integer(proj.filteredTotalTokens)}</div>
                           </td>
-                          <td style={{ color: "#fb7185", fontWeight: 600 }}>{usd(proj.costWithoutFilter)}</td>
-                          <td style={{ color: "#22d3ee", fontWeight: 600 }}>{usd(proj.costWithFilter)}</td>
-                          <td style={{ color: "#34d399", fontWeight: 800, fontSize: "1.05rem" }}>
+                          <td style={{ color: "var(--rose-400)", fontWeight: 600 }}>{usd(proj.costWithoutFilter)}</td>
+                          <td style={{ color: "var(--accent-500)", fontWeight: 600 }}>{usd(proj.costWithFilter)}</td>
+                          <td style={{ color: "var(--success-400)", fontWeight: 800, fontSize: "1.05rem" }}>
                             +{usd(proj.costSaved)}
                           </td>
                           <td>
-                            <strong style={{ color: "#a78bfa" }}>{percentage(proj.tokenSavingsRate)}</strong>
+                            <strong style={{ color: "var(--purple-400)" }}>{percentage(proj.tokenSavingsRate)}</strong>
                           </td>
                           <td>
                             <a
@@ -843,8 +843,8 @@ export default function ModelPerformancePage() {
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14, marginTop: 20 }}>
-        <MetricCard label="Latencia media" value={`${decimal(metrics.latency?.mean, 1)} ms`} note="Tiempo promedio por prompt" tone="#22d3ee" />
-        <MetricCard label="Latencia p95" value={`${decimal(metrics.latency?.p95, 1)} ms`} note="El 95% termina antes de este valor" tone="#818cf8" />
+        <MetricCard label="Latencia media" value={`${decimal(metrics.latency?.mean, 1)} ms`} note="Tiempo promedio por prompt" tone="var(--accent-500)" />
+        <MetricCard label="Latencia p95" value={`${decimal(metrics.latency?.p95, 1)} ms`} note="El 95% termina antes de este valor" tone="var(--brand-400)" />
       </section>
 
       <ComparisonTable title="Rendimiento por dataset" rows={payload?.by_dataset} nameKey="dataset" nameLabel="Dataset" />

@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
+  color-scheme: dark;
   --bg-primary: #0a0e1a;
   --bg-secondary: #0f1524;
   --bg-card: rgba(22, 30, 50, 0.7);
@@ -20,6 +21,17 @@
   --warning-500: #f59e0b;
   --danger-500: #ef4444;
   --danger-400: #f87171;
+  --purple-400: #a78bfa;
+  --rose-400: #fb7185;
+  --warning-text: #fbbf24;
+  --info-text: #93c5fd;
+  --orange-text: #fdba74;
+  --text: var(--text-primary);
+  --bg-chrome: rgba(15, 21, 36, 0.8);
+  --bg-header: rgba(10, 14, 26, 0.95);
+  --bg-inset: rgba(15, 23, 42, 0.48);
+  --bg-code: rgba(0, 0, 0, 0.2);
+  --overlay: rgba(0, 0, 0, 0.7);
   --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.15);
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
   --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.4);
@@ -28,6 +40,66 @@
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-full: 9999px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-primary: #f5f7fc;
+  --bg-secondary: #edf1f8;
+  --bg-card: rgba(255, 255, 255, 0.88);
+  --bg-card-solid: #ffffff;
+  --border: rgba(51, 65, 105, 0.2);
+  --border-hover: rgba(79, 70, 229, 0.45);
+  --text-primary: #17213a;
+  --text-secondary: #44536b;
+  --text-muted: #52617a;
+  --brand-500: #4f46e5;
+  --brand-400: #3730a3;
+  --brand-600: #4338ca;
+  --accent-500: #0e7490;
+  --accent-400: #155e75;
+  --success-500: #047857;
+  --success-400: #065f46;
+  --warning-500: #b45309;
+  --danger-500: #dc2626;
+  --danger-400: #b91c1c;
+  --purple-400: #7c3aed;
+  --rose-400: #be123c;
+  --warning-text: #92400e;
+  --info-text: #1d4ed8;
+  --orange-text: #9a3412;
+  --bg-chrome: rgba(245, 247, 252, 0.95);
+  --bg-header: rgba(255, 255, 255, 0.95);
+  --bg-inset: #edf1f8;
+  --bg-code: rgba(51, 65, 105, 0.06);
+  --overlay: rgba(23, 33, 58, 0.35);
+  --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.06);
+  --shadow-card: 0 4px 24px rgba(23, 33, 58, 0.06);
+  --shadow-elevated: 0 8px 40px rgba(23, 33, 58, 0.12);
+}
+
+.theme-toolbar {
+  min-height: 56px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.theme-toolbar .theme-select {
+  width: 132px;
+  padding: 8px 32px 8px 12px;
+  font-size: 0.85rem;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-400);
+  outline-offset: 3px;
 }
 
 * {
@@ -334,7 +406,7 @@ a:hover {
 .card-icon.warning {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05));
   border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #fbbf24;
+  color: var(--warning-text);
 }
 
 .card h3 {
@@ -498,7 +570,7 @@ pre {
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
   border: 1px solid rgba(239, 68, 68, 0.4);
   border-bottom-left-radius: 6px;
-  color: #fecaca;
+  color: var(--danger-400);
 }
 
 .msg.blocked::before {
@@ -541,7 +613,7 @@ pre {
 .chat-markdown code {
   padding: 0.12em 0.3em;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-code);
   font-size: 0.9em;
 }
 .chat-markdown pre {
@@ -552,11 +624,13 @@ pre {
   white-space: pre;
   word-break: normal;
   overflow-wrap: normal;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-code);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 .chat-markdown pre code { padding: 0; background: transparent; }
+.msg.user :is(code, pre) { color: inherit; background: rgba(0, 0, 0, 0.15); }
+.msg.user pre code { background: transparent; }
 .chat-markdown-table { max-width: 100%; overflow-x: auto; margin: 0.8em 0; }
 .chat-markdown table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
 .chat-markdown :is(th, td) { padding: 8px 10px; border: 1px solid var(--border); text-align: left; }
@@ -627,7 +701,7 @@ pre {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(15, 21, 36, 0.8);
+  background: var(--bg-chrome);
   border-top-left-radius: var(--radius-xl);
   border-top-right-radius: var(--radius-xl);
   backdrop-filter: blur(10px);
@@ -756,7 +830,7 @@ pre {
 .fullscreen-chat .wrap {
   max-width: 100%;
   padding: 0;
-  min-height: 100vh;
+  min-height: calc(100vh - 56px);
   display: flex;
   flex-direction: column;
 }
@@ -944,7 +1018,7 @@ pre {
 }
 
 .auth-container {
-  min-height: 100vh;
+  min-height: calc(100vh - 56px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1122,7 +1196,7 @@ pre {
 .stat-card.brand .stat-value { color: var(--brand-400); }
 .stat-card.accent .stat-value { color: var(--accent-400); }
 .stat-card.success .stat-value { color: var(--success-400); }
-.stat-card.warning .stat-value { color: #fbbf24; }
+.stat-card.warning .stat-value { color: var(--warning-text); }
 .stat-card.danger .stat-value { color: var(--danger-400); }
 
 .stat-sub {
@@ -1253,42 +1327,42 @@ td.message {
 
 .badge-error {
   background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+  color: var(--danger-400);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 .badge-error::before { background: var(--danger-500); box-shadow: 0 0 6px var(--danger-500); }
 
 .badge-warning {
   background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
+  color: var(--warning-text);
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 .badge-warning::before { background: var(--warning-500); box-shadow: 0 0 6px var(--warning-500); }
 
 .badge-info {
   background: rgba(59, 130, 246, 0.15);
-  color: #93c5fd;
+  color: var(--info-text);
   border: 1px solid rgba(59, 130, 246, 0.3);
 }
 .badge-info::before { background: #3b82f6; box-shadow: 0 0 6px #3b82f6; }
 
 .badge-filter {
   background: rgba(139, 92, 246, 0.15);
-  color: #c4b5fd;
+  color: var(--purple-400);
   border: 1px solid rgba(139, 92, 246, 0.3);
 }
 .badge-filter::before { background: #8b5cf6; box-shadow: 0 0 6px #8b5cf6; }
 
 .badge-auth {
   background: rgba(249, 115, 22, 0.15);
-  color: #fdba74;
+  color: var(--orange-text);
   border: 1px solid rgba(249, 115, 22, 0.3);
 }
 .badge-auth::before { background: #f97316; box-shadow: 0 0 6px #f97316; }
 
 .badge-guard {
   background: rgba(16, 185, 129, 0.15);
-  color: #86efac;
+  color: var(--success-400);
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 .badge-guard::before { background: var(--success-500); box-shadow: 0 0 6px var(--success-500); }
@@ -1471,8 +1545,8 @@ td.message {
 
 .chat-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .chat-attachment { border: 1px solid var(--brand-400); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); background: var(--bg-secondary); cursor: pointer; }
-.chat-action-overlay { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .7); }
-.chat-action-modal { width: min(100%, 440px); padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-secondary); color: var(--text-primary); box-shadow: 0 20px 70px rgba(0,0,0,.5); }
+.chat-action-overlay { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--overlay); }
+.chat-action-modal { width: min(100%, 440px); padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-secondary); color: var(--text-primary); box-shadow: var(--shadow-elevated); }
 .chat-action-modal h3 { margin: 0 0 16px; }
 .chat-action-modal label { display: grid; gap: 8px; }
 .chat-action-modal input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); background: var(--bg-primary); }

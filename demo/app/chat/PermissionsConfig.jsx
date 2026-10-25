@@ -49,7 +49,7 @@ export default function PermissionsConfig({ isOpen, onClose, currentRole }) {
         left: 0,
         right: 0,
         bottom: 0,
-        background: "rgba(0, 0, 0, 0.7)",
+        background: "var(--overlay)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -69,7 +69,7 @@ export default function PermissionsConfig({ isOpen, onClose, currentRole }) {
           maxHeight: "90vh",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.6)"
+          boxShadow: "var(--shadow-elevated)"
         }}
         onClick={(e) => e.stopPropagation()}
       >

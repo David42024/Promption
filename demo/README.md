@@ -37,6 +37,14 @@ npm run dev            # http://localhost:3000
 
 Cuentas: `ana@demo.shop / demo123` (ventas), `jefe@demo.shop / demo123` (admin).
 
+## Apariencia
+
+El selector **Apariencia**, disponible en todas las páginas, permite elegir
+**Claro**, **Oscuro** o **Sistema**. La preferencia se conserva en el navegador
+y se aplica antes de mostrar la página. **Sistema** sigue los cambios del tema
+del dispositivo. El chat flotante, los permisos y los paneles administrativos
+comparten la misma paleta.
+
 ## Markdown en el chat
 
 El chat flotante y la vista completa comparten `app/chat/MarkdownMessage.mjs`.
