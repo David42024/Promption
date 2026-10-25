@@ -291,7 +291,7 @@ export default function Landing() {
                     background:
                       "linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.05))",
                     border: "1px solid rgba(139, 92, 246, 0.3)",
-                    color: "#c4b5fd",
+                    color: "var(--purple-400)",
                   }}
                 >
                   <FilterIcon />

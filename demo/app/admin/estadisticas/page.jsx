@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import AdminNavigation from "../components/AdminNavigation.jsx";
 
 
-function MetricCard({ label, value, note, tone = "#818cf8" }) {
+function MetricCard({ label, value, note, tone = "var(--brand-400)" }) {
   return (
     <div className="card" style={{ padding: 20, minHeight: 130 }}>
       <div style={{ color: "var(--text-muted)", fontSize: 13, fontWeight: 700 }}>{label}</div>
@@ -165,16 +165,16 @@ export default function AdminStatistics() {
         <span className="hint" style={{ marginLeft: "auto" }}>Actualización automática cada 30 segundos</span>
       </div>
 
-      {error && <div className="card" style={{ padding: 18, marginBottom: 22, color: "#fca5a5", borderColor: "rgba(239,68,68,.45)" }}>{error}</div>}
+      {error && <div className="card" style={{ padding: 18, marginBottom: 22, color: "var(--danger-400)", borderColor: "rgba(239,68,68,.45)" }}>{error}</div>}
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 14, marginBottom: 22 }}>
         <MetricCard label="Solicitudes" value={summary.requests || 0} note={`${stats?.total || 0} eventos de auditoría`} />
-        <MetricCard label="Permitidas" value={summary.allowed || 0} note="Finalizaron sin bloqueo" tone="#34d399" />
-        <MetricCard label="Bloqueadas" value={summary.blocked || 0} note={`Tasa de bloqueo ${blockRate}`} tone="#f87171" />
-        <MetricCard label="Inciertas" value={summary.uncertain || 0} note="Requieren revisión" tone="#fbbf24" />
-        <MetricCard label="Redactadas" value={summary.redacted || 0} note="Output Guard eliminó valores" tone="#a78bfa" />
-        <MetricCard label="Latencia media" value={`${stats?.latency?.average_ms || 0} ms`} note={`p95 ${stats?.latency?.p95_ms || 0} ms`} tone="#22d3ee" />
-        <MetricCard label="Errores" value={summary.errors || 0} note="Eventos de nivel ERROR" tone="#fb7185" />
+        <MetricCard label="Permitidas" value={summary.allowed || 0} note="Finalizaron sin bloqueo" tone="var(--success-400)" />
+        <MetricCard label="Bloqueadas" value={summary.blocked || 0} note={`Tasa de bloqueo ${blockRate}`} tone="var(--danger-400)" />
+        <MetricCard label="Inciertas" value={summary.uncertain || 0} note="Requieren revisión" tone="var(--warning-text)" />
+        <MetricCard label="Redactadas" value={summary.redacted || 0} note="Output Guard eliminó valores" tone="var(--purple-400)" />
+        <MetricCard label="Latencia media" value={`${stats?.latency?.average_ms || 0} ms`} note={`p95 ${stats?.latency?.p95_ms || 0} ms`} tone="var(--accent-500)" />
+        <MetricCard label="Errores" value={summary.errors || 0} note="Eventos de nivel ERROR" tone="var(--rose-400)" />
       </section>
 
       <Timeline points={stats?.timeline || []} period={period} />

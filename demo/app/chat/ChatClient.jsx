@@ -294,7 +294,7 @@ export default function ChatClient({ user }) {
                   fontSize: "0.7rem",
                   fontWeight: 700,
                   fontFamily: "'JetBrains Mono', 'Consolas', monospace",
-                  background: "rgba(255,255,255,0.08)",
+                  background: "var(--bg-card)",
                   border: "1px solid var(--border)",
                   color: "var(--text-muted)",
                   letterSpacing: "0.04em",
@@ -365,11 +365,11 @@ export default function ChatClient({ user }) {
                 }`,
                 color:
                   rol === "admin"
-                    ? "#fde68a"
+                    ? "var(--warning-text)"
                     : rol === "ventas"
-                    ? "#a5b4fc"
+                    ? "var(--brand-400)"
                     : rol === "customer"
-                    ? "#a7f3d0"
+                    ? "var(--success-400)"
                     : "var(--text-muted)",
                 boxShadow:
                   rol === "admin"
@@ -488,7 +488,7 @@ export default function ChatClient({ user }) {
                     borderRadius: "var(--radius-full)",
                     background: "rgba(245, 158, 11, 0.25)",
                     border: "1px solid rgba(245, 158, 11, 0.5)",
-                    color: "#fbbf24",
+                    color: "var(--warning-text)",
                     fontSize: "0.65rem",
                     fontWeight: 800,
                   }}>
@@ -516,14 +516,14 @@ export default function ChatClient({ user }) {
                       ? "rgba(34, 211, 238, 0.4)"
                       : "rgba(245, 158, 11, 0.45)"
                   }`,
-                  color: filterStatus.outputGuardEnabled ? "var(--accent-400)" : "#fbbf24",
+                  color: filterStatus.outputGuardEnabled ? "var(--accent-400)" : "var(--warning-text)",
                 }}
               >
                 <span style={{
                   width: 6, height: 6,
                   borderRadius: "50%",
-                  background: filterStatus.outputGuardEnabled ? "var(--accent-400)" : "#fbbf24",
-                  boxShadow: `0 0 6px ${filterStatus.outputGuardEnabled ? "var(--accent-400)" : "#fbbf24"}`,
+                  background: filterStatus.outputGuardEnabled ? "var(--accent-400)" : "var(--warning-text)",
+                  boxShadow: `0 0 6px ${filterStatus.outputGuardEnabled ? "var(--accent-400)" : "var(--warning-text)"}`,
                   animation: "pulse 2.2s infinite",
                 }}></span>
                 OUTPUT GUARD · {filterStatus.outputGuardEnabled ? "ON" : "OFF"}
