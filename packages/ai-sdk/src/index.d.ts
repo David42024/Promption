@@ -11,6 +11,23 @@ export interface ConversationMessage {
   tool_name?: string;
 }
 export type Direction = "input" | "output";
+export type ProtectionProfile = "conversational" | "balanced" | "strict";
+export type DecisionControl = "input" | "injection" | "scope" | "authorization" | "output" | "operational";
+export type AssessmentState = "allowed" | "denied" | "uncertain" | "not_evaluated" | "error";
+export interface Assessment {
+  state: AssessmentState;
+  reason: string;
+  source: string;
+  evaluations: { state: AssessmentState; reason: string; source: string }[];
+}
+export type Assessments = Record<"injection" | "scope" | "authorization", Assessment>;
+export interface ProtectionSettings {
+  profile?: ProtectionProfile;
+  inputUncertainty?: "review" | "block";
+  scopeAmbiguity?: "clarify" | "block";
+  reviewBlockThreshold?: number;
+}
+export type ResolvedProtectionSettings = Readonly<Required<ProtectionSettings>>;
 export interface ScopeUsage {
   prompt_tokens: number | null;
   completion_tokens: number | null;
@@ -58,6 +75,9 @@ export interface ScopeDecision {
   provider_calls?: number;
   reused?: boolean;
   intent?: IntentAssessment;
+  control?: DecisionControl;
+  injection?: "not_evaluated" | "not_detected" | "uncertain" | "detected";
+  assessments?: Assessments;
 }
 export interface IntentAssessment {
   name: "social" | "public_information" | "document_creation" | "web_retrieval" | "clarification"
@@ -86,12 +106,25 @@ export interface GuardRequest {
   signal?: AbortSignal;
   context?: Record<string, unknown>;
   messages?: ConversationMessage[];
+  isolateHistory?: boolean;
 }
 export interface GuardResponse {
   allowed: boolean;
   text: string;
   action?: string;
   requiresOutputGuard?: boolean;
+  requiresScopeReview?: boolean;
+  inputRiskScore?: number;
+  assessments?: Assessments;
+  control?: DecisionControl;
+  reason?: string;
+  conversation?: {
+    message_count: number;
+    evaluation_mode: string;
+    requires_output_guard: boolean;
+    isolated_history?: boolean;
+    [key: string]: unknown;
+  };
 }
 export type GuardTransport = (request: GuardRequest) => Promise<GuardResponse>;
 export interface HttpOptions { fetch?: typeof globalThis.fetch; timeoutMs?: number; }
@@ -123,27 +156,34 @@ export interface ProtectToolOptions {
   signal?: AbortSignal;
 }
 export type PromptionOptions = (FilterApiOptions | { transport: GuardTransport }) & {
+  protectedValues?: readonly string[];
+  protection?: ProtectionProfile | ProtectionSettings;
   scopeEvaluator?: ScopeEvaluator;
   maxTextChars?: number;
   maxConversationMessages?: number;
   maxConversationChars?: number;
   maxStreamBytes?: number;
   earlyOutputCheckChars?: number;
-  onDecision?: (event: { direction: Direction; allowed: boolean; action?: string; userId: string; scope?: ScopeDecision }) => void;
+  onDecision?: (event: { direction: Direction; allowed: boolean; action?: string; userId: string; scope?: ScopeDecision;
+    control?: DecisionControl; reason?: string; policyReason?: string; protection: ResolvedProtectionSettings; assessments: Assessments }) => void;
 };
 export class PromptionError extends Error {
   code: string;
   status: number;
   direction?: Direction;
+  reason?: string;
+  control?: DecisionControl;
   scope?: ScopeDecision;
-  constructor(code: string, options?: { status?: number; direction?: Direction; cause?: unknown });
+  constructor(code: string, options?: { status?: number; direction?: Direction; reason?: string; control?: DecisionControl; cause?: unknown });
 }
+export function resolveProtection(settings?: ProtectionProfile | ProtectionSettings): ResolvedProtectionSettings;
 export function createFilterApiTransport(options: FilterApiOptions): GuardTransport;
 export function createGuardEndpointTransport(options: GuardEndpointOptions): GuardTransport;
 export function createScopeEvaluator(options: { model: LanguageModel; timeoutMs?: number; maxOutputTokens?: number; providerOptions?: Record<string, unknown> }): ScopeEvaluator;
 export function createContextEvaluator(options: { model: LanguageModel; timeoutMs?: number; maxOutputTokens?: number;
-  minimumConfidence?: number; providerOptions?: Record<string, unknown> }): ScopeEvaluator;
+  minimumConfidence?: number; providerOptions?: Record<string, unknown>; schemaMode?: 'constrained' | 'portable' }): ScopeEvaluator;
 export function createPromption(options: PromptionOptions): {
+  readonly protection: ResolvedProtectionSettings;
   check(text: string, options: Omit<GuardRequest, "text">): Promise<string>;
   checkScope(text: string, options: Omit<ScopeRequest, "text">): Promise<ScopeDecision>;
   middleware(options: MiddlewareOptions): LanguageModelMiddleware;

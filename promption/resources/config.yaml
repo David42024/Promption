@@ -20,19 +20,22 @@ model:
   max_depth: 20
   min_samples_leaf: 1
   random_state: 42
-  confidence_threshold: 0.66
+  confidence_threshold: 0.85
   chunk_chars: 250
   chunk_overlap: 100
   use_lightweight_ml: true
+protection:
+  profile: balanced
+
 ensemble:
   heuristic_weight: 0.4
   ml_weight: 0.6
   decision_low_threshold: 0.33
-  decision_high_threshold: 0.66
+  decision_high_threshold: 0.85
   require_llm_veto: false
 classification:
   ml_benign_threshold: 0.33
-  ml_malicious_threshold: 0.66
+  ml_malicious_threshold: 0.85
 llm:
   provider: auto
   host: http://localhost:11434

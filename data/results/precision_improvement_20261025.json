@@ -1,0 +1,2050 @@
+{
+  "library_version": "1.7.1",
+  "date": "2026-10-25",
+  "label_quality": "Original source/silver labels, development-exposed regression cohort; no new human gold.",
+  "local_profiles": {
+    "cases": 240,
+    "executions": 720,
+    "api_calls": 0,
+    "cost_usd": 0,
+    "source_sha256": "ac68860b773ad7b52c8a5f4b2d8a471344cf6c8b543008312b22b373c711cf3e",
+    "model_sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa",
+    "profiles": {
+      "conversational": {
+        "pooled": {
+          "n": 240,
+          "TP": 69,
+          "FP": 6,
+          "FN": 51,
+          "TN": 114,
+          "fpr": 0.05,
+          "fnr_veto": 0.425,
+          "routes": {
+            "review": 163,
+            "block": 75,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 51,
+          "benign_review": 112,
+          "scope_review_required": 206
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 27,
+            "FP": 1,
+            "FN": 33,
+            "TN": 59,
+            "fpr": 0.016666666666666666,
+            "fnr_veto": 0.55,
+            "routes": {
+              "review": 90,
+              "block": 28,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 33,
+            "benign_review": 57,
+            "scope_review_required": 109
+          },
+          "public": {
+            "n": 120,
+            "TP": 42,
+            "FP": 5,
+            "FN": 18,
+            "TN": 55,
+            "fpr": 0.08333333333333333,
+            "fnr_veto": 0.3,
+            "routes": {
+              "review": 73,
+              "block": 47
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 18,
+            "benign_review": 55,
+            "scope_review_required": 97
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 35,
+            "FP": 3,
+            "FN": 10,
+            "TN": 50,
+            "fpr": 0.05660377358490566,
+            "fnr_veto": 0.2222222222222222,
+            "routes": {
+              "review": 60,
+              "block": 38
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 10,
+            "benign_review": 50,
+            "scope_review_required": 77
+          },
+          "es": {
+            "n": 22,
+            "TP": 7,
+            "FP": 2,
+            "FN": 8,
+            "TN": 5,
+            "fpr": 0.2857142857142857,
+            "fnr_veto": 0.5333333333333333,
+            "routes": {
+              "block": 9,
+              "review": 13
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 8,
+            "benign_review": 5,
+            "scope_review_required": 20
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 27,
+            "FP": 1,
+            "FN": 33,
+            "TN": 59,
+            "fpr": 0.016666666666666666,
+            "fnr_veto": 0.55,
+            "routes": {
+              "review": 90,
+              "block": 28,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 33,
+            "benign_review": 57,
+            "scope_review_required": 109
+          }
+        }
+      },
+      "balanced": {
+        "pooled": {
+          "n": 240,
+          "TP": 81,
+          "FP": 8,
+          "FN": 39,
+          "TN": 112,
+          "fpr": 0.06666666666666667,
+          "fnr_veto": 0.325,
+          "routes": {
+            "review": 149,
+            "block": 89,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 39,
+          "benign_review": 110,
+          "scope_review_required": 206
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 35,
+            "FP": 2,
+            "FN": 25,
+            "TN": 58,
+            "fpr": 0.03333333333333333,
+            "fnr_veto": 0.4166666666666667,
+            "routes": {
+              "review": 81,
+              "block": 37,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 25,
+            "benign_review": 56,
+            "scope_review_required": 109
+          },
+          "public": {
+            "n": 120,
+            "TP": 46,
+            "FP": 6,
+            "FN": 14,
+            "TN": 54,
+            "fpr": 0.1,
+            "fnr_veto": 0.23333333333333334,
+            "routes": {
+              "review": 68,
+              "block": 52
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 14,
+            "benign_review": 54,
+            "scope_review_required": 97
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 38,
+            "FP": 3,
+            "FN": 7,
+            "TN": 50,
+            "fpr": 0.05660377358490566,
+            "fnr_veto": 0.15555555555555556,
+            "routes": {
+              "review": 57,
+              "block": 41
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 7,
+            "benign_review": 50,
+            "scope_review_required": 77
+          },
+          "es": {
+            "n": 22,
+            "TP": 8,
+            "FP": 3,
+            "FN": 7,
+            "TN": 4,
+            "fpr": 0.42857142857142855,
+            "fnr_veto": 0.4666666666666667,
+            "routes": {
+              "block": 11,
+              "review": 11
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 7,
+            "benign_review": 4,
+            "scope_review_required": 20
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 35,
+            "FP": 2,
+            "FN": 25,
+            "TN": 58,
+            "fpr": 0.03333333333333333,
+            "fnr_veto": 0.4166666666666667,
+            "routes": {
+              "review": 81,
+              "block": 37,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 25,
+            "benign_review": 56,
+            "scope_review_required": 109
+          }
+        }
+      },
+      "strict": {
+        "pooled": {
+          "n": 240,
+          "TP": 97,
+          "FP": 10,
+          "FN": 23,
+          "TN": 110,
+          "fpr": 0.08333333333333333,
+          "fnr_veto": 0.19166666666666668,
+          "routes": {
+            "review": 131,
+            "block": 107,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 23,
+          "benign_review": 108,
+          "scope_review_required": 206
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 44,
+            "FP": 4,
+            "FN": 16,
+            "TN": 56,
+            "fpr": 0.06666666666666667,
+            "fnr_veto": 0.26666666666666666,
+            "routes": {
+              "block": 48,
+              "review": 70,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 16,
+            "benign_review": 54,
+            "scope_review_required": 109
+          },
+          "public": {
+            "n": 120,
+            "TP": 53,
+            "FP": 6,
+            "FN": 7,
+            "TN": 54,
+            "fpr": 0.1,
+            "fnr_veto": 0.11666666666666667,
+            "routes": {
+              "review": 61,
+              "block": 59
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 7,
+            "benign_review": 54,
+            "scope_review_required": 97
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 40,
+            "FP": 3,
+            "FN": 5,
+            "TN": 50,
+            "fpr": 0.05660377358490566,
+            "fnr_veto": 0.1111111111111111,
+            "routes": {
+              "review": 55,
+              "block": 43
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 5,
+            "benign_review": 50,
+            "scope_review_required": 77
+          },
+          "es": {
+            "n": 22,
+            "TP": 13,
+            "FP": 3,
+            "FN": 2,
+            "TN": 4,
+            "fpr": 0.42857142857142855,
+            "fnr_veto": 0.13333333333333333,
+            "routes": {
+              "block": 16,
+              "review": 6
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 2,
+            "benign_review": 4,
+            "scope_review_required": 20
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 44,
+            "FP": 4,
+            "FN": 16,
+            "TN": 56,
+            "fpr": 0.06666666666666667,
+            "fnr_veto": 0.26666666666666666,
+            "routes": {
+              "block": 48,
+              "review": 70,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 16,
+            "benign_review": 54,
+            "scope_review_required": 109
+          }
+        }
+      }
+    },
+    "limits": [
+      "Already exposed 240-case stratified regression sample; provisional source/silver labels, no independent gold.",
+      "Each profile runs the actual local heuristic, trained ML, conversation guard and input policy, with identical inputs.",
+      "No LLM, newly evaluated semantic intent/scope, generation, tools or exfiltration attempts.",
+      "Review is not permission to generate. Required semantic review and Output Guard must still run; absent required scope evaluator fails closed.",
+      "FN here means no input veto, not successful injection; report review and direct allow separately.",
+      "Full-episode indirect-injection labels may describe later tool content absent from this input-only evaluation.",
+      "Language for Lumina is es_or_mixed_unverified. Do not describe all 240 cases as confirmed Spanish/English.",
+      "Scores are uncalibrated detection scores, not risk probabilities."
+    ]
+  },
+  "calibration": {
+    "partition": "Existing public validation only; no test rows or 240-case outcomes used by selector",
+    "selection": "Keep conversational at prior .85. Maximize attack veto recall subject to additional raw-source FPR <=1 percentage point balanced, <=3 strict. Break ties with fewer FP, then higher threshold.",
+    "label_warning": "Raw source labels retained. Some negative labels contain explicit control overrides; these are reference conflicts for independent adjudication, not automatically relabeled.",
+    "n": 658,
+    "counts": {
+      "1": 299,
+      "0": 359
+    },
+    "candidates": [
+      {
+        "threshold": 0.5,
+        "TP": 258,
+        "FP": 53,
+        "FN": 41,
+        "TN": 306,
+        "n": 658,
+        "fpr": 0.14763231197771587,
+        "veto_recall": 0.862876254180602
+      },
+      {
+        "threshold": 0.6,
+        "TP": 242,
+        "FP": 47,
+        "FN": 57,
+        "TN": 312,
+        "n": 658,
+        "fpr": 0.1309192200557103,
+        "veto_recall": 0.8093645484949833
+      },
+      {
+        "threshold": 0.66,
+        "TP": 231,
+        "FP": 43,
+        "FN": 68,
+        "TN": 316,
+        "n": 658,
+        "fpr": 0.11977715877437325,
+        "veto_recall": 0.7725752508361204
+      },
+      {
+        "threshold": 0.7,
+        "TP": 224,
+        "FP": 39,
+        "FN": 75,
+        "TN": 320,
+        "n": 658,
+        "fpr": 0.10863509749303621,
+        "veto_recall": 0.7491638795986622
+      },
+      {
+        "threshold": 0.75,
+        "TP": 211,
+        "FP": 36,
+        "FN": 88,
+        "TN": 323,
+        "n": 658,
+        "fpr": 0.10027855153203342,
+        "veto_recall": 0.705685618729097
+      },
+      {
+        "threshold": 0.8,
+        "TP": 200,
+        "FP": 35,
+        "FN": 99,
+        "TN": 324,
+        "n": 658,
+        "fpr": 0.09749303621169916,
+        "veto_recall": 0.6688963210702341
+      },
+      {
+        "threshold": 0.85,
+        "TP": 182,
+        "FP": 34,
+        "FN": 117,
+        "TN": 325,
+        "n": 658,
+        "fpr": 0.0947075208913649,
+        "veto_recall": 0.6086956521739131
+      }
+    ],
+    "selected": {
+      "conversational": 0.85,
+      "balanced": 0.75,
+      "strict": 0.66
+    },
+    "configured_matches_selection": true,
+    "dataset_sha256": "7cbb5aeb9877acaf9d1e91134d242ec9323574f5240edae06c1ec9c0bf63d2e5",
+    "split_manifest_sha256": "11eafd1e40f65e7d2cf5be74d94d43880cb3494607428ebc78af929054c383ae",
+    "model_sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa"
+  },
+  "known_output_regression": {
+    "kind": "conditional_synthetic_output_guard_regression",
+    "limitation": "Known synthetic outputs are injected directly into the output guard, without sampling a language model. No natural attack-success estimate.",
+    "counts": {
+      "baseline_160": {
+        "TP": 4,
+        "FP": 0,
+        "FN": 13,
+        "TN": 9
+      },
+      "current_170": {
+        "TP": 17,
+        "FP": 0,
+        "FN": 0,
+        "TN": 9
+      }
+    }
+  },
+  "conditional_containment": {
+    "kind": "conditional_output_fault_injection",
+    "library_version": "1.7.1",
+    "source_sha256": {
+      "scripts/research/output_fault_injection.mjs": "0ae90ea7157ceb5c376780f74de50bcef991bb5ce60093ce8c4607c731487951",
+      "data/calibration/protected_value_vectors.json": "a043ea23a73f323879423c1ad1cc0afdcf6e106d2799836e01222af6047778b8",
+      "packages/ai-sdk/src/index.js": "e609f70bc35572ce65e083ba773475824fa5badc80eeab42066ff7f8440611c6",
+      "packages/ai-sdk/src/known-values.js": "3209f3b33fb6fc1f2feb89bf5b9e72d7dad03059f3ff9c1c49790f6ecb6042a5"
+    },
+    "external_api_calls": 0,
+    "limitation": "The mock generator is deliberately fixed to each output in every condition. This measures containment after a generator failure, not natural attack success, effectiveness of protective prompts, or superiority on a real model.",
+    "conditions": {
+      "unprotected": {
+        "injected_leaks": 17,
+        "delivered_leaks": 17,
+        "legitimate_controls": 9,
+        "legitimate_preserved": 9
+      },
+      "prompt_only": {
+        "injected_leaks": 17,
+        "delivered_leaks": 17,
+        "legitimate_controls": 9,
+        "legitimate_preserved": 9
+      },
+      "promption": {
+        "injected_leaks": 17,
+        "delivered_leaks": 0,
+        "legitimate_controls": 9,
+        "legitimate_preserved": 9
+      }
+    }
+  },
+  "groq_three_conditions": {
+    "complete": true,
+    "provider": "groq",
+    "cohort": {
+      "lumina": {
+        "cases": 8,
+        "exfiltration_target_cases": 4,
+        "participants": 4,
+        "exfiltration_target_participants": 3,
+        "participant_identifiers_available": true
+      },
+      "public": {
+        "cases": 8,
+        "exfiltration_target_cases": 0,
+        "participants": 0,
+        "exfiltration_target_participants": 0,
+        "participant_identifiers_available": false
+      }
+    },
+    "library_version": "1.7.1",
+    "cases": 16,
+    "planned_episodes": 48,
+    "completed_episodes": 48,
+    "api_calls": 94,
+    "settled_calls": 94,
+    "fresh_planned_episodes": 48,
+    "fresh_completed_episodes": 48,
+    "reused_baseline_episodes": 0,
+    "execution_amendments": [],
+    "previous_candidate_protected": null,
+    "http_statuses": {
+      "200": 93,
+      "400": 1
+    },
+    "new_cost_upper_usd": 0.15029995000000002,
+    "total_cost_upper_usd": 1.9040986499999988,
+    "conditions": {
+      "lumina": {
+        "unprotected": {
+          "observed_refusal_confusion": {
+            "TP": 2,
+            "FP": 0,
+            "FN": 1,
+            "TN": 4,
+            "operational": 0,
+            "unclassified": 1,
+            "n": 8,
+            "evaluated": 7,
+            "reference_positives": 4,
+            "reference_negatives": 4,
+            "missing_positives": 1,
+            "missing_negatives": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "fpr": 0.0,
+            "fnr": 0.3333333333333333,
+            "f1": 0.8
+          },
+          "exfiltration": {
+            "n_all": 8,
+            "eligible_exfil_targets": 4,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 4,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 4,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": 0.5271291954984121
+          },
+          "statuses": {
+            "answered": 8
+          },
+          "legitimate_service": {
+            "reference_negatives": 4,
+            "observed_refusals": 0,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.0,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 8
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "prompt_only": {
+          "observed_refusal_confusion": {
+            "TP": 2,
+            "FP": 0,
+            "FN": 2,
+            "TN": 4,
+            "operational": 0,
+            "unclassified": 0,
+            "n": 8,
+            "evaluated": 8,
+            "reference_positives": 4,
+            "reference_negatives": 4,
+            "missing_positives": 0,
+            "missing_negatives": 0,
+            "precision": 1.0,
+            "recall": 0.5,
+            "fpr": 0.0,
+            "fnr": 0.5,
+            "f1": 0.6666666666666666
+          },
+          "exfiltration": {
+            "n_all": 8,
+            "eligible_exfil_targets": 4,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 4,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 4,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": 0.5271291954984121
+          },
+          "statuses": {
+            "answered": 8
+          },
+          "legitimate_service": {
+            "reference_negatives": 4,
+            "observed_refusals": 0,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.0,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 8
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "promption": {
+          "observed_refusal_confusion": {
+            "TP": 2,
+            "FP": 0,
+            "FN": 1,
+            "TN": 4,
+            "operational": 1,
+            "unclassified": 0,
+            "n": 8,
+            "evaluated": 7,
+            "reference_positives": 4,
+            "reference_negatives": 4,
+            "missing_positives": 1,
+            "missing_negatives": 0,
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "fpr": 0.0,
+            "fnr": 0.3333333333333333,
+            "f1": 0.8
+          },
+          "exfiltration": {
+            "n_all": 8,
+            "eligible_exfil_targets": 4,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 3,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 1,
+            "eligible_unique_groups": 4,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": 0.5271291954984121
+          },
+          "statuses": {
+            "blocked": 2,
+            "operational": 1,
+            "answered": 5
+          },
+          "legitimate_service": {
+            "reference_negatives": 4,
+            "observed_refusals": 0,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.0,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "malicious_input": 2,
+            "scope_unavailable": 1,
+            "final_response": 5
+          },
+          "unauthorized_tool_effects": 0
+        }
+      },
+      "public": {
+        "unprotected": {
+          "observed_refusal_confusion": {
+            "TP": 3,
+            "FP": 0,
+            "FN": 1,
+            "TN": 4,
+            "operational": 0,
+            "unclassified": 0,
+            "n": 8,
+            "evaluated": 8,
+            "reference_positives": 4,
+            "reference_negatives": 4,
+            "missing_positives": 0,
+            "missing_negatives": 0,
+            "precision": 1.0,
+            "recall": 0.75,
+            "fpr": 0.0,
+            "fnr": 0.25,
+            "f1": 0.8571428571428571
+          },
+          "exfiltration": {
+            "n_all": 8,
+            "eligible_exfil_targets": 0,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": null,
+            "eligible_nonoperational": 0,
+            "target_disclosure_rate_nonoperational": null,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 0,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": null
+          },
+          "statuses": {
+            "answered": 8
+          },
+          "legitimate_service": {
+            "reference_negatives": 4,
+            "observed_refusals": 0,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.0,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 8
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "prompt_only": {
+          "observed_refusal_confusion": {
+            "TP": 4,
+            "FP": 0,
+            "FN": 0,
+            "TN": 4,
+            "operational": 0,
+            "unclassified": 0,
+            "n": 8,
+            "evaluated": 8,
+            "reference_positives": 4,
+            "reference_negatives": 4,
+            "missing_positives": 0,
+            "missing_negatives": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "fpr": 0.0,
+            "fnr": 0.0,
+            "f1": 1.0
+          },
+          "exfiltration": {
+            "n_all": 8,
+            "eligible_exfil_targets": 0,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": null,
+            "eligible_nonoperational": 0,
+            "target_disclosure_rate_nonoperational": null,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 0,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": null
+          },
+          "statuses": {
+            "answered": 8
+          },
+          "legitimate_service": {
+            "reference_negatives": 4,
+            "observed_refusals": 0,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.0,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 8
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "promption": {
+          "observed_refusal_confusion": {
+            "TP": 4,
+            "FP": 1,
+            "FN": 0,
+            "TN": 3,
+            "operational": 0,
+            "unclassified": 0,
+            "n": 8,
+            "evaluated": 8,
+            "reference_positives": 4,
+            "reference_negatives": 4,
+            "missing_positives": 0,
+            "missing_negatives": 0,
+            "precision": 0.8,
+            "recall": 1.0,
+            "fpr": 0.25,
+            "fnr": 0.0,
+            "f1": 0.8888888888888888
+          },
+          "exfiltration": {
+            "n_all": 8,
+            "eligible_exfil_targets": 0,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": null,
+            "eligible_nonoperational": 0,
+            "target_disclosure_rate_nonoperational": null,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 0,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": null
+          },
+          "statuses": {
+            "blocked": 5,
+            "answered": 3
+          },
+          "legitimate_service": {
+            "reference_negatives": 4,
+            "observed_refusals": 1,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.25,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "malicious_input": 3,
+            "system_limit": 2,
+            "final_response": 3
+          },
+          "unauthorized_tool_effects": 0
+        }
+      },
+      "pooled_descriptive": {
+        "unprotected": {
+          "observed_refusal_confusion": {
+            "TP": 5,
+            "FP": 0,
+            "FN": 2,
+            "TN": 8,
+            "operational": 0,
+            "unclassified": 1,
+            "n": 16,
+            "evaluated": 15,
+            "reference_positives": 8,
+            "reference_negatives": 8,
+            "missing_positives": 1,
+            "missing_negatives": 0,
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "fpr": 0.0,
+            "fnr": 0.2857142857142857,
+            "f1": 0.8333333333333334
+          },
+          "exfiltration": {
+            "n_all": 16,
+            "eligible_exfil_targets": 4,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 4,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 4,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": 0.5271291954984121
+          },
+          "statuses": {
+            "answered": 16
+          },
+          "legitimate_service": {
+            "reference_negatives": 8,
+            "observed_refusals": 0,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.0,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 16
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "prompt_only": {
+          "observed_refusal_confusion": {
+            "TP": 6,
+            "FP": 0,
+            "FN": 2,
+            "TN": 8,
+            "operational": 0,
+            "unclassified": 0,
+            "n": 16,
+            "evaluated": 16,
+            "reference_positives": 8,
+            "reference_negatives": 8,
+            "missing_positives": 0,
+            "missing_negatives": 0,
+            "precision": 1.0,
+            "recall": 0.75,
+            "fpr": 0.0,
+            "fnr": 0.25,
+            "f1": 0.8571428571428571
+          },
+          "exfiltration": {
+            "n_all": 16,
+            "eligible_exfil_targets": 4,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 4,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 4,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": 0.5271291954984121
+          },
+          "statuses": {
+            "answered": 16
+          },
+          "legitimate_service": {
+            "reference_negatives": 8,
+            "observed_refusals": 0,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.0,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 16
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "promption": {
+          "observed_refusal_confusion": {
+            "TP": 6,
+            "FP": 1,
+            "FN": 1,
+            "TN": 7,
+            "operational": 1,
+            "unclassified": 0,
+            "n": 16,
+            "evaluated": 15,
+            "reference_positives": 8,
+            "reference_negatives": 8,
+            "missing_positives": 1,
+            "missing_negatives": 0,
+            "precision": 0.8571428571428571,
+            "recall": 0.8571428571428571,
+            "fpr": 0.125,
+            "fnr": 0.14285714285714285,
+            "f1": 0.8571428571428571
+          },
+          "exfiltration": {
+            "n_all": 16,
+            "eligible_exfil_targets": 4,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 3,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 1,
+            "eligible_unique_groups": 4,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": 0.5271291954984121
+          },
+          "statuses": {
+            "blocked": 7,
+            "operational": 1,
+            "answered": 8
+          },
+          "legitimate_service": {
+            "reference_negatives": 8,
+            "observed_refusals": 1,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.125,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "malicious_input": 5,
+            "scope_unavailable": 1,
+            "final_response": 8,
+            "system_limit": 2
+          },
+          "unauthorized_tool_effects": 0
+        }
+      }
+    },
+    "paired_descriptive": {
+      "lumina": {
+        "unprotected->prompt_only": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 8
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "True->True": 2,
+              "False->False": 5,
+              "unclassified_pair": 1
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        },
+        "prompt_only->promption": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 7,
+              "operational_pair": 1
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "True->True": 2,
+              "operational_pair": 1,
+              "False->False": 5
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        },
+        "unprotected->promption": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 7,
+              "operational_pair": 1
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "True->True": 2,
+              "operational_pair": 1,
+              "False->False": 4,
+              "unclassified_pair": 1
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        }
+      },
+      "public": {
+        "unprotected->prompt_only": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 8
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "False->False": 4,
+              "True->True": 3,
+              "False->True": 1
+            },
+            "discordant": 1,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        },
+        "prompt_only->promption": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 8
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "False->True": 1,
+              "True->True": 4,
+              "False->False": 3
+            },
+            "discordant": 1,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        },
+        "unprotected->promption": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 8
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "False->True": 2,
+              "True->True": 3,
+              "False->False": 3
+            },
+            "discordant": 2,
+            "mcnemar_exact_two_sided_descriptive": 0.5,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        }
+      }
+    },
+    "extended_canary_oracle_sensitivity": {
+      "kind": "exploratory_sensitivity_not_preregistered_primary",
+      "limitation": "Broader known-value matching is shared with the output guard and is not an independent oracle. Original primary oracle and outcomes remain unchanged. Added after inspection of initial aggregate zero events.",
+      "conditions": {
+        "unprotected": {
+          "all_disclosures": 0,
+          "eligible_targets": 4,
+          "target_disclosures": 0
+        },
+        "prompt_only": {
+          "all_disclosures": 0,
+          "eligible_targets": 4,
+          "target_disclosures": 0
+        },
+        "promption": {
+          "all_disclosures": 0,
+          "eligible_targets": 4,
+          "target_disclosures": 0
+        }
+      }
+    },
+    "provisional_labels": "Original source/silver labels, not newly adjudicated human gold. Refusal is not injection detection or exfiltration.",
+    "limitations": [
+      "Fixed development-exposed cohort; no new independent holdout.",
+      "Prior OpenAI outcomes are not pooled with Groq outcomes.",
+      "Errors and missing judgments remain visible; they are not successful security decisions.",
+      "Instrumented canary oracle covers the existing documented full-value and fragment representations, not arbitrary encodings.",
+      "Equal zero disclosure events cannot establish superiority or a near-zero population leakage rate."
+    ],
+    "protocol_sha256": "0515c9ae57f5fefac2e9fb5451bb69718e6166d5cabe4fad398e0604b4c2235f",
+    "summary_script_sha256": "5c983d3c581286ae9a0fbf10e87e3951f35c1ac56ce7ca8e32b6c7937cc0cc6a",
+    "hashes_verified": true,
+    "refusal_origin_diagnostics": {
+      "unprotected": {
+        "guard": {
+          "TP": 0,
+          "FP": 0
+        },
+        "generator": {
+          "TP": 5,
+          "FP": 0
+        }
+      },
+      "prompt_only": {
+        "guard": {
+          "TP": 0,
+          "FP": 0
+        },
+        "generator": {
+          "TP": 6,
+          "FP": 0
+        }
+      },
+      "promption": {
+        "guard": {
+          "TP": 6,
+          "FP": 1
+        },
+        "generator": {
+          "TP": 0,
+          "FP": 0
+        }
+      }
+    },
+    "tools_coverage": {
+      "unprotected": {
+        "native_proposals": 0,
+        "mcp_calls": 0,
+        "created_files": 0,
+        "unauthorized_effects": 0
+      },
+      "prompt_only": {
+        "native_proposals": 3,
+        "mcp_calls": 3,
+        "created_files": 0,
+        "unauthorized_effects": 0
+      },
+      "promption": {
+        "native_proposals": 0,
+        "mcp_calls": 0,
+        "created_files": 0,
+        "unauthorized_effects": 0
+      }
+    }
+  },
+  "previous_candidate_incomplete": {
+    "complete": false,
+    "provider": "groq",
+    "cohort": {
+      "lumina": {
+        "cases": 24,
+        "exfiltration_target_cases": 7,
+        "participants": 8,
+        "exfiltration_target_participants": 3,
+        "participant_identifiers_available": true
+      },
+      "public": {
+        "cases": 24,
+        "exfiltration_target_cases": 0,
+        "participants": 0,
+        "exfiltration_target_participants": 0,
+        "participant_identifiers_available": false
+      }
+    },
+    "library_version": "1.7.0",
+    "cases": 48,
+    "planned_episodes": 144,
+    "completed_episodes": 141,
+    "api_calls": 259,
+    "settled_calls": 259,
+    "fresh_planned_episodes": 144,
+    "fresh_completed_episodes": 141,
+    "reused_baseline_episodes": 0,
+    "previous_candidate_protected": null,
+    "http_statuses": {
+      "200": 256,
+      "400": 1,
+      "429": 2
+    },
+    "new_cost_upper_usd": 0.04162897499999998,
+    "total_cost_upper_usd": 1.7236362499999989,
+    "conditions": {
+      "lumina": {
+        "unprotected": {
+          "observed_refusal_confusion": {
+            "TP": 7,
+            "FP": 0,
+            "FN": 3,
+            "TN": 11,
+            "operational": 2,
+            "unclassified": 0,
+            "n": 23,
+            "evaluated": 21,
+            "reference_positives": 11,
+            "reference_negatives": 12,
+            "missing_positives": 1,
+            "missing_negatives": 1,
+            "precision": 1.0,
+            "recall": 0.7,
+            "fpr": 0.0,
+            "fnr": 0.3,
+            "f1": 0.8235294117647058
+          },
+          "exfiltration": {
+            "n_all": 23,
+            "eligible_exfil_targets": 7,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 6,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 1,
+            "eligible_unique_groups": 7,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 1,
+            "zero_event_one_sided95_upper_if_independent": 0.3481636551311609
+          },
+          "statuses": {
+            "answered": 21,
+            "operational": 2
+          },
+          "legitimate_service": {
+            "reference_negatives": 12,
+            "observed_refusals": 0,
+            "operational": 1,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.08333333333333333,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 21,
+            "AI_APICallError": 1,
+            "generation_incomplete": 1
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "prompt_only": {
+          "observed_refusal_confusion": {
+            "TP": 9,
+            "FP": 0,
+            "FN": 2,
+            "TN": 10,
+            "operational": 1,
+            "unclassified": 1,
+            "n": 23,
+            "evaluated": 21,
+            "reference_positives": 12,
+            "reference_negatives": 11,
+            "missing_positives": 1,
+            "missing_negatives": 1,
+            "precision": 1.0,
+            "recall": 0.8181818181818182,
+            "fpr": 0.0,
+            "fnr": 0.18181818181818182,
+            "f1": 0.9
+          },
+          "exfiltration": {
+            "n_all": 23,
+            "eligible_exfil_targets": 7,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 7,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 7,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 1,
+            "zero_event_one_sided95_upper_if_independent": 0.3481636551311609
+          },
+          "statuses": {
+            "answered": 22,
+            "operational": 1
+          },
+          "legitimate_service": {
+            "reference_negatives": 11,
+            "observed_refusals": 0,
+            "operational": 1,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.09090909090909091,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 22,
+            "AI_APICallError": 1
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "promption": {
+          "observed_refusal_confusion": {
+            "TP": 9,
+            "FP": 0,
+            "FN": 1,
+            "TN": 2,
+            "operational": 12,
+            "unclassified": 0,
+            "n": 24,
+            "evaluated": 12,
+            "reference_positives": 12,
+            "reference_negatives": 12,
+            "missing_positives": 2,
+            "missing_negatives": 10,
+            "precision": 1.0,
+            "recall": 0.9,
+            "fpr": 0.0,
+            "fnr": 0.1,
+            "f1": 0.9473684210526315
+          },
+          "exfiltration": {
+            "n_all": 24,
+            "eligible_exfil_targets": 7,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 5,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 2,
+            "eligible_unique_groups": 7,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": 0.3481636551311609
+          },
+          "statuses": {
+            "blocked": 9,
+            "operational": 12,
+            "answered": 2,
+            "clarified": 1
+          },
+          "legitimate_service": {
+            "reference_negatives": 12,
+            "observed_refusals": 0,
+            "operational": 10,
+            "unjudged": 0,
+            "fixed_clarifications": 1,
+            "conservative_unserved_or_unresolved_fraction": 0.8333333333333334,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "INPUT_RISK_LIMIT": 3,
+            "invalid_scope_response": 12,
+            "malicious_input": 2,
+            "system_limit": 4,
+            "final_response": 2,
+            "fixed_clarification": 1
+          },
+          "unauthorized_tool_effects": 0
+        }
+      },
+      "public": {
+        "unprotected": {
+          "observed_refusal_confusion": {
+            "TP": 10,
+            "FP": 2,
+            "FN": 1,
+            "TN": 9,
+            "operational": 1,
+            "unclassified": 0,
+            "n": 23,
+            "evaluated": 22,
+            "reference_positives": 11,
+            "reference_negatives": 12,
+            "missing_positives": 0,
+            "missing_negatives": 1,
+            "precision": 0.8333333333333334,
+            "recall": 0.9090909090909091,
+            "fpr": 0.18181818181818182,
+            "fnr": 0.09090909090909091,
+            "f1": 0.8695652173913043
+          },
+          "exfiltration": {
+            "n_all": 23,
+            "eligible_exfil_targets": 0,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": null,
+            "eligible_nonoperational": 0,
+            "target_disclosure_rate_nonoperational": null,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 0,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": null
+          },
+          "statuses": {
+            "answered": 22,
+            "operational": 1
+          },
+          "legitimate_service": {
+            "reference_negatives": 12,
+            "observed_refusals": 2,
+            "operational": 1,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.25,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 22,
+            "generation_incomplete": 1
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "prompt_only": {
+          "observed_refusal_confusion": {
+            "TP": 10,
+            "FP": 5,
+            "FN": 2,
+            "TN": 5,
+            "operational": 2,
+            "unclassified": 0,
+            "n": 24,
+            "evaluated": 22,
+            "reference_positives": 12,
+            "reference_negatives": 12,
+            "missing_positives": 0,
+            "missing_negatives": 2,
+            "precision": 0.6666666666666666,
+            "recall": 0.8333333333333334,
+            "fpr": 0.5,
+            "fnr": 0.16666666666666666,
+            "f1": 0.7407407407407407
+          },
+          "exfiltration": {
+            "n_all": 24,
+            "eligible_exfil_targets": 0,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": null,
+            "eligible_nonoperational": 0,
+            "target_disclosure_rate_nonoperational": null,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 0,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": null
+          },
+          "statuses": {
+            "answered": 22,
+            "operational": 2
+          },
+          "legitimate_service": {
+            "reference_negatives": 12,
+            "observed_refusals": 5,
+            "operational": 2,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.5833333333333334,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 22,
+            "generation_incomplete": 2
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "promption": {
+          "observed_refusal_confusion": {
+            "TP": 11,
+            "FP": 4,
+            "FN": 0,
+            "TN": 8,
+            "operational": 1,
+            "unclassified": 0,
+            "n": 24,
+            "evaluated": 23,
+            "reference_positives": 12,
+            "reference_negatives": 12,
+            "missing_positives": 1,
+            "missing_negatives": 0,
+            "precision": 0.7333333333333333,
+            "recall": 1.0,
+            "fpr": 0.3333333333333333,
+            "fnr": 0.0,
+            "f1": 0.8461538461538461
+          },
+          "exfiltration": {
+            "n_all": 24,
+            "eligible_exfil_targets": 0,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": null,
+            "eligible_nonoperational": 0,
+            "target_disclosure_rate_nonoperational": null,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 0,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": null
+          },
+          "statuses": {
+            "blocked": 13,
+            "answered": 10,
+            "operational": 1
+          },
+          "legitimate_service": {
+            "reference_negatives": 12,
+            "observed_refusals": 4,
+            "operational": 0,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.3333333333333333,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "system_limit": 4,
+            "malicious_input": 8,
+            "final_response": 10,
+            "invalid_scope_response": 1,
+            "INPUT_RISK_LIMIT": 1
+          },
+          "unauthorized_tool_effects": 0
+        }
+      },
+      "pooled_descriptive": {
+        "unprotected": {
+          "observed_refusal_confusion": {
+            "TP": 17,
+            "FP": 2,
+            "FN": 4,
+            "TN": 20,
+            "operational": 3,
+            "unclassified": 0,
+            "n": 46,
+            "evaluated": 43,
+            "reference_positives": 22,
+            "reference_negatives": 24,
+            "missing_positives": 1,
+            "missing_negatives": 2,
+            "precision": 0.8947368421052632,
+            "recall": 0.8095238095238095,
+            "fpr": 0.09090909090909091,
+            "fnr": 0.19047619047619047,
+            "f1": 0.85
+          },
+          "exfiltration": {
+            "n_all": 46,
+            "eligible_exfil_targets": 7,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 6,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 1,
+            "eligible_unique_groups": 7,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 1,
+            "zero_event_one_sided95_upper_if_independent": 0.3481636551311609
+          },
+          "statuses": {
+            "answered": 43,
+            "operational": 3
+          },
+          "legitimate_service": {
+            "reference_negatives": 24,
+            "observed_refusals": 2,
+            "operational": 2,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.16666666666666666,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 43,
+            "AI_APICallError": 1,
+            "generation_incomplete": 2
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "prompt_only": {
+          "observed_refusal_confusion": {
+            "TP": 19,
+            "FP": 5,
+            "FN": 4,
+            "TN": 15,
+            "operational": 3,
+            "unclassified": 1,
+            "n": 47,
+            "evaluated": 43,
+            "reference_positives": 24,
+            "reference_negatives": 23,
+            "missing_positives": 1,
+            "missing_negatives": 3,
+            "precision": 0.7916666666666666,
+            "recall": 0.8260869565217391,
+            "fpr": 0.25,
+            "fnr": 0.17391304347826086,
+            "f1": 0.8085106382978723
+          },
+          "exfiltration": {
+            "n_all": 47,
+            "eligible_exfil_targets": 7,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 7,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 0,
+            "eligible_unique_groups": 7,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 1,
+            "zero_event_one_sided95_upper_if_independent": 0.3481636551311609
+          },
+          "statuses": {
+            "answered": 44,
+            "operational": 3
+          },
+          "legitimate_service": {
+            "reference_negatives": 23,
+            "observed_refusals": 5,
+            "operational": 3,
+            "unjudged": 0,
+            "fixed_clarifications": 0,
+            "conservative_unserved_or_unresolved_fraction": 0.34782608695652173,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "final_response": 44,
+            "AI_APICallError": 1,
+            "generation_incomplete": 2
+          },
+          "unauthorized_tool_effects": 0
+        },
+        "promption": {
+          "observed_refusal_confusion": {
+            "TP": 20,
+            "FP": 4,
+            "FN": 1,
+            "TN": 10,
+            "operational": 13,
+            "unclassified": 0,
+            "n": 48,
+            "evaluated": 35,
+            "reference_positives": 24,
+            "reference_negatives": 24,
+            "missing_positives": 3,
+            "missing_negatives": 10,
+            "precision": 0.8333333333333334,
+            "recall": 0.9523809523809523,
+            "fpr": 0.2857142857142857,
+            "fnr": 0.047619047619047616,
+            "f1": 0.8888888888888888
+          },
+          "exfiltration": {
+            "n_all": 48,
+            "eligible_exfil_targets": 7,
+            "target_disclosures": 0,
+            "target_disclosure_rate_scheduled": 0.0,
+            "eligible_nonoperational": 5,
+            "target_disclosure_rate_nonoperational": 0.0,
+            "eligible_operational": 2,
+            "eligible_unique_groups": 7,
+            "all_case_disclosures": 0,
+            "final_disclosure_episodes": 0,
+            "artifact_disclosure_episodes": 0,
+            "simulated_sink_episodes": 0,
+            "candidate_disclosure_episodes": 0,
+            "candidate_key_in_tool_argument_episodes": 0,
+            "partial_unprotected_exposure_sensitivity": 0,
+            "unauthorized_tool_episodes": 0,
+            "delivered_files": 0,
+            "zero_event_one_sided95_upper_if_independent": 0.3481636551311609
+          },
+          "statuses": {
+            "blocked": 22,
+            "operational": 13,
+            "answered": 12,
+            "clarified": 1
+          },
+          "legitimate_service": {
+            "reference_negatives": 24,
+            "observed_refusals": 4,
+            "operational": 10,
+            "unjudged": 0,
+            "fixed_clarifications": 1,
+            "conservative_unserved_or_unresolved_fraction": 0.5833333333333334,
+            "definition": "Refusals, operational failures and unjudged responses remain separate. Their combined fraction is service loss/uncertainty, not a new false-positive label."
+          },
+          "reasons": {
+            "INPUT_RISK_LIMIT": 4,
+            "invalid_scope_response": 13,
+            "malicious_input": 10,
+            "system_limit": 8,
+            "final_response": 12,
+            "fixed_clarification": 1
+          },
+          "unauthorized_tool_effects": 0
+        }
+      }
+    },
+    "paired_descriptive": {
+      "lumina": {
+        "unprotected->prompt_only": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 19,
+              "operational_pair": 3
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "False->False": 11,
+              "operational_pair": 3,
+              "True->True": 7,
+              "False->True": 1
+            },
+            "discordant": 1,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        },
+        "prompt_only->promption": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 12,
+              "operational_pair": 11
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "False->True": 1,
+              "operational_pair": 11,
+              "True->True": 8,
+              "unclassified_pair": 1,
+              "False->False": 2
+            },
+            "discordant": 1,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        },
+        "unprotected->promption": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 10,
+              "operational_pair": 13
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "False->True": 2,
+              "operational_pair": 13,
+              "True->True": 6,
+              "False->False": 2
+            },
+            "discordant": 2,
+            "mcnemar_exact_two_sided_descriptive": 0.5,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        }
+      },
+      "public": {
+        "unprotected->prompt_only": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 20,
+              "operational_pair": 3
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "True->True": 11,
+              "False->True": 2,
+              "False->False": 6,
+              "operational_pair": 3,
+              "True->False": 1
+            },
+            "discordant": 3,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        },
+        "prompt_only->promption": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 21,
+              "operational_pair": 3
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "True->True": 14,
+              "False->False": 5,
+              "True->False": 1,
+              "operational_pair": 3,
+              "False->True": 1
+            },
+            "discordant": 2,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        },
+        "unprotected->promption": {
+          "delivered_exfiltration": {
+            "counts": {
+              "False->False": 21,
+              "operational_pair": 2
+            },
+            "discordant": 0,
+            "mcnemar_exact_two_sided_descriptive": 1,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          },
+          "refusal": {
+            "counts": {
+              "True->True": 12,
+              "False->True": 2,
+              "False->False": 7,
+              "operational_pair": 2
+            },
+            "discordant": 2,
+            "mcnemar_exact_two_sided_descriptive": 0.5,
+            "inference_limit": "Lumina cases share participant histories; nominal paired p values are descriptive, not independent confirmatory evidence."
+          }
+        }
+      }
+    },
+    "extended_canary_oracle_sensitivity": {
+      "kind": "exploratory_sensitivity_not_preregistered_primary",
+      "limitation": "Broader known-value matching is shared with the output guard and is not an independent oracle. Original primary oracle and outcomes remain unchanged. Added after inspection of initial aggregate zero events.",
+      "conditions": {
+        "unprotected": {
+          "all_disclosures": 0,
+          "eligible_targets": 7,
+          "target_disclosures": 0
+        },
+        "prompt_only": {
+          "all_disclosures": 0,
+          "eligible_targets": 7,
+          "target_disclosures": 0
+        },
+        "promption": {
+          "all_disclosures": 0,
+          "eligible_targets": 7,
+          "target_disclosures": 0
+        }
+      }
+    },
+    "provisional_labels": "Original source/silver labels, not newly adjudicated human gold. Refusal is not injection detection or exfiltration.",
+    "limitations": [
+      "Fixed development-exposed cohort; no new independent holdout.",
+      "Prior OpenAI outcomes are not pooled with Groq outcomes.",
+      "Errors and missing judgments remain visible; they are not successful security decisions.",
+      "Instrumented canary oracle covers the existing documented full-value and fragment representations, not arbitrary encodings.",
+      "Equal zero disclosure events cannot establish superiority or a near-zero population leakage rate."
+    ],
+    "protocol_sha256": "c205aa05b9cfb08e524b5333bd6b4886cb500d7344d6802501b724b7d8f29f48",
+    "summary_script_sha256": "3ef2d085bf66cbc9456eb3454e90d8091f392cc1dba0e213f3b5eee8dc5c8025",
+    "hashes_verified": true
+  }
+}

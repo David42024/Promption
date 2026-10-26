@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from promption.utils.config import load_config, load_heuristics
 from promption.utils.logger import logger
 from promption.utils.text import normalize_content
+from promption.evidence import interpret_input
+from promption.encoded_evidence import decoded_views
 
 _CONF = load_config()
 _SCORES = {"high": 1.0, "medium": 0.7, "low": 0.4}
@@ -23,6 +25,8 @@ class HeuristicResult:
     layer: str = "heuristic"
     benign_matched: list[str] = field(default_factory=list)
     signal: str = "unknown"
+    requires_scope_review: bool = False
+    evidence: dict = field(default_factory=dict)
 
 
 class HeuristicFilter:
@@ -41,7 +45,10 @@ class HeuristicFilter:
                 "description": rule.get("description", ""),
                 "severity_score": _SCORES.get(rule.get("severity", "medium"), 0.7),
                 "applies_to_roles": [r.lower() for r in rule.get("applies_to_roles", [])],
+                "action": rule.get("action", "block"),
             })
+            if self._rules[-1]["action"] not in {"block", "review"}:
+                raise ValueError("Rule action must be block or review")
         scoring = cfg.get("scoring", {})
         self.threshold = threshold if threshold is not None else float(scoring.get("heuristic_threshold", 0.6))
         self.unknown_score = float(scoring.get("unknown_score", 0.5))
@@ -56,7 +63,7 @@ class HeuristicFilter:
         logger.info("HeuristicFilter initialized with %d rules (threshold=%.2f)", len(self._rules), self.threshold)
 
     # ------------------------------------------------------------------ public
-    def analyze(self, text: str, roles: list[str] | None = None) -> HeuristicResult:
+    def analyze(self, text: str, roles: list[str] | None = None, *, origin: str = "user") -> HeuristicResult:
         """Score a prompt and return the full result object.
 
         Parameters
@@ -67,21 +74,30 @@ class HeuristicFilter:
             Roles del usuario. Si una regla tiene ``applies_to_roles``, solo
             se evalúa si el usuario tiene al menos uno de esos roles.
         """
+        evidence = interpret_input(text or "", origin=origin)
         text = normalize_content(text or "")
+        instruction_text = normalize_content(evidence.instruction_text)
+        decoded, adopted = decoded_views(evidence.instruction_text, origin=origin)
+        inspected = [instruction_text] + ([normalize_content(value) for _, value in decoded] if adopted else [])
         user_roles = {r.lower() for r in (roles or [])}
         matches: list[dict] = []
         for rule in self._rules:
             if rule["applies_to_roles"] and not (user_roles & set(rule["applies_to_roles"])):
                 continue
-            if rule["regex"].search(text):
+            if any(rule["regex"].search(value) for value in inspected):
                 matches.append(rule)
-        matches.sort(key=lambda rule: rule["severity_score"], reverse=True)
+        matches.sort(key=lambda rule: (rule["action"] == "block", rule["severity_score"]), reverse=True)
+        vetoes = [m for m in matches if m["action"] == "block"]
+        review = bool(matches and not vetoes) or bool(evidence.quoted_texts) or bool(decoded and not adopted)
         matches = matches[:self.max_matches]
 
         benign = [b["name"] for b in self._benign if (not b["applies_to_roles"] or user_roles & b["applies_to_roles"]) and b["regex"].fullmatch(text)]
         if matches:
             score = max(m["severity_score"] for m in matches)
-            signal = "malicious"
+            signal = "malicious" if vetoes else "review"
+        elif evidence.quoted_texts or decoded and not adopted:
+            score = self.unknown_score
+            signal = "review"
         elif benign:
             score = 0.0
             signal = "benign"
@@ -89,13 +105,20 @@ class HeuristicFilter:
             score = self.unknown_score
             signal = "unknown"
         return HeuristicResult(
-            blocked=signal == "malicious" and score >= self.threshold,
+            blocked=any(m["severity_score"] >= self.threshold for m in vetoes),
             score=score,
             matched_rules=matches,
             threshold=self.threshold,
             benign_matched=benign,
             signal=signal,
+            requires_scope_review=review or bool(matches and not any(m["severity_score"] >= self.threshold for m in vetoes)),
+            evidence={**evidence.metadata(), "decoded_views": len(decoded),
+                      "decoded_instruction_adopted": adopted and bool(decoded),
+                      "encodings": sorted({encoding for encoding, _ in decoded})},
         )
+
+    def analyze_evidence(self, text: str, *, roles=None, origin="user"):
+        return self.analyze(text, roles=roles, origin=origin)
 
     def check(self, text: str) -> tuple[bool, float]:
         """Convenience: returns ``(blocked, score)``."""

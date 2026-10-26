@@ -1,0 +1,13 @@
+{
+  "status": "incomplete",
+  "reason": "agent thread limit reached",
+  "completed_responses": 6,
+  "restored_unfulfilled_reservations": [
+    "8e543e62a1a7e3ea664101a0",
+    "969278cd616baaea5e8f75b3",
+    "8aae500227a9fafc945e4427"
+  ],
+  "paid_api_requests_from_runner": 0,
+  "frozen_protocol_modified": false,
+  "note": "Do not calculate final rates or fill table 7 from missing episodes."
+}

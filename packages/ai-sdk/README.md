@@ -4,6 +4,49 @@ Middleware de Promption para Vercel AI SDK 6. Incluye validación de entrada y
 salida, streaming validado antes de entregar contenido, protección de herramientas,
 comprobación de resultados no confiables y errores sin exponer texto protegido.
 
+Desde **1.5.0**, configura `protection: 'balanced'` (predeterminado),
+`'conversational'` o `'strict'` en `createPromption`. Para ajustar los controles
+independientemente: `protection: { profile: 'balanced', inputUncertainty: 'review',
+scopeAmbiguity: 'clarify' }`. `inputUncertainty` admite `review | block` y
+`scopeAmbiguity`, `clarify | block`. Los perfiles no pueden anular vetos,
+permisos o revisión de salida. Las aclaraciones son fijas,
+sin generación ni tools. No configures perfiles con datos del navegador.
+`onDecision` incluye `control` y `protection`; los errores distinguen también
+autorización de herramientas. Ver [guía de perfiles](../../docs/protection_profiles_20261025.md).
+
+En **1.7.0**, las señales ML inciertas pueden recibir un veto adicional de política:
+`reviewBlockThreshold` vale `0.85`, `0.75` y `0.66` en conversacional, equilibrado
+y estricto. No cambia los pesos del clasificador ni relaja vetos existentes.
+El motivo `risk_policy_veto` conserva la inyección como incierta. Son scores de
+detección, no probabilidades calibradas. Estos ajustes pertenecen al servidor.
+
+Registra los valores confidenciales con `createPromption({ protectedValues: [secret], ... })`.
+La revisión local cubre representaciones conocidas, codificaciones habituales y
+fragmentos de ocho caracteres para tokens opacos largos. También comprueba los
+argumentos de `protectTool` antes de ejecutar efectos. No cubre cualquier cifrado
+ni garantiza detectar fragmentos más pequeños repartidos entre turnos. Nunca
+envíes `protectedValues` al navegador ni los cargues desde mensajes de usuario.
+
+Para proveedores que rechazan uniones JSON Schema en salidas estructuradas, usa
+`createContextEvaluator({ model, schemaMode: 'portable' })`. Se mantienen las
+validaciones de coherencia, origen y evidencia en tiempo de ejecución. El modo
+predeterminado sigue siendo `constrained`. Ver [evaluación 1.7](../../docs/precision_improvement_20261025.md).
+
+Desde **1.7.1**, ese esquema portable combina ataque y origen en un enum para
+impedir contradicciones como «sin ataque / origen usuario». La intención pública
+conserva sus campos canónicos separados y sus validaciones en tiempo de ejecución.
+
+En **1.6.0**, `onDecision.assessments` separa inyección, alcance y autorización;
+cada control conserva su motivo y evaluaciones, incluso ante errores. Los tres
+perfiles revisan la incertidumbre de entrada por defecto; `strict` bloquea la
+ambigüedad de alcance. `inputUncertainty: 'block'` conserva el veto de toda
+incertidumbre como opción explícita del servidor. Las citas analíticas se conservan
+íntegras para el evaluador y el modelo. Si el backend informa
+`requires_scope_review: true`, se exige `scopeEvaluator`; sin él se devuelve
+`SCOPE_REVIEW_REQUIRED` antes de generar. Las tools conservan su procedencia no
+confiable y las aclaraciones por información faltante no ejecutan el generador.
+Consulta [contrato y medición local](../../docs/context_intent_review_20261025.md).
+
 ```ts
 import { createPromption } from '@promption/ai-sdk';
 import { wrapLanguageModel, generateText } from 'ai';
@@ -80,3 +123,26 @@ deben proceder del servidor. Para `protectTool`, añade `systemPrompt` y context
 usuario. Una decisión de alcance no sustituye ACL, filtro de inyección ni Output Guard.
 La evaluación semántica es probabilística y añade llamadas al modelo; el evaluador
 predeterminado usa salida estructurada de AI SDK y un timeout de 30 segundos.
+
+## Aclaraciones y aislamiento desde 1.4.0
+
+El middleware solicita `isolate_history=true` al comprobar la conversación. Solo
+si el backend devuelve `conversation.isolated_history=true` bajo el contrato
+verificado, retira el historial anterior del contexto enviado al generador. La
+evidencia original sigue disponible para auditoría. Se conserva el mensaje system,
+el turno actual y los resultados posteriores de herramientas. Los alias, las
+condiciones de activación, los seguimientos y el contenido de tools mantienen sus
+controles. Una decisión independiente nunca autoriza una tool ni desactiva la
+revisión de salida. Un backend anterior conserva el comportamiento conservador.
+
+Un dictamen válido `UNCERTAIN/ambiguous` con intención inocua puede producir una
+pregunta fija de aclaración. `checkScope().allowed` permanece `false`: no se llama
+al generador ni se ejecutan herramientas, y la pregunta pasa por Output Guard.
+Los dictámenes inválidos, errores, timeouts, ataques y herramientas propuestas no
+usan ese camino. La salida estructurada JSON conserva el fallo cerrado.
+
+Los eventos distinguen `REVIEW`, `CLARIFY` e `ISOLATE_HISTORY` de `BLOCK`. Una
+aclaración no equivale a completar la tarea y debe contabilizarse aparte. El caché
+del middleware está pensado para el turno y su bucle de tools: crea una instancia
+de middleware por petición, con identidad, política y evidencia resueltas en el
+servidor. Los permisos no proceden del historial ni de argumentos del usuario.

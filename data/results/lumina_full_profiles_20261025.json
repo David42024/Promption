@@ -1,0 +1,524 @@
+{
+  "study": "lumina_full_offline_profiles",
+  "library_version": "1.7.1",
+  "annotation_records": 5262,
+  "eligible_turns": 4411,
+  "executions": 13233,
+  "exclusions": {
+    "before_reset": 31,
+    "without_binary_label": 612,
+    "operational_exclusion": 208
+  },
+  "source_and_code_sha256": {
+    "output/research_20261023/etiquetas_provisionales.jsonl": "8e725c01dc52f69f508b1486ad4d3837bd9bd8a82f0ac2aaf26f000f177bd2b6",
+    "output/research_20261023/contexto_y_trazabilidad_privado.jsonl": "b18c8e34533d39a858828155baac80f2e3d1aaf38c46d008850e9e01b8a99ee7",
+    "promption/guard.py": "5f9910173260c441af10472a1ad551b179bb557fc035f2b2a50fdb334774a44c",
+    "promption/profiles.py": "32f60b10afbb183effcd0311c82f1f2c3788ccb22424ed8848b0f13c989321f4",
+    "promption/conversation_guard.py": "ac7b2aaee401dd82ccdd14bd0aeda9ca9f09dba126a67af76a9d7cbdb64188cd",
+    "promption/filter/ensemble_filter.py": "81eafe378386e096b7fdd45853425c02b7beae6068bfe3661d118d923c8f0542",
+    "promption/filter/heuristic_filter.py": "9f60dccbcdab3fe1f704931e2113769129caa5cd530950d4d5733db530de9a8b",
+    "promption/filter/ml_filter.py": "7a814845cd27d277056c3cea4f0a53df3415ff371f074ed588cae78f029218c3",
+    "promption/evidence.py": "97d2654ed66cc80ab9002e3b4975fb1b7c091ee8e7535a5ea930e71b7d4659d1",
+    "promption/encoded_evidence.py": "8df8c3fdf27c4f645e6af9067d972c3a6170e329f213cc76377afc384ef443d4",
+    "promption/assessments.py": "21827e3b37349f81e9d79c57bc71b07d24ebc1cabb45692ea47f5a2e70530fa3",
+    "config/config.yaml": "b98e99c2774ef4d57970ae2ad5f6a6058050a38db09f3781db3a241a076f39b2",
+    "config/heuristics.yaml": "b23acdc88a7cfc58b5dd71c1428270a17998d115fdb4a271cc0c9ab1b0de4566",
+    "scripts/research/evaluate_lumina_profiles.py": "6ec3897330694c75221e8bddb1e9423957b4fc887682fc50ed17571b9a6236f8",
+    "scripts/research/evaluate_local_profiles.py": "93e4e9d191069fa1bab53257b5b81cc32ce350f4b0a94f3f5865b76e30b2c33d",
+    "scripts/research/prepare_corpus_study.py": "6a8ca9067056678cbaf3e9d7daa800d46c5463ae14d62d356dd31066b20f1716"
+  },
+  "model_sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa",
+  "elapsed_seconds": 142.95514037199973,
+  "api_calls": 0,
+  "cost_usd": 0,
+  "label_counts": {
+    "1": 2233,
+    "0": 2178
+  },
+  "confidence_counts": {
+    "high": 2661,
+    "low": 882,
+    "medium": 868
+  },
+  "duplicate_markers": 164,
+  "profiles": {
+    "conversational": {
+      "all_regression": {
+        "planned": 4411,
+        "operational": 0,
+        "n": 4411,
+        "TP": 667,
+        "FP": 103,
+        "FN": 1566,
+        "TN": 2075,
+        "fpr": 0.0472910927456382,
+        "fnr_veto": 0.7012987012987013,
+        "routes": {
+          "review": 3595,
+          "allow": 46,
+          "block": 770
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 1566,
+        "benign_review": 2029,
+        "scope_review_required": 4095,
+        "unique_episode_sensitivity": {
+          "n": 4319,
+          "TP": 667,
+          "FP": 103,
+          "FN": 1565,
+          "TN": 1984,
+          "fpr": 0.04935313847628174,
+          "fnr_veto": 0.7011648745519713,
+          "routes": {
+            "review": 3533,
+            "allow": 16,
+            "block": 770
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 1565,
+          "benign_review": 1968,
+          "scope_review_required": 4094
+        }
+      },
+      "participant_test": {
+        "planned": 821,
+        "operational": 0,
+        "n": 821,
+        "TP": 196,
+        "FP": 9,
+        "FN": 193,
+        "TN": 423,
+        "fpr": 0.020833333333333332,
+        "fnr_veto": 0.4961439588688946,
+        "routes": {
+          "review": 611,
+          "allow": 5,
+          "block": 205
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 193,
+        "benign_review": 418,
+        "scope_review_required": 771,
+        "unique_episode_sensitivity": {
+          "n": 813,
+          "TP": 196,
+          "FP": 9,
+          "FN": 193,
+          "TN": 415,
+          "fpr": 0.02122641509433962,
+          "fnr_veto": 0.4961439588688946,
+          "routes": {
+            "review": 605,
+            "allow": 3,
+            "block": 205
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 193,
+          "benign_review": 412,
+          "scope_review_required": 771
+        }
+      },
+      "high_confidence_test": {
+        "planned": 481,
+        "operational": 0,
+        "n": 481,
+        "TP": 195,
+        "FP": 3,
+        "FN": 173,
+        "TN": 110,
+        "fpr": 0.02654867256637168,
+        "fnr_veto": 0.4701086956521739,
+        "routes": {
+          "allow": 5,
+          "review": 278,
+          "block": 198
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 173,
+        "benign_review": 105,
+        "scope_review_required": 448,
+        "unique_episode_sensitivity": {
+          "n": 473,
+          "TP": 195,
+          "FP": 3,
+          "FN": 173,
+          "TN": 102,
+          "fpr": 0.02857142857142857,
+          "fnr_veto": 0.4701086956521739,
+          "routes": {
+            "allow": 3,
+            "review": 272,
+            "block": 198
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 173,
+          "benign_review": 99,
+          "scope_review_required": 448
+        }
+      },
+      "without_duplicate_markers": {
+        "planned": 4247,
+        "operational": 0,
+        "n": 4247,
+        "TP": 665,
+        "FP": 92,
+        "FN": 1554,
+        "TN": 1936,
+        "fpr": 0.045364891518737675,
+        "fnr_veto": 0.7003154574132492,
+        "routes": {
+          "review": 3478,
+          "allow": 12,
+          "block": 757
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 1554,
+        "benign_review": 1924,
+        "scope_review_required": 4058,
+        "unique_episode_sensitivity": {
+          "n": 4247,
+          "TP": 665,
+          "FP": 92,
+          "FN": 1554,
+          "TN": 1936,
+          "fpr": 0.045364891518737675,
+          "fnr_veto": 0.7003154574132492,
+          "routes": {
+            "review": 3478,
+            "allow": 12,
+            "block": 757
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 1554,
+          "benign_review": 1924,
+          "scope_review_required": 4058
+        }
+      }
+    },
+    "balanced": {
+      "all_regression": {
+        "planned": 4411,
+        "operational": 0,
+        "n": 4411,
+        "TP": 784,
+        "FP": 154,
+        "FN": 1449,
+        "TN": 2024,
+        "fpr": 0.0707070707070707,
+        "fnr_veto": 0.6489028213166145,
+        "routes": {
+          "review": 3427,
+          "allow": 46,
+          "block": 938
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 1449,
+        "benign_review": 1978,
+        "scope_review_required": 4095,
+        "unique_episode_sensitivity": {
+          "n": 4319,
+          "TP": 784,
+          "FP": 154,
+          "FN": 1448,
+          "TN": 1933,
+          "fpr": 0.07379012937230474,
+          "fnr_veto": 0.6487455197132617,
+          "routes": {
+            "review": 3365,
+            "allow": 16,
+            "block": 938
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 1448,
+          "benign_review": 1917,
+          "scope_review_required": 4094
+        }
+      },
+      "participant_test": {
+        "planned": 821,
+        "operational": 0,
+        "n": 821,
+        "TP": 223,
+        "FP": 22,
+        "FN": 166,
+        "TN": 410,
+        "fpr": 0.05092592592592592,
+        "fnr_veto": 0.4267352185089974,
+        "routes": {
+          "review": 571,
+          "allow": 5,
+          "block": 245
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 166,
+        "benign_review": 405,
+        "scope_review_required": 771,
+        "unique_episode_sensitivity": {
+          "n": 813,
+          "TP": 223,
+          "FP": 22,
+          "FN": 166,
+          "TN": 402,
+          "fpr": 0.05188679245283019,
+          "fnr_veto": 0.4267352185089974,
+          "routes": {
+            "review": 565,
+            "allow": 3,
+            "block": 245
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 166,
+          "benign_review": 399,
+          "scope_review_required": 771
+        }
+      },
+      "high_confidence_test": {
+        "planned": 481,
+        "operational": 0,
+        "n": 481,
+        "TP": 221,
+        "FP": 4,
+        "FN": 147,
+        "TN": 109,
+        "fpr": 0.035398230088495575,
+        "fnr_veto": 0.39945652173913043,
+        "routes": {
+          "allow": 5,
+          "review": 251,
+          "block": 225
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 147,
+        "benign_review": 104,
+        "scope_review_required": 448,
+        "unique_episode_sensitivity": {
+          "n": 473,
+          "TP": 221,
+          "FP": 4,
+          "FN": 147,
+          "TN": 101,
+          "fpr": 0.0380952380952381,
+          "fnr_veto": 0.39945652173913043,
+          "routes": {
+            "allow": 3,
+            "review": 245,
+            "block": 225
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 147,
+          "benign_review": 98,
+          "scope_review_required": 448
+        }
+      },
+      "without_duplicate_markers": {
+        "planned": 4247,
+        "operational": 0,
+        "n": 4247,
+        "TP": 782,
+        "FP": 142,
+        "FN": 1437,
+        "TN": 1886,
+        "fpr": 0.07001972386587771,
+        "fnr_veto": 0.647589004055881,
+        "routes": {
+          "review": 3311,
+          "allow": 12,
+          "block": 924
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 1437,
+        "benign_review": 1874,
+        "scope_review_required": 4058,
+        "unique_episode_sensitivity": {
+          "n": 4247,
+          "TP": 782,
+          "FP": 142,
+          "FN": 1437,
+          "TN": 1886,
+          "fpr": 0.07001972386587771,
+          "fnr_veto": 0.647589004055881,
+          "routes": {
+            "review": 3311,
+            "allow": 12,
+            "block": 924
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 1437,
+          "benign_review": 1874,
+          "scope_review_required": 4058
+        }
+      }
+    },
+    "strict": {
+      "all_regression": {
+        "planned": 4411,
+        "operational": 0,
+        "n": 4411,
+        "TP": 1067,
+        "FP": 341,
+        "FN": 1166,
+        "TN": 1837,
+        "fpr": 0.15656565656565657,
+        "fnr_veto": 0.5221674876847291,
+        "routes": {
+          "review": 2957,
+          "block": 1408,
+          "allow": 46
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 1166,
+        "benign_review": 1791,
+        "scope_review_required": 4095,
+        "unique_episode_sensitivity": {
+          "n": 4319,
+          "TP": 1067,
+          "FP": 341,
+          "FN": 1165,
+          "TN": 1746,
+          "fpr": 0.16339242932438908,
+          "fnr_veto": 0.5219534050179212,
+          "routes": {
+            "review": 2895,
+            "block": 1408,
+            "allow": 16
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 1165,
+          "benign_review": 1730,
+          "scope_review_required": 4094
+        }
+      },
+      "participant_test": {
+        "planned": 821,
+        "operational": 0,
+        "n": 821,
+        "TP": 273,
+        "FP": 38,
+        "FN": 116,
+        "TN": 394,
+        "fpr": 0.08796296296296297,
+        "fnr_veto": 0.2982005141388175,
+        "routes": {
+          "review": 505,
+          "allow": 5,
+          "block": 311
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 116,
+        "benign_review": 389,
+        "scope_review_required": 771,
+        "unique_episode_sensitivity": {
+          "n": 813,
+          "TP": 273,
+          "FP": 38,
+          "FN": 116,
+          "TN": 386,
+          "fpr": 0.08962264150943396,
+          "fnr_veto": 0.2982005141388175,
+          "routes": {
+            "review": 499,
+            "allow": 3,
+            "block": 311
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 116,
+          "benign_review": 383,
+          "scope_review_required": 771
+        }
+      },
+      "high_confidence_test": {
+        "planned": 481,
+        "operational": 0,
+        "n": 481,
+        "TP": 269,
+        "FP": 8,
+        "FN": 99,
+        "TN": 105,
+        "fpr": 0.07079646017699115,
+        "fnr_veto": 0.26902173913043476,
+        "routes": {
+          "allow": 5,
+          "review": 199,
+          "block": 277
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 99,
+        "benign_review": 100,
+        "scope_review_required": 448,
+        "unique_episode_sensitivity": {
+          "n": 473,
+          "TP": 269,
+          "FP": 8,
+          "FN": 99,
+          "TN": 97,
+          "fpr": 0.0761904761904762,
+          "fnr_veto": 0.26902173913043476,
+          "routes": {
+            "allow": 3,
+            "review": 193,
+            "block": 277
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 99,
+          "benign_review": 94,
+          "scope_review_required": 448
+        }
+      },
+      "without_duplicate_markers": {
+        "planned": 4247,
+        "operational": 0,
+        "n": 4247,
+        "TP": 1065,
+        "FP": 327,
+        "FN": 1154,
+        "TN": 1701,
+        "fpr": 0.16124260355029585,
+        "fnr_veto": 0.5200540784136999,
+        "routes": {
+          "review": 2843,
+          "block": 1392,
+          "allow": 12
+        },
+        "attacks_direct_allow": 0,
+        "attacks_review": 1154,
+        "benign_review": 1689,
+        "scope_review_required": 4058,
+        "unique_episode_sensitivity": {
+          "n": 4247,
+          "TP": 1065,
+          "FP": 327,
+          "FN": 1154,
+          "TN": 1701,
+          "fpr": 0.16124260355029585,
+          "fnr_veto": 0.5200540784136999,
+          "routes": {
+            "review": 2843,
+            "block": 1392,
+            "allow": 12
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 1154,
+          "benign_review": 1689,
+          "scope_review_required": 4058
+        }
+      }
+    }
+  },
+  "limits": [
+    "Labels are provisional silver annotations, not adjudicated human gold.",
+    "All-regression results include training/development exposure. Participant-test results are separate but previously exposed to diagnostics.",
+    "FN means no local input veto. Review requires semantic evaluation and Output Guard; it is not permission to disclose.",
+    "No generation, semantic LLM evaluation, live tools or observed exfiltration in this offline replay.",
+    "Historical user/assistant context is replayed as stored. These context files do not constitute a replay of every historical tool result.",
+    "Counts refer to annotation records, not the initial reported competition prompt counter.",
+    "Unique-episode sensitivity deduplicates exact current input and history; primary results retain all eligible turns.",
+    "Cached deterministic results are reused across profiles; timings are not production latency benchmarks."
+  ],
+  "validation": {
+    "unique_case_profile_rows": true,
+    "monotonic_profile_vetoes": true,
+    "confusion_recomputed_from_predictions": true,
+    "operational_errors": 0
+  }
+}

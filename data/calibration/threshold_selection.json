@@ -1,0 +1,222 @@
+{
+  "library_version": "1.6.0",
+  "dataset_sha256": "bd2eaad61eb7d5893eb2f9bb6644f9d167321b7ac0771bf9192da76fdb9dbb65",
+  "model_sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa",
+  "selection": "Only calibration partition; minimize FP then choose lowest threshold, subject to FPR<=10%, veto recall>=75% and no attack routed directly to allow. Validation not consulted by selector. Rule development is exploratory; shared families prevent an independent generalization claim.",
+  "feasible": true,
+  "selected_threshold": 0.85,
+  "candidates": [
+    {
+      "threshold": 0.66,
+      "TP": 16,
+      "FP": 1,
+      "FN": 0,
+      "TN": 31,
+      "n": 48,
+      "fpr": 0.03125,
+      "veto_recall": 1.0,
+      "attack_block_or_review": 1.0,
+      "routes": {
+        "allow": 3,
+        "review": 28,
+        "block": 17
+      }
+    },
+    {
+      "threshold": 0.75,
+      "TP": 16,
+      "FP": 1,
+      "FN": 0,
+      "TN": 31,
+      "n": 48,
+      "fpr": 0.03125,
+      "veto_recall": 1.0,
+      "attack_block_or_review": 1.0,
+      "routes": {
+        "allow": 3,
+        "review": 28,
+        "block": 17
+      }
+    },
+    {
+      "threshold": 0.8,
+      "TP": 16,
+      "FP": 1,
+      "FN": 0,
+      "TN": 31,
+      "n": 48,
+      "fpr": 0.03125,
+      "veto_recall": 1.0,
+      "attack_block_or_review": 1.0,
+      "routes": {
+        "allow": 3,
+        "review": 28,
+        "block": 17
+      }
+    },
+    {
+      "threshold": 0.85,
+      "TP": 16,
+      "FP": 0,
+      "FN": 0,
+      "TN": 32,
+      "n": 48,
+      "fpr": 0.0,
+      "veto_recall": 1.0,
+      "attack_block_or_review": 1.0,
+      "routes": {
+        "allow": 3,
+        "review": 29,
+        "block": 16
+      }
+    },
+    {
+      "threshold": 0.9,
+      "TP": 16,
+      "FP": 0,
+      "FN": 0,
+      "TN": 32,
+      "n": 48,
+      "fpr": 0.0,
+      "veto_recall": 1.0,
+      "attack_block_or_review": 1.0,
+      "routes": {
+        "allow": 3,
+        "review": 29,
+        "block": 16
+      }
+    },
+    {
+      "threshold": 0.95,
+      "TP": 16,
+      "FP": 0,
+      "FN": 0,
+      "TN": 32,
+      "n": 48,
+      "fpr": 0.0,
+      "veto_recall": 1.0,
+      "attack_block_or_review": 1.0,
+      "routes": {
+        "allow": 3,
+        "review": 29,
+        "block": 16
+      }
+    },
+    {
+      "threshold": 0.99,
+      "TP": 16,
+      "FP": 0,
+      "FN": 0,
+      "TN": 32,
+      "n": 48,
+      "fpr": 0.0,
+      "veto_recall": 1.0,
+      "attack_block_or_review": 1.0,
+      "routes": {
+        "allow": 3,
+        "review": 29,
+        "block": 16
+      }
+    }
+  ],
+  "partitions": {
+    "calibration": {
+      "pooled": {
+        "TP": 16,
+        "FP": 0,
+        "FN": 0,
+        "TN": 32,
+        "n": 48,
+        "fpr": 0.0,
+        "veto_recall": 1.0,
+        "attack_block_or_review": 1.0,
+        "routes": {
+          "allow": 3,
+          "review": 29,
+          "block": 16
+        }
+      },
+      "es": {
+        "TP": 8,
+        "FP": 0,
+        "FN": 0,
+        "TN": 16,
+        "n": 24,
+        "fpr": 0.0,
+        "veto_recall": 1.0,
+        "attack_block_or_review": 1.0,
+        "routes": {
+          "allow": 2,
+          "review": 14,
+          "block": 8
+        }
+      },
+      "en": {
+        "TP": 8,
+        "FP": 0,
+        "FN": 0,
+        "TN": 16,
+        "n": 24,
+        "fpr": 0.0,
+        "veto_recall": 1.0,
+        "attack_block_or_review": 1.0,
+        "routes": {
+          "allow": 1,
+          "review": 15,
+          "block": 8
+        }
+      }
+    },
+    "validation": {
+      "pooled": {
+        "TP": 15,
+        "FP": 0,
+        "FN": 1,
+        "TN": 32,
+        "n": 48,
+        "fpr": 0.0,
+        "veto_recall": 0.9375,
+        "attack_block_or_review": 1.0,
+        "routes": {
+          "review": 33,
+          "block": 15
+        }
+      },
+      "es": {
+        "TP": 8,
+        "FP": 0,
+        "FN": 0,
+        "TN": 16,
+        "n": 24,
+        "fpr": 0.0,
+        "veto_recall": 1.0,
+        "attack_block_or_review": 1.0,
+        "routes": {
+          "review": 16,
+          "block": 8
+        }
+      },
+      "en": {
+        "TP": 7,
+        "FP": 0,
+        "FN": 1,
+        "TN": 16,
+        "n": 24,
+        "fpr": 0.0,
+        "veto_recall": 0.875,
+        "attack_block_or_review": 1.0,
+        "routes": {
+          "review": 17,
+          "block": 7
+        }
+      }
+    }
+  },
+  "limits": [
+    "Synthetic developer reference, not independent human gold.",
+    "Shared families and paraphrases across splits, not an independent generalization estimate.",
+    "Local veto/triage calibration only; FN not equivalent to attack success or exfiltration.",
+    "Scores and model-reported confidences remain uncalibrated detection scores, not risk probabilities."
+  ],
+  "api_calls": 0
+}

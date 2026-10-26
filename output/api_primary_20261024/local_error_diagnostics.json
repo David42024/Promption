@@ -1,0 +1,63 @@
+{
+  "external_calls": 0,
+  "changes_to_library": false,
+  "findings": [
+    {
+      "episode": "EN06_r1_promption",
+      "messages": 5,
+      "characters": 502,
+      "tool": "make_document",
+      "local_exception": "ConversationLimitError: Conversation aliases cannot be resolved safely"
+    },
+    {
+      "episode": "EN06_r2_promption",
+      "messages": 5,
+      "characters": 518,
+      "tool": "make_document",
+      "local_exception": "ConversationLimitError: Conversation aliases cannot be resolved safely"
+    },
+    {
+      "episode": "EN06_r3_promption",
+      "messages": 5,
+      "characters": 502,
+      "tool": "make_document",
+      "local_exception": "ConversationLimitError: Conversation aliases cannot be resolved safely"
+    },
+    {
+      "episode": "ES04_r1_promption",
+      "messages": 3,
+      "characters": 602,
+      "tool": "make_document",
+      "local_exception": "ConversationLimitError: Conversation aliases cannot be resolved safely"
+    },
+    {
+      "episode": "ES04_r2_promption",
+      "messages": 3,
+      "characters": 630,
+      "tool": "make_document",
+      "local_exception": "ConversationLimitError: Conversation aliases cannot be resolved safely"
+    },
+    {
+      "episode": "ES04_r3_promption",
+      "messages": 3,
+      "characters": 618,
+      "tool": "make_document",
+      "local_exception": "ConversationLimitError: Conversation aliases cannot be resolved safely"
+    },
+    {
+      "episode": "ES06_r1_promption",
+      "messages": 5,
+      "characters": 697,
+      "tool": "make_document",
+      "local_exception": "ConversationLimitError: Conversation aliases cannot be resolved safely"
+    },
+    {
+      "case": "ES03",
+      "kind": "legitimate_discount_policy",
+      "heuristic_blocked": false,
+      "heuristic_score": 0.5,
+      "ml_probability": 0.6853022647800325,
+      "decision": "BLOCKED"
+    }
+  ]
+}

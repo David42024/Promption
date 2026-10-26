@@ -16,6 +16,40 @@ const classifier = output => new MockLanguageModelV3({ doGenerate: response(outp
 const pass = async ({ text }) => ({ allowed: true, text });
 const request = extra => ({ text: 'holaaa', systemPrompt: system, identity, ...extra });
 
+test('portable schema preserves runtime rejection of contradictory metadata', async () => {
+  const model = classifier({ decision: 'in_scope', intent: intent({ origin: 'tool' }) });
+  const result = await createContextEvaluator({ model, schemaMode: 'portable' })(request());
+  assert.equal(result.reason, 'invalid_scope_response');
+  assert.equal(model.doGenerateCalls[0].responseFormat.schema.properties.intent.anyOf, undefined);
+  assert.throws(() => createContextEvaluator({ model, schemaMode: 'unsupported' }), TypeError);
+});
+
+test('portable schema encodes attack and origin atomically without ambiguous unions', async () => {
+  const model = classifier({ decision: 'in_scope', intent: {
+    name: 'social', attack_origin: 'none:none', relation: 'standalone', confidence: .99, evidence: [],
+  } });
+  const result = await createContextEvaluator({ model, schemaMode: 'portable' })(request());
+  assert.equal(result.allowed, true);
+  assert.equal(result.intent.attack, 'none');
+  assert.equal(result.intent.origin, 'none');
+  const schema = model.doGenerateCalls[0].responseFormat.schema.properties.intent;
+  assert.equal(schema.anyOf, undefined);
+  assert.equal(schema.properties.origin, undefined);
+  assert.equal(schema.properties.attack, undefined);
+  assert.ok(!schema.properties.attack_origin.enum.includes('none:user'));
+  assert.ok(!schema.properties.attack_origin.enum.includes('secret_extraction:none'));
+  assert.ok(schema.properties.attack_origin.enum.includes('indirect_injection:tool'));
+});
+
+test('portable metadata cannot override the atomic verdict using contradictory legacy fields', async () => {
+  const model = classifier({ decision: 'in_scope', intent: {
+    name: 'social', attack_origin: 'none:none', origin: 'user', relation: 'standalone', confidence: .99, evidence: [],
+  } });
+  const result = await createContextEvaluator({ model, schemaMode: 'portable' })(request());
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, 'invalid_scope_response');
+});
+
 test('joint evaluator uses one structured call and keeps policy separate from untrusted context', async () => {
   const model = classifier({ decision: 'in_scope', intent: intent({ name: 'social' }) });
   const evaluate = createContextEvaluator({ model });

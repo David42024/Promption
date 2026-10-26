@@ -65,6 +65,9 @@ Thumbs.db
 
 # Env
 .env
+/.env.groq.local
+/.env.gemini.local
+/.env.deepseek.local
 *.env
 
 # Frontend (demo Next.js)
@@ -73,3 +76,11 @@ node_modules/
 
 output/research_20261023/
 output/guardrail_experiments_20261023/
+output/corpus_three_conditions_20261024/
+output/fp_reduction_20261024/
+output/corpus_repeat_140_20261024/
+output/protection_profiles_20261025/
+output/profiles_comparison_20261025/
+output/local_profiles_sample_20261025/
+output/local_profiles_sample_160_20261025/
+output/precision_improvement_20261025/

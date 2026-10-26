@@ -5,7 +5,8 @@ import { createPromption } from '../src/index.js';
 for (const [reason, status] of [['ambiguous',403], ['scope_timeout',504], ['scope_unavailable',503],
   ['scope_truncated',403], ['invalid_scope_response',503]]) {
   test(`Scope preserves failure cause ${reason} and observed usage`, async () => {
-    const sdk = createPromption({ transport:async ({text}) => ({allowed:true,text}), scopeEvaluator:async () => ({
+    const events = [];
+    const sdk = createPromption({ onDecision: event => events.push(event), transport:async ({text}) => ({allowed:true,text}), scopeEvaluator:async () => ({
       classification:'UNCERTAIN', reason, provider_calls:1, usage:{ prompt_tokens:0,completion_tokens:null,total_tokens:null } }) });
     const decision = await sdk.checkScope('Consulta catálogo', { systemPrompt:'Solo tienda', identity:{userId:'u',roles:['customer'],authenticated:true} });
     assert.equal(decision.reason, reason);
@@ -14,6 +15,9 @@ for (const [reason, status] of [['ambiguous',403], ['scope_timeout',504], ['scop
     assert.equal(decision.allowed, false);
     assert.equal(decision.usage.prompt_tokens, 0);
     assert.equal(decision.usage.total_tokens, null);
+    assert.equal(decision.control, reason === 'ambiguous' ? 'scope' : 'operational');
+    assert.equal(events.at(-1).control, decision.control);
+    assert.equal(events.at(-1).action, reason === 'ambiguous' ? 'REVIEW' : 'ERROR');
   });
 }
 

@@ -1,0 +1,9 @@
+{
+  "cases": 96,
+  "benign": 64,
+  "attacks": 32,
+  "sha256": "bd2eaad61eb7d5893eb2f9bb6644f9d167321b7ac0771bf9192da76fdb9dbb65",
+  "labels": "Synthetic developer references, not independent human gold",
+  "split": "Frozen before threshold selection. Both languages and every family in both partitions; paraphrases and families are dependent. Validation not used by selector.",
+  "network_calls": 0
+}

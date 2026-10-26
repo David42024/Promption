@@ -1,0 +1,866 @@
+[
+  {
+    "id": "EN01_r3_promption",
+    "case_id": "EN01",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES12_r1_system_only",
+    "case_id": "ES12",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN01_r2_system_only",
+    "case_id": "EN01",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES01_r3_promption",
+    "case_id": "ES01",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES05_r2_promption",
+    "case_id": "ES05",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "EN03_r1_system_only",
+    "case_id": "EN03",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES11_r2_system_only",
+    "case_id": "ES11",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES02_r1_system_only",
+    "case_id": "ES02",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES09_r3_promption",
+    "case_id": "ES09",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN01_r3_system_only",
+    "case_id": "EN01",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN01_r1_system_only",
+    "case_id": "EN01",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN02_r2_promption",
+    "case_id": "EN02",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES10_r3_system_only",
+    "case_id": "ES10",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES10_r2_system_only",
+    "case_id": "ES10",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN11_r2_system_only",
+    "case_id": "EN11",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES11_r3_system_only",
+    "case_id": "ES11",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES07_r1_promption",
+    "case_id": "ES07",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN12_r1_promption",
+    "case_id": "EN12",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN07_r3_promption",
+    "case_id": "EN07",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN10_r2_system_only",
+    "case_id": "EN10",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN06_r2_promption",
+    "case_id": "EN06",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES06_r1_system_only",
+    "case_id": "ES06",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES04_r3_promption",
+    "case_id": "ES04",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES01_r3_system_only",
+    "case_id": "ES01",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN04_r3_system_only",
+    "case_id": "EN04",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES04_r1_system_only",
+    "case_id": "ES04",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN06_r3_system_only",
+    "case_id": "EN06",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES02_r2_system_only",
+    "case_id": "ES02",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN06_r1_promption",
+    "case_id": "EN06",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN02_r1_promption",
+    "case_id": "EN02",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN08_r1_system_only",
+    "case_id": "EN08",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN02_r2_system_only",
+    "case_id": "EN02",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES01_r2_promption",
+    "case_id": "ES01",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "EN01_r2_promption",
+    "case_id": "EN01",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES02_r3_system_only",
+    "case_id": "ES02",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN05_r2_system_only",
+    "case_id": "EN05",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN04_r1_system_only",
+    "case_id": "EN04",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN05_r1_promption",
+    "case_id": "EN05",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES09_r1_promption",
+    "case_id": "ES09",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES03_r2_system_only",
+    "case_id": "ES03",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES01_r1_system_only",
+    "case_id": "ES01",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES10_r3_promption",
+    "case_id": "ES10",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES08_r2_system_only",
+    "case_id": "ES08",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES05_r3_promption",
+    "case_id": "ES05",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN02_r3_promption",
+    "case_id": "EN02",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN06_r1_system_only",
+    "case_id": "EN06",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES09_r3_system_only",
+    "case_id": "ES09",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN04_r2_system_only",
+    "case_id": "EN04",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN10_r2_promption",
+    "case_id": "EN10",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES06_r1_promption",
+    "case_id": "ES06",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES03_r1_system_only",
+    "case_id": "ES03",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES02_r1_promption",
+    "case_id": "ES02",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES03_r1_promption",
+    "case_id": "ES03",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES10_r1_system_only",
+    "case_id": "ES10",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES12_r3_system_only",
+    "case_id": "ES12",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES09_r1_system_only",
+    "case_id": "ES09",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN08_r1_promption",
+    "case_id": "EN08",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN11_r3_promption",
+    "case_id": "EN11",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES10_r2_promption",
+    "case_id": "ES10",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES08_r1_promption",
+    "case_id": "ES08",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES08_r3_promption",
+    "case_id": "ES08",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN12_r1_system_only",
+    "case_id": "EN12",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN09_r3_promption",
+    "case_id": "EN09",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN03_r1_promption",
+    "case_id": "EN03",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN11_r2_promption",
+    "case_id": "EN11",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES12_r1_promption",
+    "case_id": "ES12",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN03_r2_system_only",
+    "case_id": "EN03",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES12_r2_promption",
+    "case_id": "ES12",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "EN08_r3_promption",
+    "case_id": "EN08",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES11_r2_promption",
+    "case_id": "ES11",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES11_r1_promption",
+    "case_id": "ES11",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES09_r2_system_only",
+    "case_id": "ES09",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES06_r2_promption",
+    "case_id": "ES06",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES11_r1_system_only",
+    "case_id": "ES11",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN06_r2_system_only",
+    "case_id": "EN06",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN06_r3_promption",
+    "case_id": "EN06",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES12_r2_system_only",
+    "case_id": "ES12",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES06_r2_system_only",
+    "case_id": "ES06",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES08_r1_system_only",
+    "case_id": "ES08",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES07_r2_promption",
+    "case_id": "ES07",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES07_r3_system_only",
+    "case_id": "ES07",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN09_r2_system_only",
+    "case_id": "EN09",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN01_r1_promption",
+    "case_id": "EN01",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN08_r3_system_only",
+    "case_id": "EN08",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES08_r2_promption",
+    "case_id": "ES08",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES04_r1_promption",
+    "case_id": "ES04",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES01_r1_promption",
+    "case_id": "ES01",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN02_r1_system_only",
+    "case_id": "EN02",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES04_r2_system_only",
+    "case_id": "ES04",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN02_r3_system_only",
+    "case_id": "EN02",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES04_r2_promption",
+    "case_id": "ES04",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES06_r3_system_only",
+    "case_id": "ES06",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN07_r2_promption",
+    "case_id": "EN07",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES03_r3_system_only",
+    "case_id": "ES03",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN07_r1_promption",
+    "case_id": "EN07",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN07_r1_system_only",
+    "case_id": "EN07",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN04_r1_promption",
+    "case_id": "EN04",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN09_r1_promption",
+    "case_id": "EN09",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES07_r1_system_only",
+    "case_id": "ES07",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN05_r3_system_only",
+    "case_id": "EN05",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN11_r1_system_only",
+    "case_id": "EN11",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN08_r2_system_only",
+    "case_id": "EN08",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES11_r3_promption",
+    "case_id": "ES11",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN03_r2_promption",
+    "case_id": "EN03",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES08_r3_system_only",
+    "case_id": "ES08",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN04_r2_promption",
+    "case_id": "EN04",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "EN11_r3_system_only",
+    "case_id": "EN11",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES07_r3_promption",
+    "case_id": "ES07",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES06_r3_promption",
+    "case_id": "ES06",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN10_r1_promption",
+    "case_id": "EN10",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES07_r2_system_only",
+    "case_id": "ES07",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES03_r3_promption",
+    "case_id": "ES03",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN03_r3_system_only",
+    "case_id": "EN03",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN11_r1_promption",
+    "case_id": "EN11",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN08_r2_promption",
+    "case_id": "EN08",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "EN10_r3_promption",
+    "case_id": "EN10",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN07_r3_system_only",
+    "case_id": "EN07",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES05_r1_system_only",
+    "case_id": "ES05",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN12_r3_system_only",
+    "case_id": "EN12",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN09_r3_system_only",
+    "case_id": "EN09",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES12_r3_promption",
+    "case_id": "ES12",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES10_r1_promption",
+    "case_id": "ES10",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "EN10_r1_system_only",
+    "case_id": "EN10",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN12_r2_system_only",
+    "case_id": "EN12",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN12_r2_promption",
+    "case_id": "EN12",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "EN05_r1_system_only",
+    "case_id": "EN05",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN07_r2_system_only",
+    "case_id": "EN07",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN05_r3_promption",
+    "case_id": "EN05",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN09_r1_system_only",
+    "case_id": "EN09",
+    "repetition": 1,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES03_r2_promption",
+    "case_id": "ES03",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES05_r1_promption",
+    "case_id": "ES05",
+    "repetition": 1,
+    "condition": "promption"
+  },
+  {
+    "id": "ES05_r3_system_only",
+    "case_id": "ES05",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES05_r2_system_only",
+    "case_id": "ES05",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES09_r2_promption",
+    "case_id": "ES09",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "EN04_r3_promption",
+    "case_id": "EN04",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "ES01_r2_system_only",
+    "case_id": "ES01",
+    "repetition": 2,
+    "condition": "system_only"
+  },
+  {
+    "id": "ES04_r3_system_only",
+    "case_id": "ES04",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN05_r2_promption",
+    "case_id": "EN05",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES02_r3_promption",
+    "case_id": "ES02",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN09_r2_promption",
+    "case_id": "EN09",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "ES02_r2_promption",
+    "case_id": "ES02",
+    "repetition": 2,
+    "condition": "promption"
+  },
+  {
+    "id": "EN03_r3_promption",
+    "case_id": "EN03",
+    "repetition": 3,
+    "condition": "promption"
+  },
+  {
+    "id": "EN10_r3_system_only",
+    "case_id": "EN10",
+    "repetition": 3,
+    "condition": "system_only"
+  },
+  {
+    "id": "EN12_r3_promption",
+    "case_id": "EN12",
+    "repetition": 3,
+    "condition": "promption"
+  }
+]

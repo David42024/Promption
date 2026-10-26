@@ -1,10 +1,15 @@
-import { createPromption, createFilterApiTransport, createScopeEvaluator, createContextEvaluator,
+import { createPromption, createFilterApiTransport, createScopeEvaluator, createContextEvaluator, resolveProtection,
   type IntentAssessment } from '../src/index.js';
 import { wrapLanguageModel, generateText, streamText, tool, jsonSchema } from 'ai';
 
 declare const baseModel: Parameters<typeof wrapLanguageModel>[0]['model'];
 const identity = { userId: 'server-user', roles: ['customer'], authenticated: true };
 const protection = createPromption({ baseUrl: 'http://localhost:8000', apiKey: 'server-only' });
+const balanced = resolveProtection({ profile: 'balanced', scopeAmbiguity: 'clarify', inputUncertainty: 'review' });
+void createPromption({ transport: async ({ text }) => ({ allowed: true, text }), protection: balanced,
+  onDecision: event => { const profile: string = event.protection.profile; return profile; } });
+// @ts-expect-error the participant cannot change the profile in a middleware request
+protection.middleware({ identity, protection: 'conversational' });
 const model = wrapLanguageModel({ model: baseModel, middleware: protection.middleware({ identity, toolPolicies: { catalog: {} } }) });
 void generateText({ model, prompt: 'Hola' });
 void streamText({ model, prompt: 'Hola' });

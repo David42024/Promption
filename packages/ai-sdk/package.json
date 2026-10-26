@@ -1,6 +1,6 @@
 {
   "name": "@promption/ai-sdk",
-  "version": "1.3.3",
+  "version": "1.7.2",
   "description": "Promption input, output and tool protection as Vercel AI SDK middleware",
   "type": "module",
   "main": "./src/index.js",

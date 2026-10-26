@@ -77,6 +77,7 @@ class ConversationEvidence(BaseModel):
 class FilterRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Prompt to analyze")
     use_ml: bool = True
+    isolate_history: bool = Field(default=False, strict=True, description="Caller commits to isolating the model context when the guard requests it")
     messages: list[ConversationEvidence] = Field(default_factory=list)
     user_id: str | None = Field(default=None, description="End-user id (audit + per-user policy)")
     roles: list[str] = Field(default_factory=list, description="End-user roles/scopes")
@@ -119,6 +120,7 @@ class RuleMatch(BaseModel):
     name: str
     severity: str
     description: str = ""
+    action: str = "block"
 
 
 class HeuristicInfo(BaseModel):
@@ -150,6 +152,10 @@ class FilterResponse(BaseModel):
     classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
     requires_review: bool = True
     requires_output_guard: bool = False
+    requires_scope_review: bool = False
+    input_risk_score: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False, strict=True)
+    score_kind: str = "uncalibrated_detection_score"
+    assessments: dict = Field(default_factory=dict)
 
 
 class BenchmarkRequest(BaseModel):

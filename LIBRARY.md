@@ -8,6 +8,23 @@ la app, mientras que los mecanismos de protección están en la librería.
 
 ## Integración con Vercel AI SDK
 
+Desde **1.5.0**, usa `protection: 'balanced' | 'conversational' | 'strict'` al
+construir `createPromption`, o `Promption(protection='balanced')` en Python.
+También admite opciones independientes para incertidumbre de entrada y ambigüedad
+de alcance. El perfil se resuelve en el servidor; conserva ACL, vetos y Output Guard.
+Consulta [configuración, auditoría y límites](docs/protection_profiles_20261025.md).
+
+En **1.6.0**, cada decisión expone `assessments.injection`, `assessments.scope` y
+`assessments.authorization`, con estado, motivo y evaluaciones por capa. Las citas
+analíticas y las señales débiles relevantes exigen revisión de contexto antes de
+generar y mantienen Output Guard. Sin el evaluador requerido se bloquea con
+`scope_review_required` / `SCOPE_REVIEW_REQUIRED`; una revisión pendiente no es
+autorización. Configura `scope_guard=ContextScopeGuard(...)` en Python o
+`scopeEvaluator: createContextEvaluator(...)` en AI SDK con un modelo del servidor.
+Los tres perfiles revisan por defecto la incertidumbre del detector; `strict`
+conserva el bloqueo de ambigüedad de alcance. Ver
+[contrato y calibración local](docs/context_intent_review_20261025.md).
+
 Desde `demo/`, la dependencia está instalada con
 `"@promption/ai-sdk": "file:../packages/ai-sdk"`. Para otra app local:
 
@@ -351,9 +368,24 @@ una sola evaluación, `ContextScopeGuard`/`AsyncContextScopeGuard` y el adaptado
 opcional `SmallModelFilter`. Contratos, integración, alternativas y límites:
 [contexto e intención](docs/context_intent_20261023.md).
 
-La versión 1.3.3 corrige vetos ML heredados en intervenciones autónomas y exige Output
-Guard para esas transiciones. Conserva la inspección de ataques entre turnos y el
-historial completo: [corrección y evaluación](docs/history_transitions_20261023.md).
+La versión 1.4.0 añade aislamiento del contexto del modelo para intervenciones
+independientes comprobadas por el servidor, aclaraciones sin generación ni tools
+ante ambigüedad inocua y resolución acotada de alias autorreferentes. Conserva ACL,
+vetos del mensaje actual y Output Guard obligatorio. Actualiza el paquete Python
+y `@promption/ai-sdk` juntos para activar el contrato de aislamiento.
+Consulta los [cambios, mediciones y límites](docs/false_positive_reduction_20261024.md).
+
+La versión 1.5.0 añade perfiles configurables e independientes para incertidumbre
+y ambigüedad, aclaraciones fijas ante intención compatible sin ataque identificado,
+y motivos de auditoría separados de permisos y alcance. La evaluación 1.4.0 no
+se convierte automáticamente en evidencia de eficacia de estos nuevos perfiles.
+
+La versión 1.6.0 separa las tres evaluaciones, conserva la procedencia de citas y
+tools, amplía las aclaraciones fijas por datos faltantes y trata señales débiles
+como revisión obligatoria de contexto. Calibra el umbral de veto ML en 0.85 con un
+conjunto exploratorio ES/EN; los pesos no se reentrenan y los scores no son
+probabilidades calibradas. La [muestra de 720 ejecuciones locales](docs/local_profiles_sample_20261025.md)
+informa bloqueos y revisiones por separado, sin atribuirle métricas de exfiltración.
 
 ```bash
 uv build
@@ -361,7 +393,7 @@ cd packages/ai-sdk && npm pack
 ```
 
 El wheel en `dist/` y el tarball de npm se instalan en otros proyectos con
-`pip install /ruta/promption-1.3.3-py3-none-any.whl` y `npm install /ruta/promption-ai-sdk-1.3.3.tgz`.
+`pip install /ruta/promption-1.7.1-py3-none-any.whl` y `npm install /ruta/promption-ai-sdk-1.7.1.tgz`.
 Estos comandos construyen paquetes locales; no publican en PyPI ni npm.
 
 ```bash
@@ -372,3 +404,26 @@ cd demo && npm run build
 
 Los imports antiguos de `src.*` siguen disponibles como aliases de compatibilidad.
 Las nuevas integraciones deben usar `promption.*` y `@promption/ai-sdk`.
+
+### Cambios de 1.7.0
+
+Los perfiles añaden una política de veto por score incierto (`review_block_threshold`
+en Python, `reviewBlockThreshold` en JavaScript): 0.85, 0.75 y 0.66 respectivamente.
+La selección utiliza la partición pública de validación; no reentrena pesos ni
+transforma el score en probabilidad. Un veto por política no confirma una inyección.
+Los vetos concluyentes, ACL y Output Guard conservan prioridad.
+
+Los valores registrados en `protected_values` (Python) o `protectedValues` (SDK)
+se revisan contra codificaciones conocidas y fragmentos de ocho caracteres de
+tokens opacos largos. El SDK revisa los argumentos antes de ejecutar una herramienta.
+No registra valores protegidos en eventos de decisión. El servidor debe registrar
+explícitamente sus secretos; no se descubren automáticamente.
+
+El evaluador de contexto admite `schemaMode: 'portable'` para proveedores con
+restricciones de JSON Schema y conserva las validaciones de coherencia. Las
+[mediciones y límites de la versión](docs/precision_improvement_20261025.md)
+separan detección local, contención de fallos y evaluación con un modelo real.
+
+En 1.7.1, el esquema portable representa ataque y origen mediante un único enum,
+evitando combinaciones contradictorias antes de validar la intención canónica.
+La API pública sigue devolviendo `intent.attack` e `intent.origin` separados.

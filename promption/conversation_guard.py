@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from .utils.config import load_config, load_heuristics
 from .utils.text import normalize_content
+from .evidence import interpret_input, adopts_quoted_instructions
 
 
 class ConversationLimitError(ValueError):
@@ -29,12 +30,16 @@ class ConversationDecision:
     tool_message_count: int = 0
     reason: str = "conversation_checked"
     evaluation_mode: str = "cumulative"
+    isolated_history: bool = False
+    requires_scope_review: bool = False
+    input_risk_score: float | None = None
 
     def metadata(self) -> dict:
         return {"blocked": self.blocked, "requires_output_guard": self.requires_output_guard,
                 "matched_rules": self.matched_rules, "message_count": self.message_count,
                 "tool_message_count": self.tool_message_count, "reason": self.reason,
-                "evaluation_mode": self.evaluation_mode}
+                "evaluation_mode": self.evaluation_mode, "isolated_history": self.isolated_history,
+                "requires_scope_review": self.requires_scope_review, "input_risk_score": self.input_risk_score}
 
 
 def _strings(value, depth: int = 0, *, include_keys: bool = False) -> list[str]:
@@ -50,14 +55,14 @@ def _strings(value, depth: int = 0, *, include_keys: bool = False) -> list[str]:
     return []
 
 
-def message_text(message: ConversationMessage) -> str:
+def message_text(message: ConversationMessage, *, raw_quotes=False) -> str:
     if message.role == "tool":
         try:
             value = json.loads(message.content)
         except (ValueError, RecursionError):
             return normalize_content(message.content)
         return normalize_content(" ".join(_strings(value)))
-    return normalize_content(message.content)
+    return normalize_content(message.content if raw_quotes else interpret_input(message.content).instruction_text)
 
 
 def validate_messages(messages: list, *, max_messages: int | None = None,
@@ -94,7 +99,9 @@ _TURN_DEPENDENCY = re.compile(
     r"|(?:cada\s+vez|en\s+cuanto)\s+que|(?:(?:mi|tu|el|la)\s+)?(?:pr[oó]xim[oa]|siguiente)"
     r"\s+(?:mensaje|respuesta|turno)|(?:de|a)\s+ahora\s+en\s+adelante"
     r"|when(?:ever)?\s+i\s+(?:say|write|reply)|if\s+i\s+(?:say|write|reply)"
-    r"|(?:my|your|the)\s+next\s+(?:message|reply|turn)|from\s+now\s+on)\b"
+    r"|(?:my|your|the)\s+next\s+(?:message|reply|turn)|from\s+now\s+on"
+    r"|(?:every|each|any)\s+(?:reply|response|message|turn)"
+    r"|(?:cada|toda|cualquier)\s+(?:respuesta|mensaje|turno))\b"
 )
 
 
@@ -102,24 +109,39 @@ def conversation_views(messages: list) -> list[str]:
     """Build separate and assembled views without promoting tool data to system text."""
     messages = validate_messages(messages)
     untrusted = [message for message in messages if message.role in {"user", "tool"}]
-    texts = [message_text(message) for message in untrusted]
+    raw_quotes = any(adopts_quoted_instructions(message.content) for message in untrusted)
+    texts = [message_text(message, raw_quotes=raw_quotes) for message in untrusted]
     texts = [text for text in texts if text]
     if not texts:
         return []
     aliases = {}
     expanded = []
 
-    def expand(text):
-        for _ in range(4):
-            previous = text
-            for alias, value in aliases.items():
-                text = re.sub(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", lambda _: value,
-                              text, flags=0 if len(alias) == 1 else re.IGNORECASE)
-                if len(text) > 100000:
-                    raise ConversationLimitError("Expanded conversation exceeds limit")
-            if text == previous:
-                return text
-        raise ConversationLimitError("Conversation aliases cannot be resolved safely")
+    def expand(text, seen=()):
+        if len(seen) > 32:
+            raise ConversationLimitError("Conversation aliases exceed depth limit")
+        if not aliases:
+            return text
+        pattern = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(a) for a in sorted(aliases, key=len, reverse=True)) + r")(?!\w)", re.I)
+        def substitute(match):
+            token = match.group()
+            alias = next((a for a in aliases if a == token or len(a) > 1 and a.casefold() == token.casefold()), None)
+            if alias is None or alias in seen:
+                return token
+            return expand(aliases[alias], (*seen, alias))
+        pieces = []
+        offset = size = 0
+        for match in pattern.finditer(text):
+            piece = text[offset:match.start()] + substitute(match)
+            size += len(piece)
+            if size > 100000:
+                raise ConversationLimitError("Expanded conversation exceeds limit")
+            pieces.append(piece)
+            offset = match.end()
+        pieces.append(text[offset:])
+        if size + len(pieces[-1]) > 100000:
+            raise ConversationLimitError("Expanded conversation exceeds limit")
+        return "".join(pieces)
 
     for text in texts:
         definitions = list(_ALIAS.finditer(text))
@@ -133,7 +155,7 @@ def conversation_views(messages: list) -> list[str]:
             expanded.append(text)
         else:
             expanded.append(expand(text))
-    by_origin = [[message_text(message) for message in untrusted if message.role == role]
+    by_origin = [[message_text(message, raw_quotes=raw_quotes) for message in untrusted if message.role == role]
                  for role in ("user", "tool")]
     views = texts + [" ".join(texts), "".join(texts)] + [" ".join(part) for part in by_origin]
     if sum(map(len, expanded)) > int(load_config().get("conversation_guard", {}).get("max_chars", 100000)):
@@ -165,7 +187,8 @@ class ConversationGuard:
                       if rule.get("enabled", True)]
 
     def analyze(self, messages: list, *, roles: list[str] | None = None,
-                use_ml: bool = True, current_text: str | None = None) -> ConversationDecision:
+                use_ml: bool = True, current_text: str | None = None,
+                isolate_history: bool = False) -> ConversationDecision:
         messages = validate_messages(messages)
         decision = ConversationDecision(message_count=len(messages),
                                         tool_message_count=sum(message.role == "tool" for message in messages))
@@ -174,9 +197,29 @@ class ConversationGuard:
                 raise ValueError("Current conversation text must be a string")
             if not messages or messages[-1].content != current_text or messages[-1].role == "assistant":
                 messages = validate_messages(messages + [ConversationMessage("user", current_text)])
+        untrusted = [message for message in messages if message.role in {"user", "tool"}]
+        independent = (len(untrusted) > 1 and messages[-1].role == "user"
+            and not decision.tool_message_count
+            and callable(getattr(self.input_filter.heuristic, "is_independent_turn", None))
+            and self.input_filter.heuristic.is_independent_turn(messages[-1].content, roles=roles)
+            and not any(_ALIAS.search(message_text(message)) or _TURN_DEPENDENCY.search(message_text(message))
+                        for message in untrusted[:-1]))
+        if isolate_history and independent:
+            decision.isolated_history = True
+            decision.evaluation_mode = "independent_turn"
+            decision.requires_output_guard = True
+            decision.reason = "isolated_history_requires_output_guard"
+            return decision
         views = conversation_views(messages)
+        raw_quotes = any(adopts_quoted_instructions(message.content) for message in untrusted)
+        decision.requires_scope_review = any(message.role == "user" and bool(interpret_input(message.content).quoted_texts)
+                                             for message in untrusted)
+        decision.requires_output_guard |= decision.requires_scope_review
         for text in views:
-            heuristic = self.input_filter.heuristic.analyze(text, roles=roles)
+            interpret = getattr(self.input_filter.heuristic, "analyze_evidence", None)
+            heuristic = (interpret(text, roles=roles, origin="tool") if callable(interpret)
+                         else self.input_filter.heuristic.analyze(text, roles=roles))
+            decision.requires_scope_review |= getattr(heuristic, "requires_scope_review", False)
             if heuristic.blocked:
                 decision.blocked = True
                 decision.matched_rules.extend(rule["name"] for rule in heuristic.matched_rules)
@@ -186,26 +229,25 @@ class ConversationGuard:
                     decision.matched_rules.append(name)
         if not decision.blocked and views:
             untrusted = [message for message in messages if message.role in {"user", "tool"}]
-            combined = " ".join(message_text(message) for message in untrusted)
+            combined = " ".join(message_text(message, raw_quotes=raw_quotes) for message in untrusted)
             benign_dialogue = all(
                 message.role == "user"
                 and self.input_filter.heuristic.analyze(message_text(message), roles=roles).signal == "benign"
                 for message in untrusted
             )
-            independent = (len(untrusted) > 1 and messages[-1].role == "user"
-                and not decision.tool_message_count
-                and callable(getattr(self.input_filter.heuristic, "is_independent_turn", None))
-                and self.input_filter.heuristic.is_independent_turn(messages[-1].content, roles=roles)
-                and not any(_ALIAS.search(message_text(message)) or _TURN_DEPENDENCY.search(message_text(message))
-                            for message in untrusted[:-1]))
             if independent and not benign_dialogue:
                 decision.evaluation_mode = "independent_turn"
                 decision.requires_output_guard = True
                 decision.reason = "independent_turn_requires_output_guard"
             elif not benign_dialogue:
-                result = self.input_filter.analyze(combined, roles=roles, use_ml=use_ml)
+                analyze = getattr(self.input_filter, "analyze_evidence", None)
+                result = (analyze(combined, roles=roles, use_ml=use_ml, origin="tool") if callable(analyze)
+                          else self.input_filter.analyze(combined, roles=roles, use_ml=use_ml))
                 decision.blocked |= result.blocked
                 decision.requires_output_guard |= result.requires_output_guard
+                decision.requires_scope_review |= getattr(result, "requires_scope_review", False)
+                if result.ml is not None:
+                    decision.input_risk_score = result.ml.probability
                 if result.blocked:
                     decision.matched_rules.extend(rule["name"] for rule in result.heuristic.matched_rules)
                     if result.ml and result.ml.blocked:

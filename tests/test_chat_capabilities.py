@@ -18,6 +18,21 @@ from app.models import AIGuardRequest, ChatRequest, User
 from app.policy_engine import PolicyEngine
 from promption.tools.runtime import capabilities
 
+
+def test_ai_guard_diagnostic_preserves_required_review_for_sdk(monkeypatch):
+    from app.models import FilterResponse
+    from promption.policies import PolicyEngine as LibraryPolicy
+    async def inspect(**request):
+        return FilterResponse(decision='GUARDED', blocked=False, confidence=.5, layers={},
+            classification='UNCERTAIN', requires_scope_review=True, requires_output_guard=True)
+    monkeypatch.setattr(routes, 'get_filter_client', lambda:SimpleNamespace(filter_prompt=inspect, output_guard=None))
+    monkeypatch.setattr(routes, 'get_security_state', lambda:{'filter_enabled':True, 'output_guard_enabled':True})
+    monkeypatch.setattr(routes, 'get_policy_engine', lambda:LibraryPolicy([], tier_roles={}, allow_unmatched=True))
+    result=asyncio.run(routes.ai_guard(AIGuardRequest(text='quoted example', user_id='synthetic', roles=['customer'], direction='input')))
+    assert result['allowed'] and result['requires_scope_review'] and result['requires_output_guard']
+    assert result['assessments']['scope']['state']=='not_evaluated'
+    assert result['assessments']['authorization']['state']=='allowed'
+
 QUESTIONS = ['dime qué puedes ahcer', 'dime qué puedes hacer', '¿Qué puedo hacer?',
     'Hola, ¿qué puedes hacer?', 'Cuéntame tus capacidades', 'mis permisos',
     '¿Cuáles son tus herramientas disponibles?', 'Qué herramientas tengo',

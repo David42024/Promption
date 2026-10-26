@@ -1,0 +1,9 @@
+{
+  "name": "promption-research-runners",
+  "private": true,
+  "type": "module",
+  "description": "Provider adapters for reproducible research runs; native Google adapter preserves Gemini tool signatures.",
+  "dependencies": {
+    "@ai-sdk/google": "3.0.138"
+  }
+}

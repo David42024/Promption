@@ -1,0 +1,910 @@
+{
+  "current": {
+    "library_version": "1.6.0",
+    "study": "offline_profile_triage",
+    "cases": 240,
+    "executions": 720,
+    "elapsed_seconds": 25.748384747000273,
+    "api_calls": 0,
+    "cost_usd": 0,
+    "source_sha256": "ac68860b773ad7b52c8a5f4b2d8a471344cf6c8b543008312b22b373c711cf3e",
+    "model_sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa",
+    "source_sha256_by_file": {
+      "promption/guard.py": "c98809aa6b89fbd1254d1f6c48b0fb3523325a3a0538b2febc43de74c6f3131c",
+      "promption/profiles.py": "ef93fbf61fd0cf7c4af7d106d0cc71fb9b7425960eb85ecebd11fc718c5649a8",
+      "promption/scope.py": "36e0cd172ab8babf26ad1def03595edfbd467169fc0de710e41e657a2ff6e7d0",
+      "promption/evidence.py": "9047a1d05f57fab8c31b10ee83c505ec9ef26119e53525384f0f34cc465a5deb",
+      "promption/assessments.py": "21827e3b37349f81e9d79c57bc71b07d24ebc1cabb45692ea47f5a2e70530fa3",
+      "promption/conversation_guard.py": "043b6c089830682a22384b7bdb83c455cc4c433e0a5baca1f6f300730b9c22de",
+      "promption/filter/ensemble_filter.py": "81eafe378386e096b7fdd45853425c02b7beae6068bfe3661d118d923c8f0542",
+      "promption/filter/heuristic_filter.py": "cd2d4f46bb9c5f6ca692bf1c8d28ffeae00b3a2f7355e00ebe2ef0bfd025d1e6",
+      "config/config.yaml": "b98e99c2774ef4d57970ae2ad5f6a6058050a38db09f3781db3a241a076f39b2",
+      "config/heuristics.yaml": "06c5efd044651ccd61bc233851a051f6bb47db8db16f58a22a735e9b350ed3f7"
+    },
+    "runner_sha256": "de1928875b2a456bf422f4915dce1856993226989ccf0c78dd93e69315f25f61",
+    "protection": {
+      "conversational": {
+        "profile": "conversational",
+        "input_uncertainty": "review",
+        "scope_ambiguity": "clarify"
+      },
+      "balanced": {
+        "profile": "balanced",
+        "input_uncertainty": "review",
+        "scope_ambiguity": "clarify"
+      },
+      "strict": {
+        "profile": "strict",
+        "input_uncertainty": "review",
+        "scope_ambiguity": "block"
+      }
+    },
+    "counts": {
+      "corpus_label": {
+        "public:0": 60,
+        "lumina:1": 60,
+        "public:1": 60,
+        "lumina:0": 60
+      },
+      "languages": {
+        "en": 98,
+        "es_or_mixed_unverified": 120,
+        "es": 22
+      },
+      "with_history": 107
+    },
+    "profiles": {
+      "conversational": {
+        "pooled": {
+          "n": 240,
+          "TP": 69,
+          "FP": 6,
+          "FN": 51,
+          "TN": 114,
+          "fpr": 0.05,
+          "fnr_veto": 0.425,
+          "routes": {
+            "review": 163,
+            "block": 75,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 51,
+          "benign_review": 112,
+          "scope_review_required": 206
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 27,
+            "FP": 1,
+            "FN": 33,
+            "TN": 59,
+            "fpr": 0.016666666666666666,
+            "fnr_veto": 0.55,
+            "routes": {
+              "review": 90,
+              "block": 28,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 33,
+            "benign_review": 57,
+            "scope_review_required": 109
+          },
+          "public": {
+            "n": 120,
+            "TP": 42,
+            "FP": 5,
+            "FN": 18,
+            "TN": 55,
+            "fpr": 0.08333333333333333,
+            "fnr_veto": 0.3,
+            "routes": {
+              "review": 73,
+              "block": 47
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 18,
+            "benign_review": 55,
+            "scope_review_required": 97
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 35,
+            "FP": 3,
+            "FN": 10,
+            "TN": 50,
+            "fpr": 0.05660377358490566,
+            "fnr_veto": 0.2222222222222222,
+            "routes": {
+              "review": 60,
+              "block": 38
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 10,
+            "benign_review": 50,
+            "scope_review_required": 77
+          },
+          "es": {
+            "n": 22,
+            "TP": 7,
+            "FP": 2,
+            "FN": 8,
+            "TN": 5,
+            "fpr": 0.2857142857142857,
+            "fnr_veto": 0.5333333333333333,
+            "routes": {
+              "block": 9,
+              "review": 13
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 8,
+            "benign_review": 5,
+            "scope_review_required": 20
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 27,
+            "FP": 1,
+            "FN": 33,
+            "TN": 59,
+            "fpr": 0.016666666666666666,
+            "fnr_veto": 0.55,
+            "routes": {
+              "review": 90,
+              "block": 28,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 33,
+            "benign_review": 57,
+            "scope_review_required": 109
+          }
+        }
+      },
+      "balanced": {
+        "pooled": {
+          "n": 240,
+          "TP": 69,
+          "FP": 6,
+          "FN": 51,
+          "TN": 114,
+          "fpr": 0.05,
+          "fnr_veto": 0.425,
+          "routes": {
+            "review": 163,
+            "block": 75,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 51,
+          "benign_review": 112,
+          "scope_review_required": 206
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 27,
+            "FP": 1,
+            "FN": 33,
+            "TN": 59,
+            "fpr": 0.016666666666666666,
+            "fnr_veto": 0.55,
+            "routes": {
+              "review": 90,
+              "block": 28,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 33,
+            "benign_review": 57,
+            "scope_review_required": 109
+          },
+          "public": {
+            "n": 120,
+            "TP": 42,
+            "FP": 5,
+            "FN": 18,
+            "TN": 55,
+            "fpr": 0.08333333333333333,
+            "fnr_veto": 0.3,
+            "routes": {
+              "review": 73,
+              "block": 47
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 18,
+            "benign_review": 55,
+            "scope_review_required": 97
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 35,
+            "FP": 3,
+            "FN": 10,
+            "TN": 50,
+            "fpr": 0.05660377358490566,
+            "fnr_veto": 0.2222222222222222,
+            "routes": {
+              "review": 60,
+              "block": 38
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 10,
+            "benign_review": 50,
+            "scope_review_required": 77
+          },
+          "es": {
+            "n": 22,
+            "TP": 7,
+            "FP": 2,
+            "FN": 8,
+            "TN": 5,
+            "fpr": 0.2857142857142857,
+            "fnr_veto": 0.5333333333333333,
+            "routes": {
+              "block": 9,
+              "review": 13
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 8,
+            "benign_review": 5,
+            "scope_review_required": 20
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 27,
+            "FP": 1,
+            "FN": 33,
+            "TN": 59,
+            "fpr": 0.016666666666666666,
+            "fnr_veto": 0.55,
+            "routes": {
+              "review": 90,
+              "block": 28,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 33,
+            "benign_review": 57,
+            "scope_review_required": 109
+          }
+        }
+      },
+      "strict": {
+        "pooled": {
+          "n": 240,
+          "TP": 69,
+          "FP": 6,
+          "FN": 51,
+          "TN": 114,
+          "fpr": 0.05,
+          "fnr_veto": 0.425,
+          "routes": {
+            "review": 163,
+            "block": 75,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 51,
+          "benign_review": 112,
+          "scope_review_required": 206
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 27,
+            "FP": 1,
+            "FN": 33,
+            "TN": 59,
+            "fpr": 0.016666666666666666,
+            "fnr_veto": 0.55,
+            "routes": {
+              "review": 90,
+              "block": 28,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 33,
+            "benign_review": 57,
+            "scope_review_required": 109
+          },
+          "public": {
+            "n": 120,
+            "TP": 42,
+            "FP": 5,
+            "FN": 18,
+            "TN": 55,
+            "fpr": 0.08333333333333333,
+            "fnr_veto": 0.3,
+            "routes": {
+              "review": 73,
+              "block": 47
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 18,
+            "benign_review": 55,
+            "scope_review_required": 97
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 35,
+            "FP": 3,
+            "FN": 10,
+            "TN": 50,
+            "fpr": 0.05660377358490566,
+            "fnr_veto": 0.2222222222222222,
+            "routes": {
+              "review": 60,
+              "block": 38
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 10,
+            "benign_review": 50,
+            "scope_review_required": 77
+          },
+          "es": {
+            "n": 22,
+            "TP": 7,
+            "FP": 2,
+            "FN": 8,
+            "TN": 5,
+            "fpr": 0.2857142857142857,
+            "fnr_veto": 0.5333333333333333,
+            "routes": {
+              "block": 9,
+              "review": 13
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 8,
+            "benign_review": 5,
+            "scope_review_required": 20
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 27,
+            "FP": 1,
+            "FN": 33,
+            "TN": 59,
+            "fpr": 0.016666666666666666,
+            "fnr_veto": 0.55,
+            "routes": {
+              "review": 90,
+              "block": 28,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 33,
+            "benign_review": 57,
+            "scope_review_required": 109
+          }
+        }
+      }
+    },
+    "historical_scope_replay": {
+      "profiles": {
+        "conversational": {
+          "saved_verdicts": 128,
+          "allow": 95,
+          "no_saved_verdict": 112,
+          "block": 22,
+          "clarify": 11
+        },
+        "balanced": {
+          "saved_verdicts": 128,
+          "allow": 95,
+          "no_saved_verdict": 112,
+          "block": 22,
+          "clarify": 11
+        },
+        "strict": {
+          "saved_verdicts": 128,
+          "allow": 95,
+          "no_saved_verdict": 112,
+          "block": 33
+        }
+      },
+      "note": "First recorded scope verdict per case, from the prior 1.4.0 API study. Separate policy replay, not new semantic inference or a combined pipeline result."
+    },
+    "limits": [
+      "Already exposed 240-case stratified regression sample; provisional source/silver labels, no independent gold.",
+      "Each profile runs the actual local heuristic, trained ML, conversation guard and input policy, with identical inputs.",
+      "No LLM, newly evaluated semantic intent/scope, generation, tools or exfiltration attempts.",
+      "Review is not permission to generate. Required semantic review and Output Guard must still run; absent required scope evaluator fails closed.",
+      "FN here means no input veto, not successful injection; report review and direct allow separately.",
+      "Full-episode indirect-injection labels may describe later tool content absent from this input-only evaluation.",
+      "Language for Lumina is es_or_mixed_unverified. Do not describe all 240 cases as confirmed Spanish/English.",
+      "Scores are uncalibrated detection scores, not risk probabilities."
+    ],
+    "public_dataset_counts": {
+      "Benigno": 60,
+      "Custom": 25,
+      "Jailbreak": 32,
+      "OWASP": 1,
+      "NEPI": 2
+    }
+  },
+  "baseline150": {
+    "library_version": "1.5.0",
+    "study": "offline_profile_triage",
+    "cases": 240,
+    "executions": 720,
+    "elapsed_seconds": 20.201335279999512,
+    "api_calls": 0,
+    "cost_usd": 0,
+    "source_sha256": "ac68860b773ad7b52c8a5f4b2d8a471344cf6c8b543008312b22b373c711cf3e",
+    "model_sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa",
+    "source_sha256_by_file": {
+      "promption/guard.py": "2c70d92240fb3664e0cdf45c04a0b1f0dc8ed19e28b9ec37deb877e2a18bcd52",
+      "promption/profiles.py": "4052d04d9054caab032bf0eb42168de3b360d6146cf798e1a58448a449488a37",
+      "promption/scope.py": "e481772196ccf94fb9dbf5ae86d3acd2e00af3f184302dffd88dcc1f381710eb",
+      "promption/evidence.py": "10479e2820ae0b0309d28c7ec2fbf7e60d1bb6e76225df39f27ec37df17ab922",
+      "promption/assessments.py": "21827e3b37349f81e9d79c57bc71b07d24ebc1cabb45692ea47f5a2e70530fa3",
+      "promption/conversation_guard.py": "5ab4681aa6f0706a571ac9cfb9311184a500aee79d71394fce045ac3ee23a9b4",
+      "promption/filter/ensemble_filter.py": "0d87f71e8f6d3b0460f86ddf7029ba9a6f5f7afbe2961b03d6a6dedd40348c15",
+      "promption/filter/heuristic_filter.py": "e6619e505fc991781efe0771655d4a03e78a0276f5d4325b42a5571d7a58b109",
+      "config/config.yaml": "57b4c1f139908685ff74774602c14da6a1dd16745437b64bb820c8d635f83a4d",
+      "config/heuristics.yaml": "78aa2388215f6b7353f220d9598a5048f9f6531465287a8778f709588ba40c16"
+    },
+    "runner_sha256": "de1928875b2a456bf422f4915dce1856993226989ccf0c78dd93e69315f25f61",
+    "protection": {
+      "conversational": {
+        "profile": "conversational",
+        "input_uncertainty": "review",
+        "scope_ambiguity": "clarify"
+      },
+      "balanced": {
+        "profile": "balanced",
+        "input_uncertainty": "review",
+        "scope_ambiguity": "clarify"
+      },
+      "strict": {
+        "profile": "strict",
+        "input_uncertainty": "block",
+        "scope_ambiguity": "block"
+      }
+    },
+    "counts": {
+      "corpus_label": {
+        "public:0": 60,
+        "lumina:1": 60,
+        "public:1": 60,
+        "lumina:0": 60
+      },
+      "languages": {
+        "en": 98,
+        "es_or_mixed_unverified": 120,
+        "es": 22
+      },
+      "with_history": 107
+    },
+    "profiles": {
+      "conversational": {
+        "pooled": {
+          "n": 240,
+          "TP": 101,
+          "FP": 10,
+          "FN": 19,
+          "TN": 110,
+          "fpr": 0.08333333333333333,
+          "fnr_veto": 0.15833333333333333,
+          "routes": {
+            "review": 127,
+            "block": 111,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 19,
+          "benign_review": 108,
+          "scope_review_required": 0
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 48,
+            "FP": 4,
+            "FN": 12,
+            "TN": 56,
+            "fpr": 0.06666666666666667,
+            "fnr_veto": 0.2,
+            "routes": {
+              "block": 52,
+              "review": 66,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 12,
+            "benign_review": 54,
+            "scope_review_required": 0
+          },
+          "public": {
+            "n": 120,
+            "TP": 53,
+            "FP": 6,
+            "FN": 7,
+            "TN": 54,
+            "fpr": 0.1,
+            "fnr_veto": 0.11666666666666667,
+            "routes": {
+              "review": 61,
+              "block": 59
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 7,
+            "benign_review": 54,
+            "scope_review_required": 0
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 40,
+            "FP": 3,
+            "FN": 5,
+            "TN": 50,
+            "fpr": 0.05660377358490566,
+            "fnr_veto": 0.1111111111111111,
+            "routes": {
+              "review": 55,
+              "block": 43
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 5,
+            "benign_review": 50,
+            "scope_review_required": 0
+          },
+          "es": {
+            "n": 22,
+            "TP": 13,
+            "FP": 3,
+            "FN": 2,
+            "TN": 4,
+            "fpr": 0.42857142857142855,
+            "fnr_veto": 0.13333333333333333,
+            "routes": {
+              "block": 16,
+              "review": 6
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 2,
+            "benign_review": 4,
+            "scope_review_required": 0
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 48,
+            "FP": 4,
+            "FN": 12,
+            "TN": 56,
+            "fpr": 0.06666666666666667,
+            "fnr_veto": 0.2,
+            "routes": {
+              "block": 52,
+              "review": 66,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 12,
+            "benign_review": 54,
+            "scope_review_required": 0
+          }
+        }
+      },
+      "balanced": {
+        "pooled": {
+          "n": 240,
+          "TP": 101,
+          "FP": 10,
+          "FN": 19,
+          "TN": 110,
+          "fpr": 0.08333333333333333,
+          "fnr_veto": 0.15833333333333333,
+          "routes": {
+            "review": 127,
+            "block": 111,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 19,
+          "benign_review": 108,
+          "scope_review_required": 0
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 48,
+            "FP": 4,
+            "FN": 12,
+            "TN": 56,
+            "fpr": 0.06666666666666667,
+            "fnr_veto": 0.2,
+            "routes": {
+              "block": 52,
+              "review": 66,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 12,
+            "benign_review": 54,
+            "scope_review_required": 0
+          },
+          "public": {
+            "n": 120,
+            "TP": 53,
+            "FP": 6,
+            "FN": 7,
+            "TN": 54,
+            "fpr": 0.1,
+            "fnr_veto": 0.11666666666666667,
+            "routes": {
+              "review": 61,
+              "block": 59
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 7,
+            "benign_review": 54,
+            "scope_review_required": 0
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 40,
+            "FP": 3,
+            "FN": 5,
+            "TN": 50,
+            "fpr": 0.05660377358490566,
+            "fnr_veto": 0.1111111111111111,
+            "routes": {
+              "review": 55,
+              "block": 43
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 5,
+            "benign_review": 50,
+            "scope_review_required": 0
+          },
+          "es": {
+            "n": 22,
+            "TP": 13,
+            "FP": 3,
+            "FN": 2,
+            "TN": 4,
+            "fpr": 0.42857142857142855,
+            "fnr_veto": 0.13333333333333333,
+            "routes": {
+              "block": 16,
+              "review": 6
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 2,
+            "benign_review": 4,
+            "scope_review_required": 0
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 48,
+            "FP": 4,
+            "FN": 12,
+            "TN": 56,
+            "fpr": 0.06666666666666667,
+            "fnr_veto": 0.2,
+            "routes": {
+              "block": 52,
+              "review": 66,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 12,
+            "benign_review": 54,
+            "scope_review_required": 0
+          }
+        }
+      },
+      "strict": {
+        "pooled": {
+          "n": 240,
+          "TP": 120,
+          "FP": 118,
+          "FN": 0,
+          "TN": 2,
+          "fpr": 0.9833333333333333,
+          "fnr_veto": 0.0,
+          "routes": {
+            "block": 238,
+            "allow": 2
+          },
+          "attacks_direct_allow": 0,
+          "attacks_review": 0,
+          "benign_review": 0,
+          "scope_review_required": 0
+        },
+        "by_corpus": {
+          "lumina": {
+            "n": 120,
+            "TP": 60,
+            "FP": 58,
+            "FN": 0,
+            "TN": 2,
+            "fpr": 0.9666666666666667,
+            "fnr_veto": 0.0,
+            "routes": {
+              "block": 118,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 0,
+            "benign_review": 0,
+            "scope_review_required": 0
+          },
+          "public": {
+            "n": 120,
+            "TP": 60,
+            "FP": 60,
+            "FN": 0,
+            "TN": 0,
+            "fpr": 1.0,
+            "fnr_veto": 0.0,
+            "routes": {
+              "block": 120
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 0,
+            "benign_review": 0,
+            "scope_review_required": 0
+          }
+        },
+        "by_language": {
+          "en": {
+            "n": 98,
+            "TP": 45,
+            "FP": 53,
+            "FN": 0,
+            "TN": 0,
+            "fpr": 1.0,
+            "fnr_veto": 0.0,
+            "routes": {
+              "block": 98
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 0,
+            "benign_review": 0,
+            "scope_review_required": 0
+          },
+          "es": {
+            "n": 22,
+            "TP": 15,
+            "FP": 7,
+            "FN": 0,
+            "TN": 0,
+            "fpr": 1.0,
+            "fnr_veto": 0.0,
+            "routes": {
+              "block": 22
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 0,
+            "benign_review": 0,
+            "scope_review_required": 0
+          },
+          "es_or_mixed_unverified": {
+            "n": 120,
+            "TP": 60,
+            "FP": 58,
+            "FN": 0,
+            "TN": 2,
+            "fpr": 0.9666666666666667,
+            "fnr_veto": 0.0,
+            "routes": {
+              "block": 118,
+              "allow": 2
+            },
+            "attacks_direct_allow": 0,
+            "attacks_review": 0,
+            "benign_review": 0,
+            "scope_review_required": 0
+          }
+        }
+      }
+    },
+    "historical_scope_replay": {
+      "profiles": {
+        "conversational": {
+          "saved_verdicts": 128,
+          "allow": 95,
+          "no_saved_verdict": 112,
+          "block": 22,
+          "clarify": 11
+        },
+        "balanced": {
+          "saved_verdicts": 128,
+          "allow": 95,
+          "no_saved_verdict": 112,
+          "block": 22,
+          "clarify": 11
+        },
+        "strict": {
+          "saved_verdicts": 128,
+          "allow": 95,
+          "no_saved_verdict": 112,
+          "block": 33
+        }
+      },
+      "note": "First recorded scope verdict per case, from the prior 1.4.0 API study. Separate policy replay, not new semantic inference or a combined pipeline result."
+    },
+    "limits": [
+      "Already exposed 240-case stratified regression sample; provisional source/silver labels, no independent gold.",
+      "Each profile runs the actual local heuristic, trained ML, conversation guard and input policy, with identical inputs.",
+      "No LLM, newly evaluated semantic intent/scope, generation, tools or exfiltration attempts.",
+      "Review is not permission to generate. Required semantic review and Output Guard must still run; absent required scope evaluator fails closed.",
+      "FN here means no input veto, not successful injection; report review and direct allow separately.",
+      "Full-episode indirect-injection labels may describe later tool content absent from this input-only evaluation.",
+      "Language for Lumina is es_or_mixed_unverified. Do not describe all 240 cases as confirmed Spanish/English.",
+      "Scores are uncalibrated detection scores, not risk probabilities."
+    ]
+  },
+  "local_http_sdk_smoke": {
+    "actual_local_http": true,
+    "actual_ai_sdk": true,
+    "model": "simulated",
+    "external_api_calls": 0,
+    "required_review_without_evaluator_blocked": true,
+    "results": [
+      {
+        "profile": "conversational",
+        "quote_scope_review": true,
+        "raw_quote_preserved": true,
+        "output_checked": true,
+        "indirect_tool_veto": true,
+        "unauthorized_effects": 0
+      },
+      {
+        "profile": "balanced",
+        "quote_scope_review": true,
+        "raw_quote_preserved": true,
+        "output_checked": true,
+        "indirect_tool_veto": true,
+        "unauthorized_effects": 0
+      },
+      {
+        "profile": "strict",
+        "quote_scope_review": true,
+        "raw_quote_preserved": true,
+        "output_checked": true,
+        "indirect_tool_veto": true,
+        "unauthorized_effects": 0
+      }
+    ]
+  },
+  "comparison_scope": "Offline input veto/triage only; no new semantic model evaluation or exfiltration measurement.",
+  "implementation_verification": {
+    "python": {
+      "passed": 1196,
+      "skipped": 10
+    },
+    "sdk_native": {
+      "passed": 140
+    },
+    "typescript": "passed",
+    "offline_benchmark_rows": 661,
+    "api_health_status": 200,
+    "dashboard_health_status": 200,
+    "dashboard_apptest": "passed",
+    "wheel_and_npm_isolated_imports": "passed",
+    "external_ai_calls": 0,
+    "five_requirements": {
+      "independent_decisions": "tests/test_contextual_decisions.py and packages/ai-sdk/test/decision-axes.test.js",
+      "fixed_missing_information_clarifications": "Python sync/async, native generateText/streamText in all profiles",
+      "weak_signals_require_review": "Real HTTP API-SDK smoke and malformed-flag tests; conclusive veto OR preserved",
+      "quote_origin_and_adoption": "Raw quote retained; follow-up adoption and tool-origin veto tests",
+      "es_en_calibration": "data/calibration/threshold_selection.json; exploratory, not independent human gold"
+    }
+  }
+}

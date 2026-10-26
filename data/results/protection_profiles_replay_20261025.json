@@ -1,0 +1,33 @@
+{
+  "scope": "Saved semantic ambiguity verdicts only, not full pipeline or new model inference",
+  "source": "output/corpus_repeat_140_20261024",
+  "distinct_protected_records": 240,
+  "profiles": {
+    "conversational": {
+      "reviewed": 13,
+      "block": 2,
+      "clarify": 11,
+      "blocked_to_clarification": 8,
+      "source_negative_blocked_to_clarification": 8
+    },
+    "balanced": {
+      "reviewed": 13,
+      "block": 2,
+      "clarify": 11,
+      "blocked_to_clarification": 8,
+      "source_negative_blocked_to_clarification": 8
+    },
+    "strict": {
+      "reviewed": 13,
+      "block": 13,
+      "clarification_to_block": 3
+    }
+  },
+  "api_calls": 0,
+  "limits": [
+    "Uses the same already observed cases and automatic/silver labels.",
+    "A clarification neither authorizes generation/tools nor completes a task.",
+    "Strict input uncertainty and new model judgments are not replayed.",
+    "Does not establish new FPR/FNR, ASR, task completion or exfiltration rates."
+  ]
+}

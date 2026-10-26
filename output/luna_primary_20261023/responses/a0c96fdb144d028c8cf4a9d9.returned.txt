@@ -1,0 +1,1 @@
+{"classification":"IN_SCOPE","reason":"in_scope","intent":{"name":"public_information","attack":"none","relation":"standalone","origin":"none","confidence":1,"evidence":[]}}

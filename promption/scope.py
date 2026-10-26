@@ -5,8 +5,38 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Callable, Literal
 import math
+import re
 
 from .intent import IntentAssessment, validate_intent
+from .assessments import scope_assessments
+
+CLARIFICATION_TEXT = "¿Puedes precisar qué información pública necesitas o qué tarea quieres realizar?"
+
+
+def missing_reference(text, messages=None):
+    previous = list(messages or [])
+    if previous and previous[-1].get("role") == "user" and previous[-1].get("content") == text:
+        previous.pop()
+    return not previous and bool(re.fullmatch(r"(?:hazlo|h[aá]zlo|exp[oó]rtalo|contin[uú]a|eso|do it|export it|continue|that)[.!?\s]*", text.strip(), re.I))
+
+
+def missing_reference_decision():
+    return ScopeDecision("UNCERTAIN", "missing_information", 403,
+        intent=IntentAssessment("clarification", "none", "unresolved", "none", 0, ()))
+
+
+def needs_clarification(decision, *, tool=None, protection=None):
+    """Offer a fixed response without authorizing generation, data access or tools."""
+    from .profiles import resolve_protection
+    settings = resolve_protection(protection)
+    intent = decision.intent
+    excluded = {"protected_information", "instruction_override", "privilege_escalation"}
+    if settings.profile != "conversational":
+        excluded.add("unknown")
+    return ((settings.scope_ambiguity == "clarify" or decision.reason == "missing_information") and tool is None
+            and decision.classification == "UNCERTAIN" and decision.reason in {"ambiguous", "missing_information"}
+            and intent is not None and intent.attack in {"none", "unknown"} and intent.origin == "none"
+            and intent.name not in excluded)
 
 
 @dataclass(frozen=True)
@@ -28,6 +58,11 @@ class ScopeDecision:
 
     def to_dict(self) -> dict:
         result = {**asdict(self), "allowed": self.allowed}
+        result["assessments"] = scope_assessments(self)
+        result["control"] = "operational" if self.status >= 500 or self.reason == "scope_truncated" else "scope"
+        result["injection"] = ("not_evaluated" if self.intent is None else
+                               "not_detected" if self.intent.attack == "none" else
+                               "uncertain" if self.intent.attack == "unknown" else "detected")
         if self.intent is not None:
             result["intent"] = self.intent.to_dict()
         else:
@@ -39,7 +74,7 @@ def _validated(result) -> ScopeDecision:
     data = result.to_dict() if isinstance(result, ScopeDecision) else result
     reasons = {"IN_SCOPE": {"in_scope"},
                "OUT_OF_SCOPE": {"topic_outside_scope", "system_limit"},
-               "UNCERTAIN": {"ambiguous", "scope_timeout", "scope_unavailable", "scope_truncated", "invalid_scope_response"}}
+               "UNCERTAIN": {"ambiguous", "missing_information", "scope_timeout", "scope_unavailable", "scope_truncated", "invalid_scope_response"}}
     if (not isinstance(data, dict) or not isinstance(data.get("classification"), str)
             or not isinstance(data.get("reason"), str)
             or data["reason"] not in reasons.get(data["classification"], set())):
@@ -152,10 +187,10 @@ class AsyncScopeGuard(ScopeGuard):
 
 def _context_decision(decision, messages, minimum_confidence, tool=None):
     from dataclasses import replace
+    if decision.reason in {"scope_timeout", "scope_unavailable", "scope_truncated", "invalid_scope_response"}:
+        return decision
     intent = decision.intent
     if intent is None:
-        if decision.reason in {"scope_timeout", "scope_unavailable", "scope_truncated", "invalid_scope_response"}:
-            return decision
         return replace(decision, classification="UNCERTAIN", reason="invalid_scope_response", status=503)
     evidence = messages or []
     has_proposal = (isinstance(tool, dict) and isinstance(tool.get("name"), str)
@@ -166,6 +201,8 @@ def _context_decision(decision, messages, minimum_confidence, tool=None):
                 evidence[index].get("role") == "tool" for index in intent.evidence))):
         return replace(decision, classification="UNCERTAIN", reason="invalid_scope_response", status=503,
                        intent=None)
+    if decision.reason == "missing_information":
+        return decision
     if intent.confidence < minimum_confidence or intent.relation == "unresolved" or intent.attack == "unknown":
         return replace(decision, classification="UNCERTAIN", reason="ambiguous", status=403)
     return decision

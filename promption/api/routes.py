@@ -23,6 +23,7 @@ from promption.limiter import concurrency_limiter, rate_limiter
 from promption.llm import get_llm_client
 from promption.utils.config import load_config
 from promption.utils.logger import logger
+from promption.assessments import assess
 
 router = APIRouter()
 _CONF = load_config()
@@ -336,7 +337,7 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
             try:
                 conversation = ConversationGuard(flt).analyze(
                     [message.model_dump() for message in req.messages], roles=merged_roles,
-                    use_ml=req.use_ml, current_text=req.text)
+                    use_ml=req.use_ml, current_text=req.text, isolate_history=req.isolate_history)
             except ConversationLimitError as exc:
                 raise HTTPException(status_code=413, detail="Conversation security context exceeds limits") from exc
             except MLError as exc:
@@ -348,12 +349,14 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
                 res = replace(res, decision="GUARDED")
         latency = (time.perf_counter() - t0) * 1000
 
-        rules = [{"name": r["name"], "severity": r["severity"], "description": r.get("description", "")}
+        rules = [{"name": r["name"], "severity": r["severity"], "description": r.get("description", ""), "action": r.get("action", "block")}
                  for r in res.heuristic.matched_rules]
         ml_info = {
             "available": res.ml is not None,
             "blocked": res.ml.blocked if res.ml else None,
             "probability": res.ml.probability if res.ml else None,
+            "score": res.ml.probability if res.ml else None,
+            "score_kind": "uncalibrated_detection_score",
             "threshold": res.ml.threshold if res.ml else None,
             "status": res.merged_features.get("ml_status", "UNKNOWN"),
             "error_code": res.merged_features.get("ml_error_code"),
@@ -379,7 +382,7 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
             "ml": ml_info,
             "additional_ml": {"status": res.merged_features.get("additional_status", "NOT_CONFIGURED"),
                               "results": res.merged_features.get("additional_filters", [])},
-            "ensemble": {"score": res.score,
+            "ensemble": {"score": res.score, "score_kind": "uncalibrated_detection_score",
                          "decision": res.decision,
                          "requires_output_guard": res.requires_output_guard,
                          "heuristic_band": res.merged_features.get("heuristic_band"),
@@ -396,6 +399,9 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
         }
         if conversation is not None:
             layers["conversation"] = conversation.metadata()
+        scope_review = res.requires_scope_review or bool(conversation and conversation.requires_scope_review)
+        layers["evidence"] = res.merged_features.get("evidence", {})
+        layers["ensemble"]["requires_scope_review"] = scope_review
         logger.info("Filter [%s] tenant=%s user=%s roles=%s length=%d in %.1fms",
                     res.decision, tenant.tenant_id, req.user_id, req.roles, len(req.text), latency)
         
@@ -422,8 +428,13 @@ def filter_prompt(req: FilterRequest, tenant: TenantContext = Depends(_require_f
             sanitized=sanitize_prompt(req.text, res) if res.blocked else req.text,
             tenant_id=tenant.tenant_id,
             classification=classification,
+            input_risk_score=max((value for value in (res.ml.probability if res.ml else None,
+                conversation.input_risk_score if conversation else None) if value is not None), default=None),
             requires_review=requires_review,
             requires_output_guard=res.requires_output_guard,
+            requires_scope_review=scope_review,
+            assessments=assess(None, "injection", "denied" if res.blocked else "uncertain" if classification == "UNCERTAIN" else "allowed",
+                               "detector_veto" if res.blocked else "review_required" if classification == "UNCERTAIN" else "no_attack_detected", "input_filter"),
         )
 
 

@@ -100,6 +100,7 @@ class FilterClient:
         use_ml: bool = True,
         messages: list[dict] | None = None,
         timeout: float | None = None,
+        isolate_history: bool = False,
     ) -> FilterResponse:
         """Filter a prompt through the Filter API"""
         req_timeout = timeout if timeout is not None else self.timeout
@@ -113,6 +114,7 @@ class FilterClient:
                     json={
                         "text": text,
                         "use_ml": use_ml,
+                        **({"isolate_history": True} if isolate_history else {}),
                         "messages": messages or [],
                         "user_id": identity.user_id,
                         "roles": list(identity.roles),

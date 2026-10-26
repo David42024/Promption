@@ -33,10 +33,11 @@ rules:
     pattern: "system prompt|initial prompt|your instructions|your system message|reveal (the )?(original|system) prompt"
     description: "Referencia a instrucciones internas; no sustituye al evaluador de alcance"
     severity: "high"
+    action: review
     enabled: true
 
   - name: "system_instruction_extraction"
-    pattern: '\b(?:show|print|reveal|repeat|dump|disclose|output|give\s+me|tell\s+me|what\s+(?:are|is)|muestra\w*|imprime\w*|revela\w*|repite|transcribe|devuelve|dame|dime|copia|exporta|traduce)\b[^.!?;]{0,100}\b(?:system\s+(?:prompt|message|instructions)|initial\s+prompt|(?:your|original)\s+instructions|prompt\s+(?:del?\s+)?sistema|mensaje\s+(?:del?\s+)?sistema|instrucciones\s+(?:del?\s+)?sistema|(?:tus|las)\s+(?:instrucciones|directivas)\s+(?:internas|iniciales|originales))\b'
+    pattern: '\b(?:show|print|reveal|repeat|dump|disclose|output|translate|give\s+me|tell\s+me|muestra\w*|imprime\w*|revela\w*|repite|transcribe|devuelve|dame|dime|copia|exporta|traduce)\b[^.!?;]{0,100}\b(?:system\s+(?:prompt|message|instructions)|initial\s+prompt|(?:your\s+(?:(?:original|internal|hidden)\s+){0,3}instructions|original\s+instructions)|prompt\s+(?:del?\s+)?sistema|mensaje\s+(?:del?\s+)?sistema|instrucciones\s+(?:del?\s+)?sistema|(?:tus|las)\s+(?:instrucciones|directivas)\s+(?:internas|iniciales|originales))\b'
     description: "Petición explícita de extraer o transformar instrucciones internas ES/EN"
     severity: "high"
     enabled: true
@@ -123,6 +124,7 @@ rules:
     pattern: '(?:token|c[óo]digo).{0,10}(?:secreto|secret|confidencial|interno(?!\s+(?:de\s+(?:cada\s+|los\s+|un\s+|el\s+)?productos?|del\s+producto)\b))'
     description: "Mención directa de token secreto/código secreto"
     severity: "high"
+    action: review
     enabled: true
 
   - name: "protected_credential_extraction"
@@ -138,7 +140,7 @@ rules:
     enabled: true
 
   - name: "private_file_extraction"
-    pattern: '\b(?:lee|abre|descarga|muestra\w*|imprime\w*|copia|exporta|read|open|download|show|print|dump)\s+(?:(?:el|tu|the|your)\s+)?(?:(?:archivo|fichero|file)\s+)?(?:\.env\b|/etc/(?:passwd|shadow)\b|id_rsa\b)'
+    pattern: '\b(?:lee|abre|descarga|muestra\w*|imprime\w*|copia|exporta|read|open|download|show|print|dump)\s+(?:(?:el|tu|the|your)\s+)?(?:(?:server|local)\s+)?(?:(?:archivo|fichero|file)\s+)?(?:\.env\b|/etc/(?:passwd|shadow)\b|id_rsa\b)'
     description: "Lectura explícita de archivos de credenciales del servidor"
     severity: "high"
     enabled: true
@@ -219,12 +221,14 @@ rules:
     pattern: "(como|soy) (el )?(CISO|CEO|director ejecutivo|administrador|investigador forense).{0,80}(reveles|revela|muestra|proporciona|obedece|autorizo|necesito que)"
     description: "Autoridad auto-proclamada + extracción (ES)"
     severity: "high"
+    action: review
     enabled: true
 
   - name: "authority_claim_en"
     pattern: "(I am|as) (the )?(CEO|CISO|administrator|authorized .{0,20}investigator).{0,80}(reveal|provide|display|follow my order|authorize)"
     description: "Self-claimed authority + extraction (EN)"
     severity: "high"
+    action: review
     enabled: true
 
   - name: "audit_request"
@@ -273,6 +277,7 @@ rules:
     pattern: "(dame|muéstrame|dime).{0,30}(@|correo|email|mail)"
     description: "ES: petición de email/cliente"
     severity: "high"
+    action: review
     enabled: true
     applies_to_roles: ["customer"]
 
@@ -280,6 +285,7 @@ rules:
     pattern: "(dame|muéstrame|dime).{0,30}(tel[ée]fono|celular|phone|móvil)"
     description: "ES: petición de teléfono/cliente"
     severity: "high"
+    action: review
     enabled: true
     applies_to_roles: ["customer"]
 
@@ -287,6 +293,7 @@ rules:
     pattern: "(dame|muéstrame|dime).{0,30}(direcci[oó]n|domicilio|calle|avenida|colonia|c[oó]digo postal|ciudad|ubicaci[oó]n|vivienda)"
     description: "ES: petición de dirección/cliente"
     severity: "high"
+    action: review
     enabled: true
     applies_to_roles: ["customer"]
 
@@ -294,6 +301,7 @@ rules:
     pattern: "(dame|muéstrame|dime).{0,30}(identificacion|id|clave|número)"
     description: "ES: petición de ID/cliente"
     severity: "high"
+    action: review
     enabled: true
     applies_to_roles: ["customer"]
 
@@ -376,9 +384,15 @@ rules:
     enabled: true
 
   - name: "pseudo_system_delimiters"
-    pattern: "(<\\|system\\|>|\\[INPUT\\]|\\[SYSTEM\\]).{0,160}(allow yourself|act as|function in the capacity|continue output|ignore|override)"
+    pattern: "(<\\|system\\|>|\\[INPUT\\]|\\[SYSTEM\\]|\\{SYSTEM\\}|<system>|<developer>).{0,160}(allow yourself|act as|function in the capacity|continue output|ignore|override)"
     description: "Delimitadores pseudo-system combinados con una orden de control"
     severity: "medium"
+    enabled: true
+
+  - name: "forged_system_policy_override"
+    pattern: '(?:\{system\}|\[system\]|<system>|<\|system\|>)\s*(?:override|disable|bypass|anula|desactiva)\s+(?:the\s+|all\s+|la\s+|las\s+)?(?:policy|security|safety|instruction|pol[ií]tica|seguridad|instrucciones)'
+    description: "Rol system falsificado seguido de una orden explícita de sustituir la política"
+    severity: "high"
     enabled: true
 
   - name: "decision_process_override"
@@ -396,6 +410,19 @@ rules:
 # Señales benignas explícitas. Una coincidencia completa da score 0 y permite
 # omitir el veto ML únicamente cuando ninguna regla maliciosa coincide.
 benign:
+  - name: "public_catalog_complete"
+    independent_turn: true
+    pattern: '^\s*(?:(?:hola|hello|hi)[,!.]?\s+)?(?:(?:ahora|now)\s+)?(?:quiero\s+(?:ver\s+)?(?:el\s+)?cat[aá]logo\s+p[uú]blico|(?:i\s+(?:now\s+)?want|show\s+me)\s+(?:the\s+|your\s+)?public\s+cat(?:alogue|alog))\s*[.!?]*$'
+  - name: "public_product_price_complete"
+    independent_turn: true
+    pattern: '^\s*(?:(?:gracias|thanks)[,.!]\s*)?[¿]?(?:cu[aá]nto\s+cuesta\s+(?:la\s+|el\s+)?(?:l[aá]mpara|mochila|producto)|what\s+does\s+(?:the\s+)?(?:lamp|backpack|product)\s+cost)\s*[.!?]*$'
+  - name: "capabilities_natural_complete"
+    independent_turn: true
+    pattern: '^\s*[¿]?(?:cu[eé]ntame\s+qu[eé]\s+tareas\s+puedes\s+hacer|tell\s+me\s+what\s+tasks\s+you\s+can\s+help\s+with)\s*[.!?]*$'
+  - name: "public_business_policy_question"
+    independent_turn: true
+    pattern: '^\s*[¿¡]?(?:explica|expl[ií]came|cu[eé]ntame|dime|describe|explain|describe\s+to\s+me)\s+(?:(?:todo\s+lo\s+que\s+sabes\s+)?sobre\s+)?(?:las?\s+|tus?\s+|the\s+|your\s+)?(?:garant[ií]as?|env[ií]os?|devoluciones|pol[ií]tica\s+de\s+(?:devoluciones|env[ií]os?|garant[ií]as?)|warranty|shipping\s+policy|return\s+policy)(?:,?\s+(?:incluyendo\s+ejemplos\s+y\s+casos\s+especiales|por\s+favor|please))?[\s.!?]*$'
+    description: "Pregunta completa sobre políticas comerciales públicas; no incluye referentes, secretos o acciones añadidas"
   - name: "authorized_payroll_read"
     applies_to_roles: ["admin"]
     pattern: '^\s*(?:consulta|dime|muestra)\s+el\s+(?:sueldo|salario)\s+neto\s+mensual\s+registrado\s+de\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){0,3}\.?(?:\s+Responde\s+solo\s+ese\s+dato\.)?\s*$'

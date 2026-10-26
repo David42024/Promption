@@ -77,6 +77,7 @@ class AIGuardRequest(BaseModel):
     roles: List[UserRole] = Field(...)
     direction: Literal["input", "output"]
     messages: List[ConversationEvidence] = Field(default_factory=list)
+    isolate_history: bool = Field(default=False, strict=True)
 
     @field_validator("text")
     @classmethod
@@ -134,6 +135,10 @@ class FilterResponse(BaseModel):
     latency_ms: Optional[float] = None  # Campo adicional del Filter API
     classification: Literal["MALICIOUS", "BENIGN", "UNCERTAIN"] = "UNCERTAIN"
     requires_review: bool = True
+    requires_scope_review: bool = Field(default=False, strict=True)
+    input_risk_score: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False, strict=True)
+    requires_output_guard: bool = Field(default=False, strict=True)
+    assessments: Dict[str, Any] = Field(default_factory=dict)
 
 
 class LLMResponse(BaseModel):

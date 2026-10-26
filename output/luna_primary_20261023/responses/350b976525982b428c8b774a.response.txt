@@ -1,0 +1,1 @@
+{"kind":"message","text":"¡Holaaa! La lámpara Aurora cuesta S/80 y tiene 12 meses de garantía por defectos de fábrica."}

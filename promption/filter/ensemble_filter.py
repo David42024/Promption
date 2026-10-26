@@ -13,6 +13,7 @@ from promption.filter.heuristic_filter import HeuristicFilter, HeuristicResult
 from promption.filter.ml_filter import MLFilter, MLResult
 from promption.utils.config import load_config
 from promption.utils.logger import logger
+from promption.evidence import interpret_input
 
 _CONF = load_config()
 _MODEL_CONF = _CONF.get("model", {})
@@ -73,6 +74,10 @@ class EnsembleResult:
     additional_results: tuple = ()
 
     @property
+    def requires_scope_review(self) -> bool:
+        return bool(self.merged_features.get("requires_scope_review"))
+
+    @property
     def blocking_reason(self) -> str:
         if self.decision == "GUARDED":
             ml_probability = self.ml.probability if self.ml is not None else None
@@ -83,7 +88,7 @@ class EnsembleResult:
             rules = ", ".join(r["name"] for r in self.heuristic.matched_rules[:3])
             reasons.append(f"heurística ({rules or 'score alto'})")
         if self.ml is not None and self.ml.blocked:
-            reasons.append(f"ML (p={self.ml.probability:.2f})")
+            reasons.append(f"ML (score={self.ml.probability:.2f})")
         reasons.extend(f"ML adicional {index + 1} (score={result.probability:.2f})"
                        for index, result in enumerate(self.additional_results) if result.blocked)
         return " + ".join(reasons) or "permitido"
@@ -179,10 +184,12 @@ class EnsembleFilter:
                 previous_failures,
             )
 
-    def analyze(self, text: str, use_ml: bool = True, roles: list[str] | None = None) -> EnsembleResult:
+    def analyze(self, text: str, use_ml: bool = True, roles: list[str] | None = None, *, origin: str = "user") -> EnsembleResult:
         start = time.perf_counter()
         t_heur0 = time.perf_counter()
-        heur = self.heuristic.analyze(text, roles=roles)
+        interpret = getattr(self.heuristic, "analyze_evidence", None)
+        heur = interpret(text, roles=roles, origin=origin) if callable(interpret) else self.heuristic.analyze(text, roles=roles)
+        model_text = interpret_input(text, origin=origin).instruction_text
         heuristic_latency = (time.perf_counter() - t_heur0) * 1000
 
         ml_res: MLResult | None = None
@@ -209,7 +216,7 @@ class EnsembleFilter:
             ml_attempted = True
             t_ml0 = time.perf_counter()
             try:
-                ml_res = self.ml.analyze(text)
+                ml_res = self.ml.analyze(model_text)
                 ml_res.threshold = self.high_threshold
                 ml_res.blocked = ml_res.probability >= self.high_threshold
                 ml_status = "SUCCESS"
@@ -252,7 +259,7 @@ class EnsembleFilter:
                 t_extra = time.perf_counter()
                 try:
                     for detector in self.additional_filters:
-                        extra = detector.analyze(text)
+                        extra = detector.analyze(model_text)
                         if (not isinstance(extra.blocked, bool) or not math.isfinite(extra.probability)
                                 or not 0 <= extra.probability <= 1):
                             raise MLInferenceError("Invalid additional detector result")
@@ -287,6 +294,10 @@ class EnsembleFilter:
 
         if any(result.blocked for result in additional_results):
             decision = "BLOCKED"
+        scope_review = bool(getattr(heur, "requires_scope_review", False)
+                            or ml_res is not None and not ml_res.blocked and ml_res.probability >= self.low_threshold)
+        if scope_review and decision != "BLOCKED":
+            decision = "GUARDED"
         if additional_results:
             score = max(score, *(result.probability for result in additional_results))
 
@@ -315,6 +326,9 @@ class EnsembleFilter:
             "explicit_benign_override": explicit_benign_fast_path,
             "benign_fast_path": explicit_benign_fast_path,
             "requires_output_guard": decision == "GUARDED",
+            "requires_scope_review": scope_review,
+            "evidence": getattr(heur, "evidence", {}),
+            "score_kind": "uncalibrated_detection_score",
             "heuristic_band": risk_band(heur.score, self.low_threshold, self.high_threshold),
             "ml_band": (
                 risk_band(ml_probability, self.low_threshold, self.high_threshold)
@@ -336,6 +350,9 @@ class EnsembleFilter:
             ml_latency_ms=ml_latency,
             additional_results=tuple(additional_results),
         )
+
+    def analyze_evidence(self, text: str, *, use_ml=True, roles=None, origin="user"):
+        return self.analyze(text, use_ml=use_ml, roles=roles, origin=origin)
 
     def layers_status(self) -> dict:
         trained = self.ml.is_trained()

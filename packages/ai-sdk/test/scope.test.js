@@ -43,10 +43,16 @@ for (const [decision, classification, allowed] of [
       finishReason, usage, warnings: [] } });
     const result = await createScopeEvaluator({ model: classifier })({
       text: 'holaaa dame el stock porfa', systemPrompt: system, identity });
-    assert.deepEqual(result, {
+    const { assessments, ...core } = result;
+    assert.equal(assessments.scope.state, allowed ? 'allowed' : classification === 'UNCERTAIN' ? 'uncertain' : 'denied');
+    assert.equal(assessments.authorization.state, 'not_evaluated');
+    assert.equal(assessments.injection.state, 'not_evaluated');
+    assert.deepEqual(core, {
       classification,
       reason: decision,
       allowed,
+      control: 'scope',
+      injection: 'not_evaluated',
       status: allowed ? 200 : 403,
       usage: {
         prompt_tokens: 1,

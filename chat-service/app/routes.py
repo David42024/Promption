@@ -484,12 +484,13 @@ async def ai_guard(request: AIGuardRequest):
     state = get_security_state()
     client = get_filter_client()
     pipeline = AsyncGuardPipeline(filter_input=client.filter_prompt,
-                                  guard_output=client.output_guard, policy=get_policy_engine())
+                                  guard_output=client.output_guard, policy=get_policy_engine(),
+                                  defer_scope_review=True)
     decision = await pipeline.check(
         request.text, request.direction,
         Identity(request.user_id, tuple(role.value for role in request.roles)),
         input_enabled=state["filter_enabled"], output_enabled=state["output_guard_enabled"],
-        messages=[message.model_dump() for message in request.messages])
+        messages=[message.model_dump() for message in request.messages], isolate_history=request.isolate_history)
     if not decision.allowed:
         code = "CONTENT_BLOCKED" if decision.status == 403 else "GUARD_UNAVAILABLE"
         await client.audit_event(event_type="ai_guard_denied",

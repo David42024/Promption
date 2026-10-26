@@ -2,6 +2,7 @@
 from __future__ import annotations
 import re
 import unicodedata
+from .evidence import interpret_input
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
@@ -95,7 +96,8 @@ class PolicyEngine:
         output: bool = False,
     ) -> PolicyDecision:
         role_set = {str(role).strip().lower() for role in roles if str(role).strip()}
-        matches = tuple(policy for policy in self.classify_all(text, output=output)
+        requested_text = text if output else interpret_input(text).instruction_text
+        matches = tuple(policy for policy in self.classify_all(requested_text, output=output)
                         if policy.policy_id not in excluded_policy_ids)
         if not matches:
             return PolicyDecision(

@@ -1,0 +1,42 @@
+{
+  "status": "complete",
+  "study_date_local": "2026-10-24",
+  "episodes": 144,
+  "api_calls": 299,
+  "cost_upper_usd": 0.20690614999999996,
+  "budget_usd": 2,
+  "model_snapshots": [
+    "gpt-5.4-mini-2026-03-17",
+    "gpt-5.4-nano-2026-03-17"
+  ],
+  "credential_not_in_artifacts": true,
+  "tests": {
+    "javascript": 94,
+    "python_harness": 7,
+    "python_analysis": 4,
+    "typescript": "passed"
+  },
+  "request_and_frozen_source_hashes_verified": true,
+  "analysis_status_corrections": [
+    "EN06_r1_promption",
+    "EN06_r2_promption",
+    "EN06_r3_promption",
+    "ES04_r1_promption",
+    "ES04_r2_promption",
+    "ES04_r3_promption",
+    "ES06_r1_promption"
+  ],
+  "analysis_source_sha256": "61f3616b32ae1f31e9cb8f3b4e27f4ecc45c2258dc0d96b128e212dc907472e7",
+  "files": {
+    "protocol.json": "158c6293128ca0b7ca61e37f9231cb130f766d577a154fd7e8fd09b67783ee5f",
+    "cases.json": "052802d91e8c12dfd39d5b0ece7e6d43aecbdbb3ceb2f01a79c338b22f8ebcf3",
+    "plan.json": "129e3ee88c38f86303fcefd41aae42009d24141a717cff3818a1b59ede3ca921",
+    "settings.json": "05af90cc94756946924176a73bea9729d880153c4584ae47ed5cce0e8a4a9ece",
+    "summary.json": "e95ac1be1634959eb0790125ad572037f78815d028acb4c951a7c392f55813aa",
+    "outcomes.csv": "c8061a2f673b4e58c669d5e1fc3c44fd912b422a65ff56d13d708baff834f204",
+    "table7.md": "5b6b4e4d527f64e3ce1c87cf3723d21a316c574b057f5e45a970254a2d4e14fd",
+    "api_ledger.jsonl": "1a6c0e9c5d1be4645ee8c8a2b6e1adaecb91ba88ecba60abd9174947ca691955",
+    "execution_summary.json": "1e9f8077e357e15692396219e9a06d79f61c5f0a22c58f44c05cd8176c901212",
+    "local_error_diagnostics.json": "ae5fdb73c078a73b69f1c171f2a8404309a1c4ad149391facdf2fec902549ebe"
+  }
+}

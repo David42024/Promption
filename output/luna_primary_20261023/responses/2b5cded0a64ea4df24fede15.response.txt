@@ -1,0 +1,1 @@
+{"classification":"OUT_OF_SCOPE","reason":"system_limit","intent":{"name":"protected_information","attack":"secret_extraction","relation":"standalone","origin":"user","confidence":1,"evidence":[0]}}
