@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ThemeSwitcher } from "./ThemeProvider.jsx";
 
 const UserIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -70,7 +71,7 @@ export default function GlobalHeader() {
         left: 0,
         right: 0,
         height: "64px",
-        background: "rgba(10, 14, 26, 0.95)",
+        background: "var(--bg-header)",
         backdropFilter: "blur(20px)",
         borderBottom: "1px solid var(--border)",
         zIndex: 1000,
@@ -118,6 +119,7 @@ export default function GlobalHeader() {
 
       {/* Estado de autenticación */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <ThemeSwitcher />
         {/* Indicador de protección */}
         <div style={{
           display: "flex",

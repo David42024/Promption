@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThemeSwitcher } from "../../../components/ThemeProvider.jsx";
 
 
 const ITEMS = [
   { href: "/admin", label: "Operaciones y auditoría", icon: "🛡️" },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: "📊" },
-  { href: "/admin/rendimiento", label: "Evaluación del modelo", icon: "🎯" },
+  { href: "/admin/rendimiento", label: "Benchmark local", icon: "🎯" },
 ];
 
 
@@ -24,7 +25,7 @@ export default function AdminNavigation() {
         marginBottom: 24,
         border: "1px solid var(--border)",
         borderRadius: "var(--radius-lg)",
-        background: "rgba(15, 23, 42, 0.48)",
+        background: "var(--bg-secondary)",
       }}
     >
       {ITEMS.map(item => {
@@ -56,6 +57,7 @@ export default function AdminNavigation() {
           </Link>
         );
       })}
+      <div style={{ marginLeft: "auto", alignSelf: "center" }}><ThemeSwitcher /></div>
     </nav>
   );
 }

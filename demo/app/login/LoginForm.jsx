@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ThemeSwitcher } from "../../components/ThemeProvider.jsx";
 
 const MailIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -78,11 +79,12 @@ export default function LoginForm() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
           <Link href="/" className="linkbtn" style={{ padding: 0 }}>
             <BackIcon />
             Volver a la tienda
           </Link>
+          <ThemeSwitcher />
         </div>
 
         <div className="auth-header">

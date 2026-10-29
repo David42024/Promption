@@ -6,9 +6,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 export class CorpusBudget {
   constructor(directory, protocol, previousLedger, fetchImpl = fetch) {
     const ceiling = ['precision_lumina_openai_three_conditions', 'precision_lumina_gemini_three_conditions',
-      'precision_lumina_gemini_native_three_conditions', 'gemini_preflight', 'gemini_native_preflight', 'deepseek_preflight', 'precision_lumina_deepseek_three_conditions'].includes(protocol.study) ? 5
+      'precision_lumina_gemini_native_three_conditions', 'gemini_preflight', 'gemini_native_preflight', 'deepseek_preflight', 'precision_lumina_deepseek_three_conditions', 'shop_mixed_three_conditions'].includes(protocol.study) ? 5
       : protocol.study === 'precision_lumina_three_conditions' ? 7 : 2;
-    if (protocol.budget_usd !== ceiling || protocol.max_api_calls !== 1800 || sha(fs.readFileSync(previousLedger)) !== protocol.prior_ledger_sha256) throw Error('Unexpected shared authorization bounds');
+    if (protocol.budget_usd !== ceiling || protocol.max_api_calls !== (protocol.study === 'shop_mixed_three_conditions' ? 6000 : 1800) || sha(fs.readFileSync(previousLedger)) !== protocol.prior_ledger_sha256) throw Error('Unexpected shared authorization bounds');
     const old = new Map();
     for (const row of lines(previousLedger)) {
       if (row.kind === 'reserved') old.set(row.call, row.reserved_usd);

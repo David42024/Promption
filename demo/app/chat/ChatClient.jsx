@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ThemeSwitcher } from "../../components/ThemeProvider.jsx";
 import { useChat } from "./ChatContext";
 import PermissionsConfig from "./PermissionsConfig";
 import ChatActions from "./ChatActions";
@@ -212,6 +213,7 @@ export default function ChatClient({ user }) {
 
   return (
     <div className="chat-container">
+      <div className="chat-appearance"><ThemeSwitcher /></div>
       {/* ==================== HEADER USUARIO ==================== */}
       <div
         style={{

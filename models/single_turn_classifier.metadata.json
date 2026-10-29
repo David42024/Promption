@@ -1,0 +1,197 @@
+{
+  "backend": "tfidf_extra_trees",
+  "sha256": "aca0401fb467e09d54ef90f28b9ec3f848411202028d3e45f96ad7b037c3c5e4",
+  "recommended_threshold": 0.9,
+  "origins": [
+    "user"
+  ],
+  "annotation_status": "PROVISIONAL_SILVER_NOT_HUMAN_GOLD",
+  "training": "Public train plus privacy-filtered high-confidence standalone Lumina train; participant/family partitions preserved; neither validation nor test fitted.",
+  "validation": {
+    "threshold": 0.9,
+    "metrics": {
+      "public": {
+        "before": {
+          "tp": 211,
+          "fp": 36,
+          "fn": 88,
+          "tn": 323,
+          "n": 658,
+          "recall": 0.705685618729097,
+          "fpr": 0.10027855153203342,
+          "precision": 0.854251012145749
+        },
+        "after": {
+          "tp": 212,
+          "fp": 36,
+          "fn": 87,
+          "tn": 323,
+          "n": 658,
+          "recall": 0.7090301003344481,
+          "fpr": 0.10027855153203342,
+          "precision": 0.8548387096774194
+        }
+      },
+      "lumina": {
+        "before": {
+          "tp": 26,
+          "fp": 1,
+          "fn": 150,
+          "tn": 106,
+          "n": 283,
+          "recall": 0.14772727272727273,
+          "fpr": 0.009345794392523364,
+          "precision": 0.9629629629629629
+        },
+        "after": {
+          "tp": 62,
+          "fp": 1,
+          "fn": 114,
+          "tn": 106,
+          "n": 283,
+          "recall": 0.3522727272727273,
+          "fpr": 0.009345794392523364,
+          "precision": 0.9841269841269841
+        }
+      }
+    },
+    "feasible": true,
+    "additional_tp": 37
+  },
+  "training_protocol": {
+    "training_only": true,
+    "threshold_selection": "validation_only",
+    "labels": "source_and_provisional_silver_unchanged",
+    "inference": {
+      "normalize": true
+    },
+    "c_grid": [
+      0.5,
+      2.0,
+      8.0
+    ],
+    "lumina_weight_grid": [
+      0.5,
+      1.5
+    ],
+    "thresholds": [
+      0.25,
+      0.26,
+      0.27,
+      0.28,
+      0.29,
+      0.3,
+      0.31,
+      0.32,
+      0.33,
+      0.34,
+      0.35,
+      0.36,
+      0.37,
+      0.38,
+      0.39,
+      0.4,
+      0.41,
+      0.42,
+      0.43,
+      0.44,
+      0.45,
+      0.46,
+      0.47,
+      0.48,
+      0.49,
+      0.5,
+      0.51,
+      0.52,
+      0.53,
+      0.54,
+      0.55,
+      0.56,
+      0.57,
+      0.58,
+      0.59,
+      0.6,
+      0.61,
+      0.62,
+      0.63,
+      0.64,
+      0.65,
+      0.66,
+      0.67,
+      0.68,
+      0.69,
+      0.7,
+      0.71,
+      0.72,
+      0.73,
+      0.74,
+      0.75,
+      0.76,
+      0.77,
+      0.78,
+      0.79,
+      0.8,
+      0.81,
+      0.82,
+      0.83,
+      0.84,
+      0.85,
+      0.86,
+      0.87,
+      0.88,
+      0.89,
+      0.9,
+      0.91,
+      0.92,
+      0.93,
+      0.94,
+      0.95
+    ],
+    "baseline_effective_threshold": 0.75,
+    "calibrated": false,
+    "trees": true,
+    "selection": "Maximize mean corpus recall subject to no increase in either validation FPR or FNR and lower total FP. Tie: fewer FP, smaller C, smaller domain weight, higher threshold.",
+    "excluded": {
+      "unresolved_label": 641,
+      "pilot_before_reset": 15,
+      "needs_confidence_review": 1795,
+      "requires_conversation_context": 1526,
+      "duplicate": 125,
+      "privacy_or_length": 16,
+      "family_overlap_across_participants": 51,
+      "conflicting_family_labels": 32,
+      "public_unassigned": 2
+    },
+    "counts": {
+      "public:train:1": 1409,
+      "public:val:1": 299,
+      "public:external:1": 1566,
+      "public:test:1": 302,
+      "public:train:0": 1683,
+      "public:external:0": 1844,
+      "public:test:0": 359,
+      "public:val:0": 359,
+      "lumina:val:1": 53,
+      "lumina:train:0": 281,
+      "lumina:train:1": 541,
+      "lumina:test:0": 49,
+      "lumina:test:1": 130,
+      "lumina:val:0": 7
+    },
+    "baseline_model_sha256": "81f0ae6c2d017617c449cd6e53c0a384613493056eb9034a4152b60c79de7bfa",
+    "source_sha256": {
+      "data/processed/training_data.csv": "7cbb5aeb9877acaf9d1e91134d242ec9323574f5240edae06c1ec9c0bf63d2e5",
+      "data/processed/split_manifest.json": "11eafd1e40f65e7d2cf5be74d94d43880cb3494607428ebc78af929054c383ae",
+      "output/research_20261023/etiquetas_provisionales.jsonl": "8e725c01dc52f69f508b1486ad4d3837bd9bd8a82f0ac2aaf26f000f177bd2b6",
+      "promption/evidence.py": "433ef313d438e431ff795007b547f3ee09bf7b0a408aeb97bc6ad331e090be19",
+      "config/heuristics.yaml": "b23acdc88a7cfc58b5dd71c1428270a17998d115fdb4a271cc0c9ab1b0de4566",
+      "scripts/research/train_detector_revision.py": "dd50ebcb18f4276dae2b524e1372a8ce69be97da11af9cb91e541ec8fecf4f7c"
+    },
+    "api_calls": 0,
+    "test_status": "Previously exposed regression partitions. Not fitted or used for selection in this run."
+  },
+  "limitations": [
+    "Previously exposed regression data and provisional labels, not independent human gold.",
+    "Supplemental user-turn veto only; never overrides existing detectors or authorizes tools."
+  ]
+}

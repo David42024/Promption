@@ -40,6 +40,10 @@ ensemble:
   decision_low_threshold: 0.33
   decision_high_threshold: 0.85
   require_llm_veto: false
+  additional_classifiers:
+    - model_path: models/single_turn_classifier.pkl
+      threshold: 0.9
+      origins: [user]
 
 classification:
   ml_benign_threshold: 0.33

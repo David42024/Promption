@@ -39,7 +39,8 @@ function makeScopeResponse(decision = 'in_scope', usage = { prompt_tokens: 15, c
         content: [
           {
             type: 'output_text',
-            text: JSON.stringify({ assessment: 'Valido', decision }),
+            text: JSON.stringify({ decision, intent: { name: 'public_information', attack: 'none',
+              origin: 'none', relation: 'standalone', confidence: 0.98, evidence: [] } }),
             annotations: [],
           },
         ],
@@ -246,7 +247,7 @@ test('Scope endpoint receipts eliminate equivalent turn classification without l
       const input = JSON.parse(options.body);
       return Response.json({allowed:true,text:input.text,action:'PASS',conversation_checked:true});
     }
-    if (String(options?.body).includes('scope_decision')) { scopeAttempts++; return makeScopeResponse(); }
+    if (String(options?.body).includes('context_intent_scope')) { scopeAttempts++; return makeScopeResponse(); }
     generationAttempts++;
     return makeGenerationResponse('Respuesta autorizada');
   };

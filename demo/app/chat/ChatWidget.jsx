@@ -381,7 +381,7 @@ export default function ChatWidget() {
         style={{
           padding: 14,
           borderTop: "1px solid var(--border)",
-          background: "rgba(15, 21, 36, 0.8)",
+          background: "var(--bg-secondary)",
           display: "flex",
           gap: 10,
           margin: 0,

@@ -33,6 +33,7 @@ def model_provenance(path: Path, backend: str) -> dict:
             metadata = json.loads(manifest.read_text(encoding="utf-8"))
             if metadata.get("sha256") == result["sha256"]:
                 result["training"] = metadata
+                result["backend"] = metadata.get("backend", backend)
     return result
 
 

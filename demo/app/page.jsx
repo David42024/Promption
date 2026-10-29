@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { ThemeSwitcher } from "../components/ThemeProvider.jsx";
+import library from "../../packages/ai-sdk/package.json";
 import { ChatProvider } from "./chat/ChatContext";
 import ChatWidget from "./chat/ChatWidget";
 import { useState, useEffect } from "react";
@@ -124,9 +126,10 @@ export default function Landing() {
           </div>
           <span className="badge-pill">
             <span className="dot"></span>
-            Protegido por Filter API · tenant <strong style={{ color: "var(--text-primary)" }}>demo-shop</strong>
+            Promption {library.version} · tenant <strong style={{ color: "var(--text-primary)" }}>demo-shop</strong>
           </span>
           <div className="nav-links">
+            <ThemeSwitcher />
             <Link href="/admin" className="linkbtn">
               Panel Admin
             </Link>
@@ -222,11 +225,11 @@ export default function Landing() {
             ser un punto débil.
           </h1>
           <p className="hero-subtitle">
-            Esta tienda demo contiene datos reales de usuarios: perfiles, pedidos,
+            Esta tienda demo contiene datos ficticios de usuarios: perfiles, pedidos,
             direcciones e incluso credenciales internas. Cada mensaje pasa primero por el{" "}
             <strong style={{ color: "var(--text-primary)" }}>Filter API</strong> antes de
             llegar al LLM. Intenta robar la contraseña del admin o el API key de un usuario:
-            sin filtro caería, con filtro ni lo intentes.
+            compara cómo responden el modelo y las protecciones de Promption.
           </p>
           <div className="hero-actions">
             <button
@@ -374,7 +377,7 @@ export default function Landing() {
             <p>
               El proxy valida cada prompt con tu tenant; lo bloqueado nunca consume tokens
               del modelo. Detección por <strong>regex heurística</strong> +{" "}
-              <strong>RandomForest</strong> sobre embeddings + <strong>Output Guard</strong>
+              <strong>clasificación ML</strong>, contexto e intención + <strong>Output Guard</strong>
               anti-fuga.
             </p>
           </div>
@@ -383,9 +386,9 @@ export default function Landing() {
             <div className="card-icon success">
               <BotIcon />
             </div>
-            <h3>Chat con Groq + MCP</h3>
+            <h3>Chat con AI SDK + MCP</h3>
             <p>
-              Modelo configurable vía <code>PIF_LLM_MODEL</code>. Las keys viven solo en
+              Modelos configurables en el servidor y conexión mediante Vercel AI SDK. Las keys viven solo en
               el servidor. Tools para consultar usuarios, pedidos, facturas y documentos
               internos con permisos por rol.
             </p>

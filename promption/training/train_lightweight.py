@@ -35,6 +35,16 @@ from promption.utils.logger import logger
 _CONF = load_config()
 
 
+def build_vectorizer(max_features: int = 10000):
+    """Create the same bounded bilingual word/character features for every local classifier."""
+    return FeatureUnion([
+        ("word", TfidfVectorizer(max_features=max_features, ngram_range=(1, 2), min_df=2,
+            max_df=.95, lowercase=True, sublinear_tf=True)),
+        ("char", TfidfVectorizer(analyzer="char_wb", max_features=max_features,
+            ngram_range=(3, 5), min_df=2, lowercase=True, sublinear_tf=True)),
+    ])
+
+
 def train_lightweight_model(df: pd.DataFrame, max_features: int = 10000, *, sample_weight=None) -> tuple:
     """Train TF-IDF + LogisticRegression (very lightweight)."""
     logger.info("Training lightweight TF-IDF + LogisticRegression model...")
@@ -65,24 +75,7 @@ def train_lightweight_model(df: pd.DataFrame, max_features: int = 10000, *, samp
     logger.info("Cleaned training samples: %d", len(df))
     
     # Configurar TF-IDF con límites para mantener el modelo pequeño
-    vectorizer = FeatureUnion([
-        ("word", TfidfVectorizer(
-            max_features=max_features,
-            ngram_range=(1, 2),
-            min_df=2,
-            max_df=0.95,
-            lowercase=True,
-            sublinear_tf=True,
-        )),
-        ("char", TfidfVectorizer(
-            analyzer="char_wb",
-            max_features=max_features,
-            ngram_range=(3, 5),
-            min_df=2,
-            lowercase=True,
-            sublinear_tf=True,
-        )),
-    ])
+    vectorizer = build_vectorizer(max_features)
     
     X = vectorizer.fit_transform(df["prompt"].tolist())
     

@@ -54,7 +54,7 @@ def decide_pipeline_action(heuristic_score: float, ml_probability: float | None,
 
 if _USE_LIGHTWEIGHT:
     from promption.filter.ml_filter_lightweight import LightMLFilter
-    logger.info("DEBUG: Using LightMLFilter (TF-IDF + LogisticRegression)")
+    logger.info("Using LightMLFilter (artifact-defined local classifier)")
 else:
     logger.info("DEBUG: Using regular MLFilter (SentenceTransformers + RandomForest)")
 
@@ -124,7 +124,13 @@ class EnsembleFilter:
                 threshold = float(detector["threshold"])
                 if not math.isfinite(threshold) or not 0 < threshold < 1:
                     raise ValueError("Additional detector threshold must be strictly between zero and one")
-                additional_filters.append(ArtifactFilter.from_artifact(detector["model_path"], threshold=threshold))
+                origins = detector.get("origins", ["user", "tool"])
+                if not isinstance(origins, list) or not origins or any(
+                        not isinstance(value, str) or value not in {"user", "tool"} for value in origins):
+                    raise ValueError("Additional detector origins must contain user or tool")
+                artifact = ArtifactFilter.from_artifact(detector["model_path"], threshold=threshold)
+                artifact.supported_origins = frozenset(origins)
+                additional_filters.append(artifact)
         self.additional_filters = tuple(additional_filters)
 
         # Observability state tracking
@@ -255,10 +261,12 @@ class EnsembleFilter:
             elif not use_ml:
                 additional_status = "SKIPPED_USER_DISABLED"
             else:
-                additional_status = "SUCCESS"
+                applicable = [detector for detector in self.additional_filters
+                              if origin in getattr(detector, "supported_origins", {"user", "tool"})]
+                additional_status = "SUCCESS" if applicable else "SKIPPED_ORIGIN"
                 t_extra = time.perf_counter()
                 try:
-                    for detector in self.additional_filters:
+                    for detector in applicable:
                         extra = detector.analyze(model_text)
                         if (not isinstance(extra.blocked, bool) or not math.isfinite(extra.probability)
                                 or not 0 <= extra.probability <= 1):

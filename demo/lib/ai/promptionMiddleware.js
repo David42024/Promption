@@ -1,5 +1,5 @@
 import { withScopeReceipts } from "./scopeReceipts.js";
-import { createPromption, createGuardEndpointTransport, createScopeEvaluator } from "@promption/ai-sdk";
+import { createPromption, createGuardEndpointTransport, createContextEvaluator } from "@promption/ai-sdk";
 
 function getChatApiUrl() {
   return (process.env.CHAT_API_URL || process.env.NEXT_PUBLIC_CHAT_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
@@ -19,7 +19,7 @@ const toolPolicies = {
 
 function promption(scopeModel, scopeProviderOptions, onScope, options = {}) {
   const evaluateScope = scopeModel ? withScopeReceipts(
-    createScopeEvaluator({ model: scopeModel, providerOptions: scopeProviderOptions }),
+    createContextEvaluator({ model: scopeModel, providerOptions: scopeProviderOptions }),
     { receipts: options.scopeReceipts, binding: options.scopeBinding, model: options.scopeModelId,
       secret: process.env.CHAT_SERVICE_TOKEN, requestId: options.requestId, onReceipt: options.onScopeReceipt }) : null;
   return createPromption({

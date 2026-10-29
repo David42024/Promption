@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/deepseek": "2.0.77",
     "@ai-sdk/openai": "^3.0.119",
     "@promption/ai-sdk": "file:../packages/ai-sdk",
     "ai": "^6.0.293",

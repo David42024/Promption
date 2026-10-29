@@ -1,7 +1,7 @@
 """End-to-end pipeline: prepare data -> train model -> run benchmark.
 
 Usage:
-    python scripts/run_benchmark.py                # train + full benchmark (uses LLM)
+    python scripts/run_benchmark.py                # evaluate the installed model (uses LLM)
     python scripts/run_benchmark.py --no-llm        # skip LLM queries (proxy ASR)
     python scripts/run_benchmark.py --prepare-only  # only build training data
     python scripts/run_benchmark.py --train-only    # only train the model
@@ -108,11 +108,18 @@ def main() -> None:
     parser.add_argument("--train-only", action="store_true")
     parser.add_argument("--sample", type=int, default=None)
     parser.add_argument("--no-train", action="store_true", help="Skip model training if a model file exists")
+    parser.add_argument("--retrain", action="store_true", help="Explicitly replace the model using the configured training pipeline")
     parser.add_argument("--pdf-dir", type=Path, default=None,
                         help="Benchmark personalizado sobre los PDF de este directorio (metadatos en metadata.csv)")
     parser.add_argument("--audio-dir", type=Path, default=None,
                         help="Benchmark personalizado sobre audios transcritos (metadatos en metadata.csv)")
     args = parser.parse_args()
+    if args.no_train and (args.retrain or args.train_only):
+        parser.error("--no-train no puede combinarse con --retrain o --train-only")
+    backend, model_path = selected_backend()
+    retrain = args.train_only or args.retrain or not model_path.exists()
+    if args.no_train and not model_path.exists():
+        raise SystemExit("No existe el modelo solicitado; entrena uno explícitamente antes de evaluarlo.")
 
     pdf_df = None
     if args.pdf_dir and args.audio_dir:
@@ -122,15 +129,16 @@ def main() -> None:
     elif args.audio_dir:
         pdf_df = _load_audio_dataset(args.audio_dir)
     else:
-        dataset_mod.prepare_training_data()
+        processed = Path(load_config()["paths"]["processed_data"]) / "training_data.csv"
+        if args.prepare_only or retrain or not processed.exists():
+            dataset_mod.prepare_training_data()
         if args.prepare_only:
             logger.info("Dataset built. Run `python scripts/run_benchmark.py --train-only` to train the selected backend.")
             return
 
-    backend, model_path = selected_backend()
     backup = preserve_records()
     logger.info("Previous models and results preserved in %s", backup)
-    if args.train_only or not model_path.exists() or not args.no_train:
+    if retrain:
         if backend == "tfidf_logistic_regression":
             from promption.training.train_lightweight import train
             train(out_path=model_path, preserve=False)

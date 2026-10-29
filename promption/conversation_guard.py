@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from .utils.config import load_config, load_heuristics
 from .utils.text import normalize_content
-from .evidence import interpret_input, adopts_quoted_instructions
+from .evidence import interpret_input, adopts_quoted_instructions, positive_operation
 
 
 class ConversationLimitError(ValueError):
@@ -182,7 +182,8 @@ class ConversationGuard:
             from .filter.ensemble_filter import EnsembleFilter
             input_filter = EnsembleFilter()
         self.input_filter = input_filter
-        self.rules = [(rule["name"], re.compile(rule["pattern"], re.IGNORECASE | re.DOTALL))
+        self.rules = [(rule["name"], re.compile(rule["pattern"], re.IGNORECASE | re.DOTALL),
+                       rule.get("respect_negation") is True)
                       for rule in load_heuristics().get("conversation_rules", [])
                       if rule.get("enabled", True)]
 
@@ -205,9 +206,19 @@ class ConversationGuard:
             and not any(_ALIAS.search(message_text(message)) or _TURN_DEPENDENCY.search(message_text(message))
                         for message in untrusted[:-1]))
         if isolate_history and independent:
+            current = self.input_filter.analyze(messages[-1].content, roles=roles, use_ml=use_ml)
+            if current.blocked:
+                decision.blocked = True
+                decision.matched_rules = [r["name"] for r in current.heuristic.matched_rules]
+                if current.ml is not None and current.ml.blocked:
+                    decision.matched_rules.append("current_turn_ml")
+                decision.reason = "current_turn_injection"
+                return decision
             decision.isolated_history = True
             decision.evaluation_mode = "independent_turn"
             decision.requires_output_guard = True
+            decision.requires_scope_review = current.heuristic.signal != "benign"
+            decision.input_risk_score = current.ml.probability if current.ml else None
             decision.reason = "isolated_history_requires_output_guard"
             return decision
         views = conversation_views(messages)
@@ -223,8 +234,12 @@ class ConversationGuard:
             if heuristic.blocked:
                 decision.blocked = True
                 decision.matched_rules.extend(rule["name"] for rule in heuristic.matched_rules)
-            for name, pattern in self.rules:
+            for name, pattern, respect_negation in self.rules:
                 if pattern.search(text):
+                    if respect_negation and not positive_operation(pattern, text):
+                        decision.requires_scope_review = True
+                        decision.requires_output_guard = True
+                        continue
                     decision.blocked = True
                     decision.matched_rules.append(name)
         if not decision.blocked and views:

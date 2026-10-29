@@ -4,17 +4,43 @@ Landing + login con roles + chatbot. Cada mensaje sigue este recorrido:
 
 ```text
 navegador → Next.js /api/chat → Chat Service (política, historial y MCP)
-                                  ↘ Next.js /api/ai/turn → Vercel AI SDK → OpenAI
+                                  ↘ Next.js /api/ai/turn → Vercel AI SDK → OpenAI / DeepSeek
                                      middleware Promption: filtro de entrada y Output Guard
 ```
 
-OpenAI se configura únicamente en el servidor Next.js mediante `OPENAI_API_KEY`.
+El proveedor se selecciona en Next.js mediante `AI_PROVIDER=openai|deepseek`.
+Las credenciales se configuran únicamente en el servidor Next.js mediante
+`OPENAI_API_KEY` o `DEEPSEEK_API_KEY`; nunca se envían al navegador.
 `CHAT_API_URL`, `PIF_API_URL` y `SITE_URL` definen las direcciones de cada entorno;
 `OPENAI_MODEL` y `OPENAI_TOOL_MODEL` deben coincidir con Chat Service.
 `gpt-5.4-nano` atiende el chat normal y `gpt-5.4-mini` se usa para generar
 archivos y continuar flujos de herramientas. El servicio de chat genera DOCX,
 PDF y XLSX a través de MCP y entrega el adjunto solo al terminar. El navegador
 muestra el estado del proceso, bloquea mensajes simultáneos y permite detenerlo.
+
+### DeepSeek
+
+Configura en `demo/.env.local`:
+
+```dotenv
+AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=tu_clave_local
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-flash
+DEEPSEEK_TOOL_MODEL=deepseek-flash
+```
+
+En `chat-service/.env`, los identificadores del puente deben coincidir:
+`OPENAI_MODEL=deepseek-flash` y `OPENAI_TOOL_MODEL=deepseek-flash`.
+Mantén `LLM_PROVIDER_ORDER=openai`: identifica el puente existente de AI SDK,
+que selecciona DeepSeek en Next.js. Reinicia ambos servicios al cambiar el proveedor.
+Se utiliza el proveedor oficial `@ai-sdk/deepseek`, compatible con AI SDK 6,
+para generación, herramientas y evaluación estructurada de alcance. El modo
+de razonamiento está desactivado para responder dentro del presupuesto de tokens
+del chat; Promption mantiene sus validaciones de entrada, contexto, permisos y salida.
+
+Referencias: [API oficial](https://api-docs.deepseek.com/quick_start) y
+[salida JSON](https://api-docs.deepseek.com/guides/json_mode/).
 
 ## Arranque
 

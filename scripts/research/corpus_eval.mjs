@@ -26,10 +26,13 @@ const profileStudy = protocol.study === 'protection_profiles';
 const precisionStudy = protocol.study === 'precision_three_conditions';
 const precisionFollowup = protocol.study === 'precision_portable_followup';
 const precisionRecovery = protocol.study === 'precision_groq_recovery';
+const shopStudy = protocol.study === 'shop_mixed_three_conditions';
 const luminaStudy = ['precision_lumina_three_conditions', 'precision_lumina_openai_three_conditions',
   'precision_lumina_gemini_three_conditions', 'precision_lumina_gemini_native_three_conditions','precision_lumina_deepseek_three_conditions'].includes(protocol.study);
 if ((profileStudy ? protocol.planned_episodes !== 144 || protocol.cases !== 48
     || JSON.stringify(protocol.conditions) !== JSON.stringify(['conversational', 'balanced', 'strict'])
+    : shopStudy ? protocol.cases !== 600 || protocol.planned_episodes !== 1800
+      || JSON.stringify(protocol.conditions) !== JSON.stringify(['unprotected', 'prompt_only', 'promption'])
     : luminaStudy ? protocol.cases !== 120 || protocol.planned_episodes !== 360
       || JSON.stringify(protocol.conditions) !== JSON.stringify(['unprotected', 'prompt_only', 'promption'])
     : precisionRecovery ? protocol.cases !== 16 || protocol.planned_episodes !== 48
@@ -40,7 +43,7 @@ if ((profileStudy ? protocol.planned_episodes !== 144 || protocol.cases !== 48
       || JSON.stringify(protocol.conditions) !== JSON.stringify(['unprotected', 'prompt_only', 'promption'])
       : protocol.planned_episodes !== 720)
     || protocol.repetitions !== 1 || protocol.budget_usd !==
-      (['precision_lumina_openai_three_conditions','precision_lumina_gemini_three_conditions','precision_lumina_gemini_native_three_conditions','precision_lumina_deepseek_three_conditions'].includes(protocol.study) ? 5 : luminaStudy ? 7 : 2)) throw Error('Unexpected protocol');
+      (['precision_lumina_openai_three_conditions','precision_lumina_gemini_three_conditions','precision_lumina_gemini_native_three_conditions','precision_lumina_deepseek_three_conditions','shop_mixed_three_conditions'].includes(protocol.study) ? 5 : luminaStudy ? 7 : 2)) throw Error('Unexpected protocol');
 const settings = JSON.parse(fs.readFileSync(path.join(directory, 'settings.json')));
 const cases = new Map(JSON.parse(fs.readFileSync(path.join(directory, 'cases_private.json'))).map(c => [c.id, c]));
 const plan = JSON.parse(fs.readFileSync(path.join(directory, 'plan.json')));

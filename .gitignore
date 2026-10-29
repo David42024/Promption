@@ -31,6 +31,7 @@ models/*.joblib
 models/*.model
 !models/random_forest.pkl
 !models/lightweight_classifier.pkl
+!models/single_turn_classifier.pkl
 data/processed/*
 !data/processed/quarantine.csv
 !data/processed/label_overrides.csv
@@ -69,6 +70,7 @@ Thumbs.db
 /.env.gemini.local
 /.env.deepseek.local
 *.env
+demo/.env.local
 
 # Frontend (demo Next.js)
 node_modules/
@@ -84,3 +86,7 @@ output/profiles_comparison_20261025/
 output/local_profiles_sample_20261025/
 output/local_profiles_sample_160_20261025/
 output/precision_improvement_20261025/
+
+output/branch_replay_20261025/
+output/shop_evaluation_20261025/
+output/detector_revision_20261025/

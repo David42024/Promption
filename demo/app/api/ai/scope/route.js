@@ -1,18 +1,17 @@
 import { issueScopeReceipt, withScopeReceipts } from "../../../../lib/ai/scopeReceipts.js";
 import { createTrackingModel } from "../../../../lib/ai/tracking.js";
-import { createOpenAI } from '@ai-sdk/openai';
-import { createScopeEvaluator } from '@promption/ai-sdk';
+import { createContextEvaluator } from '@promption/ai-sdk';
 import { trustedAIRequest } from '../../../../lib/ai/trusted.js';
-import { getModelProviderOptions, validateModelConfiguration } from '../../../../lib/ai/modelOptions.js';
+import { createChatProvider, getChatModelConfiguration, getChatProviderOptions } from '../../../../lib/ai/provider.js';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(request) {
   if (!trustedAIRequest(request)) return Response.json({ error: 'No autorizado' }, { status: 401 });
-  if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL) {
-    return Response.json({ error: 'Evaluación de alcance no configurada' }, { status: 503 });
-  }
+  let config;
+  try { config = getChatModelConfiguration(process.env, { requireTools: false }); }
+  catch { return Response.json({ error: 'Evaluación de alcance no configurada' }, { status: 503 }); }
   let body;
   try { body = await request.json(); }
   catch { return Response.json({ error: 'JSON inválido' }, { status: 400 }); }
@@ -22,7 +21,7 @@ export async function POST(request) {
       classification: 'UNCERTAIN',
       reason: 'scope_unavailable',
       allowed: false,
-      model: process.env.OPENAI_MODEL || null,
+      model: config.model,
       provider_calls: 0,
       usage: null,
       request_id: requestId,
@@ -30,12 +29,12 @@ export async function POST(request) {
   }
   let callInitiated = false;
   try {
-    const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const modelId = process.env.OPENAI_MODEL;
+    const provider = createChatProvider(config);
+    const modelId = config.model;
     const trackingModel = createTrackingModel(provider(modelId), () => { callInitiated = true; });
-    const baseEvaluate = createScopeEvaluator({
+    const baseEvaluate = createContextEvaluator({
       model: trackingModel,
-      providerOptions: getModelProviderOptions(modelId),
+      providerOptions: getChatProviderOptions(config, modelId),
       timeoutMs: Math.min(30000, Number.isFinite(body.timeout_ms) && body.timeout_ms > 0 ? body.timeout_ms : 30000),
     });
     const binding = body.scope_binding;
@@ -68,7 +67,7 @@ export async function POST(request) {
       reason: error?.name === 'TimeoutError' || error?.name === 'AbortError' && !request.signal?.aborted
         ? 'scope_timeout' : 'scope_unavailable',
       allowed: false,
-      model: process.env.OPENAI_MODEL || null,
+      model: config.model,
       provider_calls: callInitiated ? 1 : 0,
       usage: null,
       request_id: requestId,

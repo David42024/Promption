@@ -66,7 +66,7 @@ def summarize(directory):
     followup=protocol['study']=='precision_portable_followup'
     assert followup or protocol['study'] in ['precision_three_conditions','precision_groq_recovery',
                                            'precision_lumina_three_conditions', 'precision_lumina_openai_three_conditions',
-                                           'precision_lumina_gemini_three_conditions', 'precision_lumina_gemini_native_three_conditions', 'precision_lumina_deepseek_three_conditions']
+                                           'precision_lumina_gemini_three_conditions', 'precision_lumina_gemini_native_three_conditions', 'precision_lumina_deepseek_three_conditions', 'shop_mixed_three_conditions']
     for name,expected in protocol['code_sha256'].items():
         assert shared.digest(directory/'frozen_source'/name)==expected,name
     for name,expected in protocol['artifacts_sha256'].items():

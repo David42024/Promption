@@ -1,4 +1,7 @@
 import "./globals.css";
+import ThemeProvider from "../components/ThemeProvider.jsx";
+
+const themeScript = `(function(){try{var t=localStorage.getItem('promption-shop-theme');document.documentElement.dataset.theme=t==='light'||t==='dark'?t:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){document.documentElement.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}})();`;
 
 export const metadata = {
   metadataBase: process.env.SITE_URL ? new URL(process.env.SITE_URL) : undefined,
@@ -42,7 +45,7 @@ export const metadata = {
 export const viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#0a0e1a" },
-    { media: "(prefers-color-scheme: light)", color: "#0a0e1a" },
+    { media: "(prefers-color-scheme: light)", color: "#f5f7fc" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -52,7 +55,8 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body data-deployment-marker="promption-shop-2026-09-13">{children}</body>
+      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
+      <body data-deployment-marker="promption-shop-2026-10-25"><ThemeProvider>{children}</ThemeProvider></body>
     </html>
   );
 }

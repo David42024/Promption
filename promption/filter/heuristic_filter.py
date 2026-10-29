@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from promption.utils.config import load_config, load_heuristics
 from promption.utils.logger import logger
 from promption.utils.text import normalize_content
-from promption.evidence import interpret_input
+from promption.evidence import interpret_input, positive_operation, self_contained_question
 from promption.encoded_evidence import decoded_views
 
 _CONF = load_config()
@@ -46,6 +46,7 @@ class HeuristicFilter:
                 "severity_score": _SCORES.get(rule.get("severity", "medium"), 0.7),
                 "applies_to_roles": [r.lower() for r in rule.get("applies_to_roles", [])],
                 "action": rule.get("action", "block"),
+                "respect_negation": rule.get("respect_negation") is True,
             })
             if self._rules[-1]["action"] not in {"block", "review"}:
                 raise ValueError("Rule action must be block or review")
@@ -85,7 +86,9 @@ class HeuristicFilter:
             if rule["applies_to_roles"] and not (user_roles & set(rule["applies_to_roles"])):
                 continue
             if any(rule["regex"].search(value) for value in inspected):
-                matches.append(rule)
+                negated = rule["respect_negation"] and not any(
+                    positive_operation(rule["regex"], value) for value in inspected)
+                matches.append({**rule, "action": "review", "negated": True} if negated else rule)
         matches.sort(key=lambda rule: (rule["action"] == "block", rule["severity_score"]), reverse=True)
         vetoes = [m for m in matches if m["action"] == "block"]
         review = bool(matches and not vetoes) or bool(evidence.quoted_texts) or bool(decoded and not adopted)
@@ -126,10 +129,11 @@ class HeuristicFilter:
         return res.blocked, res.score
 
     def is_independent_turn(self, text: str, roles: list[str] | None = None) -> bool:
-        """Recognize a complete server-configured utterance without references or malicious rules."""
+        """Recognize a complete configured utterance or a new question; neither grants access."""
         result = self.analyze(text, roles=roles)
-        return result.signal == "benign" and any(
+        return (result.signal == "benign" and any(
             rule["independent_turn"] and rule["name"] in result.benign_matched for rule in self._benign)
+            or not result.blocked and self_contained_question(normalize_content(text)))
 
 
 if __name__ == "__main__":  # quick manual smoke test

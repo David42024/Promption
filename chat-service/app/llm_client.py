@@ -265,7 +265,7 @@ class LLMClient:
         if not (settings.vercel_ai_url and settings.openai_model and settings.openai_tool_model):
             return []
         return [
-            {"id": model_id, "label": f"OpenAI · {model}", "provider": "openai",
+            {"id": model_id, "label": f"{'DeepSeek' if model.startswith('deepseek-') else 'OpenAI'} · {model}", "provider": "openai",
              "api": "vercel_ai", "model": model, "base_url": settings.vercel_ai_url,
              "temperature": 0.2, "max_tokens": max_tokens}
             for model_id, model, max_tokens in (

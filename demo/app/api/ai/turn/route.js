@@ -1,10 +1,9 @@
 import { createTrackingModel } from "../../../../lib/ai/tracking.js";
-import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, jsonSchema, tool, wrapLanguageModel } from "ai";
 import { promptionMiddleware } from "../../../../lib/ai/promptionMiddleware.js";
 import { trustedAIRequest } from "../../../../lib/ai/trusted.js";
 import { aiFailure } from "../../../../lib/ai/errors.mjs";
-import { getModelProviderOptions, validateModelConfiguration } from "../../../../lib/ai/modelOptions.js";
+import { createChatProvider, getChatModelConfiguration, getChatProviderOptions } from "../../../../lib/ai/provider.js";
 import { MetricsAggregator } from "../../../../lib/ai/metrics.js";
 
 export const maxDuration = 300;
@@ -45,14 +44,14 @@ function transcript(messages) {
 
 export async function POST(request) {
   if (!trustedAIRequest(request)) return Response.json({ error: "No autorizado" }, { status: 401 });
-  if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL || !process.env.OPENAI_TOOL_MODEL) {
-    return Response.json({ error: "Configuración de OpenAI incompleta en Next.js" }, { status: 503 });
-  }
+  let config;
+  try { config = getChatModelConfiguration(); }
+  catch { return Response.json({ error: "Configuración del proveedor de IA incompleta en Next.js" }, { status: 503 }); }
   let body;
   try { body = await request.json(); }
   catch { return Response.json({ error: "JSON inválido" }, { status: 400 }); }
   const requestId = request.headers.get("x-request-id") || body?.request_id || crypto.randomUUID();
-  if (![process.env.OPENAI_MODEL, process.env.OPENAI_TOOL_MODEL].includes(body.model)
+  if (![config.model, config.toolModel].includes(body?.model)
       || !Array.isArray(body.messages) || body.messages.length > 40
       || typeof body.original_text !== "string" || !body.original_text.trim()
       || typeof body.user_id !== "string" || !Array.isArray(body.roles)
@@ -111,10 +110,10 @@ export async function POST(request) {
   };
 
   try {
-    const provider = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const provider = createChatProvider(config);
     const identity = { userId: body.user_id, roles: body.roles, authenticated: body.authenticated === true };
-    const scopeModelId = process.env.OPENAI_MODEL;
-    const scopeProviderOptions = getModelProviderOptions(scopeModelId);
+    const scopeModelId = config.model;
+    const scopeProviderOptions = getChatProviderOptions(config, scopeModelId);
     const trackingScopeModel = createTrackingModel(provider(scopeModelId), () => { scopeCalls++; });
     const trackingGenerationModel = createTrackingModel(provider(body.model), () => { generationCalls++; });
     const model = wrapLanguageModel({
@@ -141,7 +140,7 @@ export async function POST(request) {
       system,
       messages: transcript(body.messages.filter(message => message.role !== "system")),
       allowSystemInMessages: false,
-      providerOptions: getModelProviderOptions(body.model, { parallelToolCalls: false, maxToolCalls: 1 }),
+      providerOptions: getChatProviderOptions(config, body.model, { parallelToolCalls: false, maxToolCalls: 1 }),
       ...(hasTools ? { tools } : {}),
       toolChoice: body.force_tool ? { type: "tool", toolName: body.force_tool } : (hasTools ? "auto" : "none"),
       maxOutputTokens: Math.min(Math.max(Number(body.max_tokens) || 1200, 100), 6000),

@@ -6,12 +6,14 @@
 
 rules:
   - name: "ignore_previous_instructions"
+    respect_negation: true
     pattern: "ignore (all )?(previous|prior|above|earlier) (instructions|prompts|commands|messages|context|directions)"
     description: "Instruction to ignore previously given instructions"
     severity: "high"
     enabled: true
 
   - name: "disable_filter"
+    respect_negation: true
     pattern: "desactiva (el )?(filtro|firewall|seguridad|proteccion|guardia)|disable (the )?(filter|firewall|security|protection)"
     description: "Request to disable security filters"
     severity: "high"
@@ -37,18 +39,21 @@ rules:
     enabled: true
 
   - name: "system_instruction_extraction"
+    respect_negation: true
     pattern: '\b(?:show|print|reveal|repeat|dump|disclose|output|translate|give\s+me|tell\s+me|muestra\w*|imprime\w*|revela\w*|repite|transcribe|devuelve|dame|dime|copia|exporta|traduce)\b[^.!?;]{0,100}\b(?:system\s+(?:prompt|message|instructions)|initial\s+prompt|(?:your\s+(?:(?:original|internal|hidden)\s+){0,3}instructions|original\s+instructions)|prompt\s+(?:del?\s+)?sistema|mensaje\s+(?:del?\s+)?sistema|instrucciones\s+(?:del?\s+)?sistema|(?:tus|las)\s+(?:instrucciones|directivas)\s+(?:internas|iniciales|originales))\b'
     description: "Petición explícita de extraer o transformar instrucciones internas ES/EN"
     severity: "high"
     enabled: true
 
   - name: "disregard_safety"
+    respect_negation: true
     pattern: "disregard (all )?(safety|ethical|moral|legal) (rules|guidelines|policies|boundaries|restrictions)"
     description: "Request to bypass safety alignment"
     severity: "high"
     enabled: true
 
   - name: "act_without_restrictions"
+    respect_negation: true
     pattern: "act (as you want|without (any )?restrictions|however you want|unfiltered)"
     description: "Unrestricted assistant request"
     severity: "high"
@@ -103,12 +108,14 @@ rules:
     enabled: true
 
   - name: "credentials_request"
+    respect_negation: true
     pattern: "(give me|show me|tell me|send me|hand over|reveal|disclose).{0,40}(your |the |synthetic )?(token|password|secret|access code|api[_ -]?key|credentials)"
     description: "Direct credential request (give me the token / reveal the access code…)"
     severity: "high"
     enabled: true
 
   - name: "credentials_request_es"
+    respect_negation: true
     pattern: "(dame|pasame|pásame|dime|revelame|revélame|pasa|da|entrega|revela|revéla|proporcioname|entregame).{0,30}(el |tu |su |la )?(token|contrase[ñn]a|password|secreto|credenciales?|api[_ -]?key|clave (secreta|privada|de acceso|api)|acceso (administrativo|privilegiado|root))"
     description: "ES: petición directa de token/contraseña/secreto"
     severity: "high"
@@ -128,36 +135,42 @@ rules:
     enabled: true
 
   - name: "protected_credential_extraction"
+    respect_negation: true
     pattern: '\b(?:muestra\w*|imprime\w*|revela\w*|dame|dime|entrega\w*|devuelve|exporta|copia|traduce|incluye|escribe|proporciona\w*|show|print|reveal|disclose|output|export|include|give\s+me)\b[^.!?;]{0,80}\b(?:clave\s+(?:secreta|privada|confidencial|interna|protegida|real)|contrase[ñn]a\s+(?:interna|real|de\s+administrador)|(?:secret|private|protected)\s+(?:key|password|token))\b'
     description: "Extracción explícita de credenciales protegidas, incluso dentro de documentos"
     severity: "high"
     enabled: true
 
   - name: "initialization_data_extraction"
+    respect_negation: true
     pattern: '\b(?:imprime\w*|revela\w*|dame|dime|entrega\w*|devuelve|exporta|copia|traduce|incluye|lista|enlista|genera|muestra\w*|print|reveal|dump|export|show|include)\b[^.!?;]{0,100}\b(?:directivas\s+de\s+inicializaci[oó]n|instrucciones\s+(?:internas|ocultas|originales|iniciales)|tus\s+variables\s+de\s+entorno|variables\s+de\s+entorno\s+(?:activas|actuales|del\s+servidor)|(?:your|current|runtime)\s+environment\s+variables)\b'
     description: "Solicitud de volcar configuración o instrucciones internas activas"
     severity: "high"
     enabled: true
 
   - name: "private_file_extraction"
+    respect_negation: true
     pattern: '\b(?:lee|abre|descarga|muestra\w*|imprime\w*|copia|exporta|read|open|download|show|print|dump)\s+(?:(?:el|tu|the|your)\s+)?(?:(?:server|local)\s+)?(?:(?:archivo|fichero|file)\s+)?(?:\.env\b|/etc/(?:passwd|shadow)\b|id_rsa\b)'
     description: "Lectura explícita de archivos de credenciales del servidor"
     severity: "high"
     enabled: true
 
   - name: "ignore_instructions_es"
+    respect_negation: true
     pattern: "ignora (todas )?(las )?(instrucciones|[óo]rdenes) (anteriores|previas|dadas|de arriba)"
     description: "ES: orden de ignorar instrucciones previas"
     severity: "high"
     enabled: true
 
   - name: "forget_context_es"
+    respect_negation: true
     pattern: "olvida\\w* (todo|todas|las instrucciones|lo anterior)|olv[íi]date de (tus|las|mis) (reglas|instrucciones|órdenes|ordenes)"
     description: "ES: intento de borrar el contexto previo"
     severity: "high"
     enabled: true
 
   - name: "reveal_code_es"
+    respect_negation: true
     pattern: "(revela\\w*|mu[ée]str\\w*|imprim\\w*) (el |tu )?(c[óo]digo (secreto|interno|de seguridad)|secreto interno|comando central)"
     description: "ES: extracción directa del código/secreto"
     severity: "high"
@@ -480,6 +493,7 @@ scoring:
 
 conversation_rules:
   - name: assembled_instruction_override
+    respect_negation: true
     pattern: '(?:ignore|disregard|forget)(?:all|the|your)?(?:previous|prior|above|earlier)instructions|(?:ignora|olvida|desobedece)(?:las|tus|todaslas|todas)?instrucciones(?:anteriores|previas)|(?:disable|bypass|desactiva|evita)(?:the|el|la)?(?:securityfilter|safetyfilter|filtrodeseguridad|controlesdeseguridad)'
     enabled: true
   - name: tool_instruction_promotion
